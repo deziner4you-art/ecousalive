@@ -1,9 +1,16 @@
 # Environment & Secrets
 .env
 *.env.local
+/home/secret/
 
 # PHP Dependencies
 vendor/
+
+# Server-generated / aaPanel files
+404.html
+502.html
+index.html
+public/test-env.php
 
 # Logs
 *.log

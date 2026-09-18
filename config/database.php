@@ -8,7 +8,7 @@ Reads from /home/deziqvuj/secret/.env
 */
 
 // Absolute path to .env file
-$_envFile = '/home/deziqvuj/secret/.ecousaenv';
+$_envFile = '/home/secret/ecousaenv';
 
 $_env = [];
 
