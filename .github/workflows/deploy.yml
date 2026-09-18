@@ -11,9 +11,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -29,29 +26,13 @@ jobs:
             echo "==> Navigating to deploy directory..."
             cd "$DEPLOY_DIR"
 
-            echo "==> Backing up .env..."
-            if [ -f ".env" ]; then
-              cp .env /tmp/.env.backup
-            fi
-
             echo "==> Pulling latest code from GitHub..."
             git pull origin main
-
-            echo "==> Restoring .env (protected from overwrite)..."
-            if [ -f "/tmp/.env.backup" ]; then
-              cp /tmp/.env.backup .env
-              rm /tmp/.env.backup
-            fi
-
-            echo "==> Checking vendor directory..."
-            if [ ! -d "vendor" ]; then
-              echo "WARNING: vendor/ directory missing on server!"
-              echo "Please run: composer install --no-dev on the server manually."
-            fi
 
             echo "==> Setting file permissions..."
             find "$DEPLOY_DIR" -type f -name "*.php" -exec chmod 644 {} \;
             find "$DEPLOY_DIR" -type d -exec chmod 755 {} \;
-            chmod 640 "$DEPLOY_DIR/.env" 2>/dev/null || true
 
-            echo "==> Deploy complete! Site: https://testecousa.deziner4you.com"
+            echo "==> Deploy complete!"
+            echo "    Site: https://testecousa.deziner4you.com"
+            echo "    Time: $(date '+%Y-%m-%d %H:%M:%S')"
