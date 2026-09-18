@@ -647,6 +647,8 @@ ${item.published_link ? `<a href="${item.published_link}" target="_blank" rel="n
     /* Action buttons */
     var actionBtns = buildActionButtons(item, isAdmin, isWorker, isQa, isListing, isUrgent, lock, approvedDisabled);
 
+    var hideEditor = isInfoStage && item.work_status !== 'Content Pending' && item.status !== 'Generated' && item.status !== 'Approved' && item.status !== 'Updated' && !item.content_approved_at && !item.content_updated_at;
+
     return `
 <div class="head" onclick="headClick(event,${item.id})" ontouchend="headTouch(event,${item.id})" style="cursor:pointer; display:flex; align-items:center;">
 <div class="pid${isUrgent?' urgent-pid':''}" style="position:relative; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; padding-top:12px;">
@@ -708,7 +710,6 @@ ${workerStatusBar}
 ${workTimeBadge}
 ${adminTimeBlock}
 ${buildFamilyGroupingSection(item, isAdmin)}
-    var hideEditor = isInfoStage && item.work_status !== 'Content Pending' && item.status !== 'Generated' && item.status !== 'Approved' && item.status !== 'Updated' && !item.content_approved_at && !item.content_updated_at;
 ${((!isWorker && !isQa) || workerCanSee) && !hideEditor ? `<div class="editor ${lock&&!isWorker?'locked':''} ${isWorker||isQa?'locked':''}" id="editor-${item.id}" contenteditable="${canEdit?'true':'false'}" data-original="${encodeURIComponent(originalForDiff)}" oninput="clientEditorChanged(${item.id})" onblur="unmarkEditing(${item.id})">${item.content||''}</div>` : ''}
 ${(isAdmin || isWorker) && lock && item.original_content && item.original_content !== item.content ? `<div class="diff-bar" id="diff-label-${item.id}"><span class="diff-legend">🔍 Client Changes — <span class="diff-legend-add">■ Added</span> &nbsp; <span class="diff-legend-del">■ Deleted</span></span></div><div class="diff-preview" id="diff-${item.id}"></div>` : ''}
 ${(ROLE === 'eco_client' || isAdmin) && !lock ? `<div class="diff-bar" id="diff-label-${item.id}" style="display:none;"><span class="diff-legend">📝 Changes — <span class="diff-legend-add">■ Added</span> &nbsp; <span class="diff-legend-del">■ Deleted</span></span><button class="btn-revert" id="revert-${item.id}" onclick="revertToOriginal(${item.id})">↩ Go Back to Original</button></div><div class="diff-preview" id="diff-${item.id}" style="display:none;"></div>` : ''}
