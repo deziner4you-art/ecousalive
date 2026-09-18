@@ -1,0 +1,27 @@
+Options -Indexes
+
+# ── Block direct access to .env ──────────────────
+<Files ".env">
+    Order Allow,Deny
+    Deny from all
+</Files>
+
+<IfModule mod_rewrite.c>
+RewriteEngine On
+
+# Block direct URL access to sensitive directories
+# (Each dir also has its own Deny from all .htaccess)
+RewriteRule ^app/     - [F,L]
+RewriteRule ^config/  - [F,L]
+RewriteRule ^routes/  - [F,L]
+RewriteRule ^views/   - [F,L]
+RewriteRule ^vendor/  - [F,L]
+RewriteRule ^docker/  - [F,L]
+
+# If request is already inside public/ — let it through unchanged
+RewriteCond %{REQUEST_URI} ^/public/
+RewriteRule ^ - [L]
+
+# Redirect everything else (including /) to public/
+RewriteRule ^(.*)$ /public/$1 [L,R=301]
+</IfModule>

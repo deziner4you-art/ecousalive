@@ -1,0 +1,35 @@
+# Environment & Secrets
+.env
+*.env.local
+
+# PHP Dependencies
+vendor/
+
+# Logs
+*.log
+drive_activity.log
+public/error_log
+
+# Dev-only tools
+public/stitch-mobile-ui/
+public/generate_ui_md.php
+public/make_backup.php
+*.zip
+
+# OS Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Backup/dev folders (not for production)
+ecousa-main/
+docker/
+
+# Well-known (server manages this)
+.well-known/
