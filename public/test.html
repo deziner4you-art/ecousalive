@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Local Test - Infographics Workflow</title>
+    <style>
+        body { font-family: sans-serif; background: #0f172a; color: white; padding: 20px; }
+        .card { background: #1e293b; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .actionbtn { margin: 5px; padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; }
+        .btn1 { background: #3b82f6; color: white; }
+        .btn2 { background: #10b981; color: white; }
+    </style>
+</head>
+<body>
+    <h2>Local Test: Infographics Content Generation Buttons</h2>
+    <p style="color:#94a3b8; font-size:14px;">(Note: Yeh ek mock page hai kyunki local database nahi hai, sirf buttons ki logic test karne ke liye)</p>
+    
+    <div id="test1" class="card">
+        <h3>Test 1: Worker views Infographics in 'AI DONE' state</h3>
+        <p>Expected: "📤 Generate Info Content" button should appear.</p>
+        <div id="res1"></div>
+    </div>
+
+    <div id="test2" class="card">
+        <h3>Test 2: Worker views Infographics in 'Content Pending' state</h3>
+        <p>Expected: "⏳ Content generate hone ka intezaar karein..." text should appear.</p>
+        <div id="res2"></div>
+    </div>
+
+    <div id="test3" class="card">
+        <h3>Test 3: Worker views Infographics in 'Approved' state</h3>
+        <p>Expected: "▶ Info Working" button should appear.</p>
+        <div id="res3"></div>
+    </div>
+
+    <script>
+        // Mock Globals needed by tasks.js
+        var ROLE = 'worker';
+        var IS_EDITING = {};
+        function updateWorkStatus(id, status) { alert('Aapne click kiya: Update Work Status to ' + status); }
+        function sendForContent(id) { alert('Aapne click kiya: Send for Content (Generate Info Content)'); }
+        function pauseWork(id) { alert('Pause work'); }
+        function resumeWork(id) { alert('Resume work'); }
+    </script>
+    <script src="js/tasks.js"></script>
+    <script>
+        // Render the buttons using the updated logic in tasks.js
+        var item1 = { id: 1, product_type: 'Infographics', status: 'AI DONE', work_status: 'Pending', content_approved_at: null, content_updated_at: null };
+        document.getElementById('res1').innerHTML = buildActionButtons(item1, false, true, false, false, false, false, false);
+
+        var item2 = { id: 2, product_type: 'Infographics', status: 'Pending', work_status: 'Content Pending', content_approved_at: null, content_updated_at: null };
+        document.getElementById('res2').innerHTML = buildActionButtons(item2, false, true, false, false, false, false, false);
+
+        var item3 = { id: 3, product_type: 'Infographics', status: 'Approved', work_status: 'Pending', content_approved_at: '2026-09-19', content_updated_at: null };
+        document.getElementById('res3').innerHTML = buildActionButtons(item3, false, true, false, false, false, false, false);
+    </script>
+</body>
+</html>

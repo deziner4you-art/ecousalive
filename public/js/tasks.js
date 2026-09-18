@@ -708,7 +708,8 @@ ${workerStatusBar}
 ${workTimeBadge}
 ${adminTimeBlock}
 ${buildFamilyGroupingSection(item, isAdmin)}
-${((!isWorker && !isQa) || workerCanSee) && !isInfoStage ? `<div class="editor ${lock&&!isWorker?'locked':''} ${isWorker||isQa?'locked':''}" id="editor-${item.id}" contenteditable="${canEdit?'true':'false'}" data-original="${encodeURIComponent(originalForDiff)}" oninput="clientEditorChanged(${item.id})" onblur="unmarkEditing(${item.id})">${item.content||''}</div>` : ''}
+    var hideEditor = isInfoStage && item.work_status !== 'Content Pending' && item.status !== 'Generated' && item.status !== 'Approved' && item.status !== 'Updated' && !item.content_approved_at && !item.content_updated_at;
+${((!isWorker && !isQa) || workerCanSee) && !hideEditor ? `<div class="editor ${lock&&!isWorker?'locked':''} ${isWorker||isQa?'locked':''}" id="editor-${item.id}" contenteditable="${canEdit?'true':'false'}" data-original="${encodeURIComponent(originalForDiff)}" oninput="clientEditorChanged(${item.id})" onblur="unmarkEditing(${item.id})">${item.content||''}</div>` : ''}
 ${(isAdmin || isWorker) && lock && item.original_content && item.original_content !== item.content ? `<div class="diff-bar" id="diff-label-${item.id}"><span class="diff-legend">🔍 Client Changes — <span class="diff-legend-add">■ Added</span> &nbsp; <span class="diff-legend-del">■ Deleted</span></span></div><div class="diff-preview" id="diff-${item.id}"></div>` : ''}
 ${(ROLE === 'eco_client' || isAdmin) && !lock ? `<div class="diff-bar" id="diff-label-${item.id}" style="display:none;"><span class="diff-legend">📝 Changes — <span class="diff-legend-add">■ Added</span> &nbsp; <span class="diff-legend-del">■ Deleted</span></span><button class="btn-revert" id="revert-${item.id}" onclick="revertToOriginal(${item.id})">↩ Go Back to Original</button></div><div class="diff-preview" id="diff-${item.id}" style="display:none;"></div>` : ''}
 ${buildQABoxes(item, isAdmin, isQa)}
@@ -905,6 +906,23 @@ function buildAdminButtons(item, isUrgent, lock){
     if(item.status === 'AI Work'){
         btns += `<button class="btn2 actionbtn" style="background:#16a34a;color:#fff;" onclick="updateWorkStatus(${item.id},'AI DONE')">🤖 AI Done</button>`;
     }
+    
+    // New Feature Buttons for Admin
+    if(isInfoStage){
+        var isContentApproved = item.status === 'Approved' || item.status === 'Updated' || item.content_approved_at || item.content_updated_at;
+        if(!isContentApproved) {
+            if(item.work_status === 'Pending' || item.status === 'AI DONE' || item.status === 'Infographics') {
+                btns += `<button class="actionbtn" style="background:#6d28d9;color:#fff;" onclick="sendForContent(${item.id})">📤 Generate Info Content</button>`;
+            } else if(item.work_status === 'Content Pending') {
+                btns += `<div style="color:#94a3b8;font-size:12px;padding:8px 0;font-style:italic;">⏳ Content generate hone ka intezaar karein...</div>`;
+            }
+            // Admin can also save draft if it's pending
+            if(item.status === 'Pending') {
+                btns += `<button class="btn-writer-save actionbtn" onclick="writerSave(${item.id})">💾 Save Draft</button>`;
+            }
+        }
+    }
+
     if(item.work_status !== 'Work Done' && item.work_status !== 'Info Done' && !isInfoStage){
         btns += `<button class="btn1 actionbtn" id="u-${item.id}" disabled onclick="save(${item.id},'Updated')">UPDATED</button>`;
         btns += `<button class="btn2 actionbtn" id="a-${item.id}" ${approvedDisabled?'disabled':''} onclick="save(${item.id},'Approved')">APPROVED</button>`;
