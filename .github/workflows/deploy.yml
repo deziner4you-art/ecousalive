@@ -29,8 +29,13 @@ jobs:
             echo "==> Fixing git safe directory..."
             git config --global --add safe.directory "$DEPLOY_DIR"
 
+            echo "==> Configuring Git Remote securely..."
+            git remote remove origin 2>/dev/null || true
+            git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+
             echo "==> Pulling latest code from GitHub..."
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
 
             echo "==> Setting file permissions..."
             find "$DEPLOY_DIR" -type f -name "*.php" -exec chmod 644 {} \;
