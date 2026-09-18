@@ -26,6 +26,9 @@ jobs:
             echo "==> Navigating to deploy directory..."
             cd "$DEPLOY_DIR"
 
+            echo "==> Fixing git safe directory..."
+            git config --global --add safe.directory "$DEPLOY_DIR"
+
             echo "==> Pulling latest code from GitHub..."
             git pull origin main
 
