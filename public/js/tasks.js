@@ -722,8 +722,8 @@ ${linksBox}
 /* ── QA submit boxes ─────────────────────────── */
 function buildQABoxes(item, isAdmin, isQa){
     var html = '';
-    var isInfoStage = (item.product_type === 'Infographics')
-                   || (item.product_type === 'Info + A Plus' && (item.status === 'Pending' || item.status === 'AI DONE' || item.status === 'Infographics') && !item.content_approved_at && !item.content_updated_at);
+    var isInfoStage = (item.product_type === 'Infographics' && item.work_status !== 'Content Pending' && item.status !== 'Generated' && item.status !== 'Approved' && item.status !== 'Updated' && !item.content_approved_at && !item.content_updated_at)
+                   || (item.product_type === 'Info + A Plus' && (item.status === 'Pending' || item.status === 'AI DONE' || item.status === 'Infographics') && item.work_status !== 'Content Pending' && item.status !== 'Generated' && !item.content_approved_at && !item.content_updated_at);
     var isInfoOnly = isInfoStage || item.product_type === 'Infographics';
     
     var qaLabelHtml = '';
@@ -832,13 +832,22 @@ function buildActionButtons(item, isAdmin, isWorker, isQa, isListing, isUrgent, 
         var isInfoStage = (item.product_type === 'Infographics')
                        || (item.product_type === 'Info + A Plus' && (item.status === 'Pending' || item.status === 'AI DONE' || item.status === 'Infographics') && !item.content_approved_at && !item.content_updated_at);
         if(isInfoStage){
-            if(item.work_status !== 'Working' && item.work_status !== 'Changing' && item.work_status !== 'Paused' && item.work_status !== 'In QA' && item.work_status !== 'Work Done' && item.work_status !== 'Info Done'){
-                btns += `<button class="btn1 actionbtn" onclick="updateWorkStatus(${item.id},'Working')">▶ Info Working</button>`;
-            }
-            if(item.work_status === 'Working' || item.work_status === 'Changing')  btns += `<button class="actionbtn" style="background:#b45309;color:#fff;" onclick="pauseWork(${item.id})">⏸ Pause</button>`;
-            if(item.work_status === 'Paused')   btns += `<button class="btn1 actionbtn" onclick="resumeWork(${item.id})">▶ Resume</button>`;
-            if(item.work_status === 'Working' || item.work_status === 'Changing' || item.work_status === 'Paused') {
-                btns += `<button class="btn2 actionbtn" onclick="updateWorkStatus(${item.id},'In QA')">📤 Ready for QA</button>`;
+            var isContentApproved = item.status === 'Approved' || item.status === 'Updated' || item.content_approved_at || item.content_updated_at;
+            if(!isContentApproved) {
+                if(item.work_status === 'Pending' || item.status === 'AI DONE' || item.status === 'Infographics') {
+                    btns += `<button class="actionbtn" style="background:#6d28d9;color:#fff;" onclick="sendForContent(${item.id})">📤 Generate Info Content</button>`;
+                } else if(item.work_status === 'Content Pending') {
+                    btns += `<div style="color:#94a3b8;font-size:12px;padding:8px 0;font-style:italic;">⏳ Content generate hone ka intezaar karein...</div>`;
+                }
+            } else {
+                if(item.work_status !== 'Working' && item.work_status !== 'Changing' && item.work_status !== 'Paused' && item.work_status !== 'In QA' && item.work_status !== 'Work Done' && item.work_status !== 'Info Done'){
+                    btns += `<button class="btn1 actionbtn" onclick="updateWorkStatus(${item.id},'Working')">▶ Info Working</button>`;
+                }
+                if(item.work_status === 'Working' || item.work_status === 'Changing')  btns += `<button class="actionbtn" style="background:#b45309;color:#fff;" onclick="pauseWork(${item.id})">⏸ Pause</button>`;
+                if(item.work_status === 'Paused')   btns += `<button class="btn1 actionbtn" onclick="resumeWork(${item.id})">▶ Resume</button>`;
+                if(item.work_status === 'Working' || item.work_status === 'Changing' || item.work_status === 'Paused') {
+                    btns += `<button class="btn2 actionbtn" onclick="updateWorkStatus(${item.id},'In QA')">📤 Ready for QA</button>`;
+                }
             }
         } else if(item.product_type === 'Info + A Plus'){
             if(item.work_status === 'Pending')         btns += `<button class="actionbtn" style="background:#c2410c;color:#fff;" onclick="updateWorkStatus(${item.id},'Info Work')">▶ Info Work</button>`;
@@ -890,7 +899,7 @@ function buildActionButtons(item, isAdmin, isWorker, isQa, isListing, isUrgent, 
 
 function buildAdminButtons(item, isUrgent, lock){
     var approvedDisabled = lock || item.status !== 'Generated';
-    var isInfoStage = (item.product_type === 'Infographics')
+    var isInfoStage = (item.product_type === 'Infographics' && !item.content_approved_at && !item.content_updated_at && item.status !== 'Approved' && item.status !== 'Updated')
                    || (item.product_type === 'Info + A Plus' && (item.status === 'Pending' || item.status === 'AI DONE') && !item.content_approved_at && !item.content_updated_at);
     var btns = '';
     if(item.status === 'AI Work'){
