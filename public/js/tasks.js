@@ -725,7 +725,7 @@ ${linksBox}
 function buildQABoxes(item, isAdmin, isQa){
     var html = '';
     var isInfoStage = (item.product_type === 'Infographics' && item.work_status !== 'Content Pending' && item.status !== 'Generated' && item.status !== 'Approved' && item.status !== 'Updated' && !item.content_approved_at && !item.content_updated_at)
-                   || (item.product_type === 'Info + A Plus' && (item.status === 'Pending' || item.status === 'AI DONE' || item.status === 'Infographics') && item.work_status !== 'Content Pending' && item.status !== 'Generated' && !item.content_approved_at && !item.content_updated_at);
+                   || (item.product_type === 'Info + A Plus' && !item.work_completed_worker_name && (item.status === 'Pending' || item.status === 'AI DONE' || item.status === 'Infographics') && item.work_status !== 'Content Pending' && item.status !== 'Generated' && !item.content_approved_at && !item.content_updated_at);
     var isInfoOnly = isInfoStage || item.product_type === 'Infographics';
     
     var qaLabelHtml = '';
@@ -832,7 +832,7 @@ function buildActionButtons(item, isAdmin, isWorker, isQa, isListing, isUrgent, 
     if(isWorker){
         var isDesignRev = item.active_revision_type === 'design';
         var isInfoStage = (item.product_type === 'Infographics')
-                       || (item.product_type === 'Info + A Plus' && (item.status === 'Pending' || item.status === 'AI DONE' || item.status === 'Infographics') && !item.content_approved_at && !item.content_updated_at);
+                       || (item.product_type === 'Info + A Plus' && !item.work_completed_worker_name && (item.status === 'Pending' || item.status === 'AI DONE' || item.status === 'Infographics') && !item.content_approved_at && !item.content_updated_at);
         if(isInfoStage){
             var isContentApproved = item.status === 'Approved' || item.status === 'Updated' || item.content_approved_at || item.content_updated_at;
             if(!isContentApproved) {
@@ -902,7 +902,7 @@ function buildActionButtons(item, isAdmin, isWorker, isQa, isListing, isUrgent, 
 function buildAdminButtons(item, isUrgent, lock){
     var approvedDisabled = lock || item.status !== 'Generated';
     var isInfoStage = (item.product_type === 'Infographics' && !item.content_approved_at && !item.content_updated_at && item.status !== 'Approved' && item.status !== 'Updated')
-                   || (item.product_type === 'Info + A Plus' && (item.status === 'Pending' || item.status === 'AI DONE') && !item.content_approved_at && !item.content_updated_at);
+                   || (item.product_type === 'Info + A Plus' && !item.work_completed_worker_name && (item.status === 'Pending' || item.status === 'AI DONE') && !item.content_approved_at && !item.content_updated_at);
     var btns = '';
     if(item.status === 'AI Work'){
         btns += `<button class="btn2 actionbtn" style="background:#16a34a;color:#fff;" onclick="updateWorkStatus(${item.id},'AI DONE')">🤖 AI Done</button>`;
@@ -1290,7 +1290,7 @@ function submitQA(id){
     
     var taskItem = ALL_TASKS.find(function(t){ return t.id == id; });
     var isInfoStage = taskItem && ((taskItem.product_type === 'Infographics')
-                   || (taskItem.product_type === 'Info + A Plus' && (taskItem.status === 'Pending' || taskItem.status === 'AI DONE' || taskItem.status === 'Infographics') && !taskItem.content_approved_at && !taskItem.content_updated_at));
+                   || (taskItem.product_type === 'Info + A Plus' && !taskItem.work_completed_worker_name && (taskItem.status === 'Pending' || taskItem.status === 'AI DONE' || taskItem.status === 'Infographics') && !taskItem.content_approved_at && !taskItem.content_updated_at));
     var isInfoOnly = isInfoStage || (taskItem && taskItem.product_type === 'Infographics');
     var seoVal = seo ? seo.value.trim() : '';
     if(!isInfoOnly && !seoVal && !_hasSeoContent(id)){ alert('SEO Doc. link ya SEO Content Form mein data zaroori hai'); return; }
@@ -1331,7 +1331,7 @@ function adminSubmitSEO(id){
     
     var taskItem = ALL_TASKS.find(function(t){ return t.id == id; });
     var isInfoStage = taskItem && ((taskItem.product_type === 'Infographics')
-                   || (taskItem.product_type === 'Info + A Plus' && (taskItem.status === 'Pending' || taskItem.status === 'AI DONE' || taskItem.status === 'Infographics') && !taskItem.content_approved_at && !taskItem.content_updated_at));
+                   || (taskItem.product_type === 'Info + A Plus' && !taskItem.work_completed_worker_name && (taskItem.status === 'Pending' || taskItem.status === 'AI DONE' || taskItem.status === 'Infographics') && !taskItem.content_approved_at && !taskItem.content_updated_at));
     var isInfoOnly = isInfoStage || (taskItem && taskItem.product_type === 'Infographics');
     var seoVal = seo ? seo.value.trim() : '';
     if(!isInfoOnly && !seoVal && !_hasSeoContent(id)){ alert('SEO Doc. link ya SEO Content Form mein data zaroori hai'); return; }
@@ -1360,7 +1360,7 @@ function saveFinalLinks(id){
     
     var taskItem = ALL_TASKS.find(function(t){ return t.id == id; });
     var isInfoStage = taskItem && ((taskItem.product_type === 'Infographics')
-                   || (taskItem.product_type === 'Info + A Plus' && (taskItem.status === 'Pending' || taskItem.status === 'AI DONE' || taskItem.status === 'Infographics') && !taskItem.content_approved_at && !taskItem.content_updated_at));
+                   || (taskItem.product_type === 'Info + A Plus' && !taskItem.work_completed_worker_name && (taskItem.status === 'Pending' || taskItem.status === 'AI DONE' || taskItem.status === 'Infographics') && !taskItem.content_approved_at && !taskItem.content_updated_at));
     var isInfoOnly = isInfoStage || (taskItem && taskItem.product_type === 'Infographics');
     var seoVal = seo ? seo.value.trim() : '';
     if(!isInfoOnly && !seoVal && !_hasSeoContent(id)){ alert('SEO Doc. link ya SEO Content Form mein data zaroori hai'); return; }

@@ -1389,7 +1389,7 @@ try {
 <!-- ── JS Modules ── -->
 <?php $v = '2.7.6'; ?>
 <script src="<?= $publicUrl ?>/js/core.js?v=<?= $v ?>"></script>
-<script src="<?= $publicUrl ?>/js/tasks.js?v=2.8.0"></script>
+<script src="<?= $publicUrl ?>/js/tasks.js?v=2.8.1"></script>
 <script src="<?= $publicUrl ?>/js/admin.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/invoices.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/payroll.js?v=2.7.11"></script>

@@ -726,7 +726,7 @@ class Task {
         $infoSubtasks = implode(',', $subtasks);
 
         // Delete current assignment so product goes into writer pool for content generation
-        db()->prepare("DELETE FROM eco_tool_assignments WHERE task_id=?")->execute([$taskId]);
+        // db()->prepare("DELETE FROM eco_tool_assignments WHERE task_id=?")->execute([$taskId]);
 
         // Transition to standard A+ content generation workflow
         db()->prepare("
