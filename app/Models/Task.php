@@ -468,6 +468,36 @@ class Task {
                 ")->execute([$taskId]);
                 break;
 
+            case 'Generate info Content':
+            case 'Generate Info Content':
+                $curr = db()->prepare("SELECT product_type FROM wp_eco_aplus_tasks WHERE id=?");
+                $curr->execute([$taskId]);
+                $pType = $curr->fetchColumn();
+                $newType = ($pType === 'Info + A Plus') ? 'Info + A Plus' : 'Infographics';
+
+                db()->prepare("
+                    UPDATE wp_eco_aplus_tasks SET
+                        product_type=?,
+                        status='Pending',
+                        work_status='Pending',
+                        content_approved_at=NULL,
+                        content_updated_at=NULL,
+                        work_started_at=NULL,
+                        work_completed_at=NULL,
+                        work_paused_at=NULL,
+                        work_total_seconds=0,
+                        media_link=NULL,
+                        seo_doc_link=NULL,
+                        qa_submitted_at=NULL,
+                        qa_submitted_by=NULL,
+                        is_urgent=0,
+                        work_completed_by_worker_id=NULL,
+                        active_revision_type=NULL,
+                        last_activity_at=NOW()
+                    WHERE id=?
+                ")->execute([$newType, $taskId]);
+                break;
+
             case 'Generated':
                 db()->prepare("DELETE FROM eco_tool_assignments WHERE task_id=?")->execute([$taskId]);
                 db()->prepare("

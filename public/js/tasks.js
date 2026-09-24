@@ -273,6 +273,7 @@ function renderSmart(data){
 function getDisplayStatus(item){
     if(item.status === 'Hold')                                 return {cls:'Hold',          label:'Hold'};
     if(item.status === 'AI Work')                              return {cls:'AIWork',        label:'AI Work'};
+    if(item.status === 'Generate info Content' || item.status === 'Generate Info Content') return {cls:'Pending', label:'Generate Info Content'};
     if(item.status === 'AI DONE' && (!item.assigned_worker_id || item.assigned_worker_id == 0) && (!item.work_status || item.work_status === 'Pending')) return {cls:'AIDone', label:'AI DONE'};
     if(item.work_status === 'Changes')                         return {cls:'Changes',       label:'Changes in Design'};
     if(item.work_status === 'Changes in Content')              return {cls:'ChangesInContent',label:'Changes in Content'};
@@ -1258,6 +1259,7 @@ function buildCard(item){
     <select id="resetSel_${item.id}" style="flex:1;padding:6px 8px;background:#0d1e36;color:#e2e8f0;border:1px solid #1e3a5f;border-radius:4px;font-size:12px;outline:none;height:32px;">
       <option value="">↩ Reset To...</option>
       <option value="Pending">Pending</option>
+      <option value="Generate info Content">Generate info Content</option>
       <option value="Generated">Generated</option>
       <option value="Updated">Updated</option>
       <option value="Approved">Approved</option>
@@ -1599,12 +1601,13 @@ function buildActionButtons(item, isAdmin, isWorker, isQa, isListing, isUrgent, 
     var btns = '';
     if(isWorker){
         var isDesignRev = item.active_revision_type === 'design';
-        var isInfoStage = (item.product_type === 'Infographics')
-                       || (item.product_type === 'Info + A Plus' && !item.work_completed_worker_name && (item.status === 'Pending' || item.status === 'AI DONE' || item.status === 'Infographics') && !item.content_approved_at && !item.content_updated_at);
+        var isInfoStage = (item.status === 'Generate info Content' || item.status === 'Generate Info Content')
+                       || (item.product_type === 'Infographics')
+                       || (item.product_type === 'Info + A Plus' && !item.work_completed_worker_name && (item.status === 'Pending' || item.status === 'AI DONE' || item.status === 'Infographics' || item.status === 'Generate info Content' || item.status === 'Generate Info Content') && !item.content_approved_at && !item.content_updated_at);
         if(isInfoStage){
             var isContentApproved = item.status === 'Approved' || item.status === 'Updated' || item.content_approved_at || item.content_updated_at;
             if(!isContentApproved) {
-                if(item.work_status === 'Pending' || item.status === 'AI DONE' || item.status === 'Infographics') {
+                if(item.work_status === 'Pending' || item.status === 'AI DONE' || item.status === 'Infographics' || item.status === 'Generate info Content' || item.status === 'Generate Info Content') {
                     btns += `<button class="actionbtn" style="background:#6d28d9;color:#fff;" onclick="sendForContent(${item.id})">📤 Generate Info Content</button>`;
                 } else if(item.work_status === 'Content Pending') {
                     btns += `<div style="color:#94a3b8;font-size:12px;padding:8px 0;font-style:italic;">⏳ Content generate hone ka intezaar karein...</div>`;
@@ -1670,8 +1673,9 @@ function buildActionButtons(item, isAdmin, isWorker, isQa, isListing, isUrgent, 
 
 function buildAdminButtons(item, isUrgent, lock){
     var approvedDisabled = lock || item.status !== 'Generated';
-    var isInfoStage = (item.product_type === 'Infographics' && !item.content_approved_at && !item.content_updated_at && item.status !== 'Approved' && item.status !== 'Updated')
-                   || (item.product_type === 'Info + A Plus' && !item.work_completed_worker_name && (item.status === 'Pending' || item.status === 'AI DONE') && !item.content_approved_at && !item.content_updated_at);
+    var isInfoStage = (item.status === 'Generate info Content' || item.status === 'Generate Info Content')
+                   || ((item.product_type === 'Infographics' || !item.product_type) && !item.content_approved_at && !item.content_updated_at && item.status !== 'Approved' && item.status !== 'Updated')
+                   || (item.product_type === 'Info + A Plus' && !item.work_completed_worker_name && (item.status === 'Pending' || item.status === 'AI DONE' || item.status === 'Infographics' || item.status === 'Generate info Content' || item.status === 'Generate Info Content') && !item.content_approved_at && !item.content_updated_at);
     var btns = '';
     if(item.status === 'AI Work'){
         btns += `<button class="btn2 actionbtn" style="background:#16a34a;color:#fff;" onclick="updateWorkStatus(${item.id},'AI DONE')">🤖 AI Done</button>`;
@@ -1681,13 +1685,13 @@ function buildAdminButtons(item, isUrgent, lock){
     if(isInfoStage){
         var isContentApproved = item.status === 'Approved' || item.status === 'Updated' || item.content_approved_at || item.content_updated_at;
         if(!isContentApproved) {
-            if(item.work_status === 'Pending' || item.status === 'AI DONE' || item.status === 'Infographics') {
+            if(item.work_status === 'Pending' || item.status === 'AI DONE' || item.status === 'Infographics' || item.status === 'Generate info Content' || item.status === 'Generate Info Content') {
                 btns += `<button class="actionbtn" style="background:#6d28d9;color:#fff;" onclick="sendForContent(${item.id})">📤 Generate Info Content</button>`;
             } else if(item.work_status === 'Content Pending') {
                 btns += `<div style="color:#94a3b8;font-size:12px;padding:8px 0;font-style:italic;">⏳ Content generate hone ka intezaar karein...</div>`;
             }
             // Admin can also save draft if it's pending
-            if(item.status === 'Pending') {
+            if(item.status === 'Pending' || item.status === 'Generate info Content' || item.status === 'Generate Info Content') {
                 btns += `<button class="btn-writer-save actionbtn" onclick="writerSave(${item.id})">💾 Save Draft</button>`;
             }
         }

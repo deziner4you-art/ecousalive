@@ -213,7 +213,7 @@ class TaskController {
 
         $taskId = intval($_POST['task_id'] ?? 0);
         $stage  = trim($_POST['stage']     ?? '');
-        $allowed = ['Pending','AI Work','AI DONE','Generated','Updated','Approved','Working','Paused','In QA','SEO Review','Work Done','Info Done','Republish','Changes','Changes in Content','Changing'];
+        $allowed = ['Pending','AI Work','AI DONE','Generated','Updated','Approved','Working','Paused','In QA','SEO Review','Work Done','Info Done','Republish','Changes','Changes in Content','Changing','Generate info Content','Generate Info Content'];
 
         if(!$taskId || !in_array($stage, $allowed)) json_error('Invalid task or stage');
 

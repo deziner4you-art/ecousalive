@@ -230,9 +230,36 @@
             }
             renderAllViews();
         }
+
+        function forceStage(id, stage) {
+            alert('🔄 Force Stage to: ' + stage);
+            var item = ALL_TASKS.find(t => t.id == id);
+            if(item){
+                if(stage === 'Generate info Content' || stage === 'Generate Info Content'){
+                    item.status = 'Pending';
+                    item.work_status = 'Pending';
+                    item.content_approved_at = null;
+                    item.content_updated_at = null;
+                    item.product_type = (item.product_type === 'Info + A Plus') ? 'Info + A Plus' : 'Infographics';
+                } else {
+                    item.status = stage;
+                }
+            }
+            renderAllViews();
+        }
+
+        function sendForContent(id) {
+            alert('📤 Product #' + id + ' sent for content! (Status: Content Pending)');
+            var item = ALL_TASKS.find(t => t.id == id);
+            if(item){
+                item.status = 'Pending';
+                item.work_status = 'Content Pending';
+            }
+            renderAllViews();
+        }
     </script>
 
-    <script src="js/tasks.js?v=3.0.2"></script>
+    <script src="js/tasks.js?v=3.0.3"></script>
 
     <script>
         // ── Data Sets for Different Scenarios ──
