@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECO A+ PRO — Multi-Box Workflow & Views Demo</title>
+    <link rel="stylesheet" href="css/app.css">
+    <style>
+        body {
+            background: #081223;
+            color: #e2e8f0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            padding: 24px;
+            margin: 0;
+        }
+        .demo-topbar {
+            background: #0f1d32;
+            border: 1px solid #1e3a5f;
+            border-radius: 12px;
+            padding: 18px 24px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        .demo-title {
+            font-size: 20px;
+            font-weight: 800;
+            color: #38bdf8;
+            letter-spacing: .5px;
+        }
+        .demo-tabs {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .tab-btn {
+            background: #1e293b;
+            color: #cbd5e1;
+            border: 1px solid #334155;
+            padding: 8px 16px;
+            border-radius: 7px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all .15s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .tab-btn:hover {
+            border-color: #3b82f6;
+            color: #ffffff;
+        }
+        .tab-btn.active {
+            background: #2563eb;
+            color: #ffffff;
+            border-color: #3b82f6;
+            box-shadow: 0 4px 12px rgba(37,99,235,0.35);
+        }
+        .view-panel {
+            display: none;
+        }
+        .view-panel.active {
+            display: block;
+        }
+        .explainer-box {
+            background: #0b192e;
+            border-left: 4px solid #38bdf8;
+            border-radius: 0 8px 8px 0;
+            padding: 12px 18px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #cbd5e1;
+        }
+        .explainer-box strong {
+            color: #f8fafc;
+        }
+        .badge-pill {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="demo-topbar">
+        <div>
+            <div class="demo-title">🚀 ECO A+ PRO — Content UI &amp; Roles Demo</div>
+            <div style="font-size:12px; color:#94a3b8; margin-top:4px;">
+                Client Approval/Update Flow • Admin/Worker Diff Viewer • D4U Writer Auto-Fill &amp; Draft
+            </div>
+        </div>
+        <div class="demo-tabs">
+            <button class="tab-btn active" onclick="switchView('client-approval')">
+                <span>👤</span> 1. Client Approval / Update View
+            </button>
+            <button class="tab-btn" onclick="switchView('admin-diff')">
+                <span>🔍</span> 2. Admin &amp; Worker View (Client Changes / Diff)
+            </button>
+            <button class="tab-btn" onclick="switchView('writer-flow')">
+                <span>✍</span> 3. D4U Writer View (Writing &amp; Auto-Fill)
+            </button>
+            <button class="tab-btn" onclick="switchView('both-phases')">
+                <span>🔄</span> 4. Info + A Plus Phases
+            </button>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════
+         VIEW 1: CLIENT APPROVAL / UPDATE FLOW
+         ══════════════════════════════════════════════════════════ -->
+    <div id="view-client-approval" class="view-panel active">
+        <div class="explainer-box">
+            <strong>👤 Client View (Product Status: Generated):</strong><br>
+            Jab Writer content ready kar deta hai, to Client ke samne ye 6 boxes aate hain. Client har box ko review karta hai:<br>
+            • Agar content pasand aye: <strong>APPROVED</strong> click karta hai (content lock ho kar Worker ke pass chala jata hai).<br>
+            • Agar client kisi box mein koi change kare: <strong>UPDATED</strong> button foran green ho kar enable ho jata hai aur <strong>APPROVED</strong> disable ho jata hai. Sath hi neechay real-time <strong>Added / Deleted Diff</strong> show hota hai!
+        </div>
+        <div id="client-card-container"></div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════
+         VIEW 2: ADMIN & WORKER DIFF VIEW (CLIENT CHANGES)
+         ══════════════════════════════════════════════════════════ -->
+    <div id="view-admin-diff" class="view-panel">
+        <div class="explainer-box">
+            <strong>🔍 Admin &amp; Worker View (Product Status: Updated):</strong><br>
+            Client ne content mein tabdeeli ki aur <strong>UPDATED</strong> click kiya. Ab Admin aur Worker ko card mein:<br>
+            1. Har wo box jis mein client ne changes kiye hain, us ke upar <span style="background:#78350f;color:#fef3c7;border:1px solid #f59e0b;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:bold;">✏ Modified</span> ka badge aur amber border nazar aata hai (Image 2 aur Image 4 dekhein!).<br>
+            2. Card ke neechay <strong>🔍 Client Changes — ■ Added &nbsp; ■ Deleted</strong> ka complete visual word-by-word diff bar nazar aata hai, jahan clear pata chalta hai ke client ne kya delete kiya aur kya add kiya!
+        </div>
+        <div id="admin-card-container"></div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════
+         VIEW 3: D4U WRITER VIEW (WRITE & AUTO-FILL)
+         ══════════════════════════════════════════════════════════ -->
+    <div id="view-writer-flow" class="view-panel">
+        <div class="explainer-box">
+            <strong>✍ D4U Writer View (Product Status: Pending):</strong><br>
+            Writer ke pass 2 asaan tareeqe hain content create karne ke:<br>
+            <strong>Tareeqa A (Direct):</strong> Writer direct har image ke box (Image 1, Image 2, etc.) mein content type kar sakta hai.<br>
+            <strong>Tareeqa B (1-Click Auto-Fill):</strong> Writer upar <strong>📋 Auto-Fill All Boxes from Single Text</strong> button par click karke ChatGPT / Gemini / Doc ka poora text aik hi baar paste karega, aur system automatically 6 boxes mein distribute kar dega!<br>
+            Phir writer neechay <strong>💾 Save Draft</strong> dabata hai aur product direct <strong>Client Approval</strong> ke liye chali jati hai!
+        </div>
+        <div id="writer-card-container"></div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════
+         VIEW 4: INFO + A PLUS PHASES
+         ══════════════════════════════════════════════════════════ -->
+    <div id="view-both-phases" class="view-panel">
+        <div class="explainer-box">
+            <strong>🔄 Info + A Plus Phase Transition:</strong><br>
+            Dono phases ka taaluq dekhein:<br>
+            • <strong>Phase 1:</strong> Infographics active hoti hai aur team us par kaam karti hai.<br>
+            • <strong>Phase 2:</strong> Jab A+ Banners shuru hota hai, to Infographics ka 6-image template <strong>🔒 Lock (Read-only Reference)</strong> ban jata hai taa ke worker/client purana content refer kar sakein, aur neechay <strong>A+ Banners (Phase 2) ka 4-Banner Grid</strong> activate ho jata hai!
+        </div>
+        <div style="margin-bottom:14px;display:flex;gap:8px;">
+            <button class="tab-btn active" id="btn-demo-phase1" onclick="switchPhaseDemo(false)">Phase 1: Infographics Phase Active</button>
+            <button class="tab-btn" id="btn-demo-phase2" onclick="switchPhaseDemo(true)">Phase 2: A+ Banners Active + Infographics Locked</button>
+        </div>
+        <div id="both-card-container"></div>
+    </div>
+
+    <!-- Global Mocks for tasks.js -->
+    <script>
+        var ROLE       = 'eco_client';
+        var USER_ID    = 1;
+        var USERNAME   = 'ilyaeco';
+        var APP_URL    = '';
+        var PUBLIC_URL = '';
+        var CSRF_TOKEN = 'mock_csrf';
+        var MODULE_PERMS = {};
+        var OPEN       = { 101: true, 102: true, 103: true, 104: true };
+        var IS_EDITING = {};
+        var ALL_WORKERS = [{ id: 1, username: 'pakeeza' }, { id: 2, username: 'huzaifa' }, { id: 3, username: 'amber' }];
+
+        function switchTab() {}
+        function loadTasks() { renderAllViews(); }
+        function formatDualTime(dt) { return { pak: 'Sep 24, 06:30 PM PKT', us: 'Sep 24, 09:30 AM ET' }; }
+        function updateNotifications() {}
+        function buildFamilyGroupingSection() { return ''; }
+        function buildSeoSection() { return ''; }
+
+        function save(id, status) {
+            var content = getTaskContentToSave(id);
+            alert('✅ Product #' + id + ' saved with status: ' + status + '!\n\nClient change detection aur diff update ho gaya.');
+            var item = ALL_TASKS.find(t => t.id == id);
+            if(item){
+                item.original_content = item.content; // keep original for diff
+                item.content = content;
+                item.status = status;
+            }
+            renderAllViews();
+        }
+
+        function writerSave(id) {
+            var content = getTaskContentToSave(id);
+            alert('💾 D4U Writer ne Draft save kar diya!\nStatus "Generated" ban gayi hai aur Client ke samne review ke liye chali gayi hai.');
+            var item = ALL_TASKS.find(t => t.id == id);
+            if(item){
+                item.original_content = content;
+                item.content = content;
+                item.status = 'Generated';
+            }
+            renderAllViews();
+        }
+    </script>
+
+    <script src="js/tasks.js?v=2.9.1"></script>
+
+    <script>
+        // ── Data Sets for Different Scenarios ──
+        var taskClient = {
+            id: 101,
+            product_no: 'JH-00028',
+            title: 'NAPKIN - BLUE 20CT (12PK) 12OZ/CS',
+            product_type: 'Infographics',
+            status: 'Generated',
+            work_status: 'Pending',
+            info_worker_name: 'pakeeza',
+            last_activity_at: '2026-09-23 04:03:31',
+            original_content: JSON.stringify({
+                _format: 'grid_v2',
+                info: {
+                    img1: "PREMIUM 2-PLY BEVERAGE NAPKINS\n500 Pack | Soft & Absorbent\nDeep Navy Blue Color\nIdeal for Parties, Bars & Dinners",
+                    img2: "PERFECT DIMENSIONS & SPECS\nFolded Size: 5\" x 5\"\nUnfolded Size: 10\" x 10\"\nThickness: High-Density 2-Ply Texture",
+                    img3: "CLOSE-UP TEXTURE & QUALITY\nCoin-embossed edges for durability\nNo lint, tear-resistant\nHighly absorbent for cocktail drinks",
+                    img4: "DAILY HOME & INDOOR USE\nCasual family dinner table\nBarbeque party & beverage tray\nLiving room coffee table coaster",
+                    img5: "OFFICE, SCHOOL & OUTDOOR\nBreakroom beverage corner\nSchool events & picnics\nOutdoor tailgate & catered luncheon",
+                    img6: "BULK COMMERCIAL & CORPORATE\nRestaurants, Cafes & Food Trucks\nWeddings, Banquets & Hospitality\nCorporate meetings & cocktail lounges",
+                    extra: "COORDINATE YOUR PARTY TABLE WITH ECOQUALITY NAPKINS"
+                },
+                aplus: { b1: '', b2: '', b3: '', b4: '', extra: '' }
+            }),
+            content: JSON.stringify({
+                _format: 'grid_v2',
+                info: {
+                    img1: "PREMIUM 2-PLY BEVERAGE NAPKINS\n500 Pack | Soft & Absorbent\nDeep Navy Blue Color\nIdeal for Parties, Bars & Dinners",
+                    img2: "PERFECT DIMENSIONS & SPECS\nFolded Size: 5\" x 5\"\nUnfolded Size: 10\" x 10\"\nThickness: High-Density 2-Ply Texture",
+                    img3: "CLOSE-UP TEXTURE & QUALITY\nCoin-embossed edges for durability\nNo lint, tear-resistant\nHighly absorbent for cocktail drinks",
+                    img4: "DAILY HOME & INDOOR USE\nCasual family dinner table\nBarbeque party & beverage tray\nLiving room coffee table coaster",
+                    img5: "OFFICE, SCHOOL & OUTDOOR\nBreakroom beverage corner\nSchool events & picnics\nOutdoor tailgate & catered luncheon",
+                    img6: "BULK COMMERCIAL & CORPORATE\nRestaurants, Cafes & Food Trucks\nWeddings, Banquets & Hospitality\nCorporate meetings & cocktail lounges",
+                    extra: "COORDINATE YOUR PARTY TABLE WITH ECOQUALITY NAPKINS"
+                },
+                aplus: { b1: '', b2: '', b3: '', b4: '', extra: '' }
+            })
+        };
+
+        // Task with actual changes made by client (for Admin / Worker diff view)
+        var taskAdminDiff = {
+            id: 102,
+            product_no: 'JH-00028',
+            title: 'NAPKIN - BLUE 20CT (12PK) 12OZ/CS',
+            product_type: 'Infographics',
+            status: 'Updated',
+            work_status: 'Assigned',
+            info_worker_name: 'pakeeza',
+            last_activity_at: '2026-09-23 04:03:31',
+            original_content: JSON.stringify({
+                _format: 'grid_v2',
+                info: {
+                    img1: "PREMIUM 2-PLY BEVERAGE NAPKINS\n500 Pack | Soft & Absorbent\nDeep Navy Blue Color\nIdeal for Parties, Bars & Dinners",
+                    img2: "PERFECT DIMENSIONS & SPECS\nFolded Size: 5\" x 5\"\nUnfolded Size: 10\" x 10\"\nThickness: High-Density 2-Ply Texture",
+                    img3: "CLOSE-UP TEXTURE & QUALITY\nCoin-embossed edges for durability\nNo lint, tear-resistant\nHighly absorbent for cocktail drinks",
+                    img4: "DAILY HOME & INDOOR USE\nCasual family dinner table\nBarbeque party & beverage tray\nLiving room coffee table coaster",
+                    img5: "OFFICE, SCHOOL & OUTDOOR\nBreakroom beverage corner\nSchool events & picnics\nOutdoor tailgate & catered luncheon",
+                    img6: "BULK COMMERCIAL & CORPORATE\nRestaurants, Cafes & Food Trucks\nWeddings, Banquets & Hospitality\nCorporate meetings & cocktail lounges",
+                    extra: "COORDINATE YOUR PARTY TABLE WITH ECOQUALITY NAPKINS"
+                },
+                aplus: { b1: '', b2: '', b3: '', b4: '', extra: '' }
+            }),
+            content: JSON.stringify({
+                _format: 'grid_v2',
+                info: {
+                    img1: "PREMIUM 2-PLY BEVERAGE NAPKINS\n500 Pack | Soft & Absorbent\nDeep Navy Blue Color\nIdeal for Parties, Bars & Dinners",
+                    img2: "PERFECT DIMENSIONS & SPECS\nFolded Size: 6\" x 6\" (Client Updated)\nUnfolded Size: 12\" x 12\" Heavyweight\nThickness: Premium Embossed 3-Ply Finish",
+                    img3: "CLOSE-UP TEXTURE & QUALITY\nCoin-embossed edges for durability\nNo lint, tear-resistant\nHighly absorbent for cocktail drinks",
+                    img4: "DAILY HOME & INDOOR USE\nCasual family dinner table & birthday catering\nBarbeque party & beverage cocktail bar\nLiving room coffee table coaster",
+                    img5: "OFFICE, SCHOOL & OUTDOOR\nBreakroom beverage corner\nSchool events & picnics\nOutdoor tailgate & catered luncheon",
+                    img6: "BULK COMMERCIAL & CORPORATE\nRestaurants, Cafes & Food Trucks\nWeddings, Banquets & Hospitality\nCorporate meetings & cocktail lounges",
+                    extra: "COORDINATE YOUR PARTY TABLE WITH ECOQUALITY NAPKINS"
+                },
+                aplus: { b1: '', b2: '', b3: '', b4: '', extra: '' }
+            })
+        };
+
+        // Task for D4U Writer in Pending state
+        var taskWriter = {
+            id: 103,
+            product_no: 'JH-00035',
+            title: 'KRAFT PAPER SALAD BOWLS WITH CLEAR LIDS 32OZ 50PK',
+            product_type: 'Infographics',
+            status: 'Pending',
+            work_status: 'Content Pending',
+            info_worker_name: 'amber',
+            last_activity_at: '2026-09-24 01:20:00',
+            original_content: '',
+            content: JSON.stringify({
+                _format: 'grid_v2',
+                info: {
+                    img1: "32OZ ECO-FRIENDLY KRAFT SALAD BOWLS\n50 Pack with Tight-Fitting Clear Lids\n100% Recyclable Brown Kraft Paper",
+                    img2: "DIMENSIONS & CAPACITY\nTop Diameter: 6\" | Bottom Diameter: 4.5\" | Height: 3.2\"\nGenerous 32oz Volume for Salads & Grain Bowls",
+                    img3: "LEAKPROOF & GREASE-RESISTANT\nCoated interior prevents sauce leaks\nSturdy rolled rim for secure snap lid",
+                    img4: "HEALTHY MEAL PREP & LUNCH\nGreat for fresh greens, poke bowls, and pastas\nFridge and freezer friendly",
+                    img5: "TAKEOUT & FOOD DELIVERY\nSecure lid prevents spills during transit\nStackable for delivery bags",
+                    img6: "COMMERCIAL RESTAURANT PACK\nIdeal for Cafes, Salad Bars & Delis\nNatural rustic presentation customers love",
+                    extra: "PREMIUM KRAFT DISPOSABLE FOOD PACKAGING"
+                },
+                aplus: { b1: '', b2: '', b3: '', b4: '', extra: '' }
+            })
+        };
+
+        // Task for Info + A Plus
+        var taskBoth = {
+            id: 104,
+            product_no: '067',
+            title: 'EcoQuality 12oz White Rectangular Microwavable Containers with Lids',
+            product_type: 'Info + A Plus',
+            status: 'Generated',
+            work_status: 'Pending',
+            info_worker_name: 'huzaifa',
+            aplus_worker_name: '',
+            last_activity_at: '2026-09-22 03:22:46',
+            content: JSON.stringify({
+                _format: 'grid_v2',
+                info: {
+                    img1: "12OZ MICROWAVABLE MEAL CONTAINERS\nFood Grade White Polypropylene with Lids\nBPA Free & Reusable",
+                    img2: "ACCURATE PORTION SIZE\nLength: 5.5\" | Width: 4.5\" | Depth: 1.8\"\nCompact stackable meal prep size",
+                    img3: "MICROWAVE & FREEZER SAFE\nHandles temperatures up to 250°F\nSafe for freezing leftovers",
+                    img4: "HOME MEAL PREP & DIET CONTROL\nPlan weekly healthy meals in advance\nClear see-through lid to identify contents",
+                    img5: "WORK & SCHOOL LUNCHBOX\nLightweight leak-resistant pack\nFits in all standard lunch coolers",
+                    img6: "COMMERCIAL CATERING BULK\nAvailable in 50pk, 150pk & 300pk cases\nEssential for takeout & restaurants",
+                    extra: "ECOQUALITY REUSABLE FOOD STORAGE"
+                },
+                aplus: {
+                    b1: "BANNER 1 — HERO PRODUCT\nEcoQuality Premium 12oz White Rectangular Meal Prep Containers\nMicrowavable, Dishwasher Safe & Leak-Resistant Clear Lids",
+                    b2: "BANNER 2 — VERSATILE REUSABLE & BPA FREE\nHeavy Duty Food Grade Polypropylene\nStackable Design for Easy Fridge & Pantry Storage",
+                    b3: "BANNER 3 — BULK PACK OPTIONS\nAvailable in 24pk, 48pk, 96pk, 144pk, 192pk, 384pk, 1000pk\nIdeal for Commercial Takeout & Home Meal Preparation",
+                    b4: "BANNER 4 — MULTI-PURPOSE APPLICATION\nMicrowave Safe (without lid)\nFreezer Safe for long term food preservation\nCommercial Kitchen & Catering Grade",
+                    extra: ""
+                }
+            })
+        };
+
+        var ALL_TASKS = [taskClient, taskAdminDiff, taskWriter, taskBoth];
+
+        function renderAllViews() {
+            // View 1: Client
+            var prevRole = ROLE;
+            ROLE = 'eco_client';
+            document.getElementById('client-card-container').innerHTML = 
+                '<div class="card open" data-id="101">' + buildCard(taskClient) + '</div>';
+
+            // View 2: Admin Diff
+            ROLE = 'administrator';
+            document.getElementById('admin-card-container').innerHTML = 
+                '<div class="card open" data-id="102">' + buildCard(taskAdminDiff) + '</div>';
+            renderDiff(102, taskAdminDiff.original_content, taskAdminDiff.content);
+
+            // View 3: Writer
+            ROLE = 'd4u_writer';
+            document.getElementById('writer-card-container').innerHTML = 
+                '<div class="card open" data-id="103">' + buildCard(taskWriter) + '</div>';
+
+            // View 4: Both
+            ROLE = 'eco_client';
+            document.getElementById('both-card-container').innerHTML = 
+                '<div class="card open" data-id="104">' + buildCard(taskBoth) + '</div>';
+
+            ROLE = prevRole;
+        }
+
+        function switchView(viewName) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+
+            var targetBtn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.getAttribute('onclick').includes(viewName));
+            if(targetBtn) targetBtn.classList.add('active');
+
+            var targetPanel = document.getElementById('view-' + viewName);
+            if(targetPanel) targetPanel.classList.add('active');
+
+            if(viewName === 'admin-diff') {
+                setTimeout(function(){ renderDiff(102, taskAdminDiff.original_content, taskAdminDiff.content); }, 50);
+            }
+        }
+
+        function switchPhaseDemo(isPhase2) {
+            document.getElementById('btn-demo-phase1').classList.toggle('active', !isPhase2);
+            document.getElementById('btn-demo-phase2').classList.toggle('active', isPhase2);
+            if(isPhase2) {
+                taskBoth.aplus_worker_name = 'huzaifa';
+                taskBoth.work_status = 'Pending';
+                taskBoth.status = 'Generated';
+            } else {
+                taskBoth.aplus_worker_name = '';
+                taskBoth.work_status = 'Pending';
+                taskBoth.status = 'Generated';
+            }
+            ROLE = 'eco_client';
+            document.getElementById('both-card-container').innerHTML = 
+                '<div class="card open" data-id="104">' + buildCard(taskBoth) + '</div>';
+        }
+
+        // Initial setup
+        renderAllViews();
+    </script>
+</body>
+</html>

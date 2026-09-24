@@ -607,6 +607,177 @@ body { background: #081223; margin: 0; padding: 0; color: #e2e8f0; }
     color: #334155 !important;
 }
 
+/* ── Multi-Box Content Grid UI (Infographics & A+ Banners) ── */
+.content-grid-wrap {
+    margin: 8px 0 12px 0;
+    width: 100%;
+    box-sizing: border-box;
+}
+.content-grid-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    margin-bottom: 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .5px;
+}
+.content-grid-header.info-header {
+    background: #082f49;
+    color: #38bdf8;
+    border: 1px solid #0284c7;
+}
+.content-grid-header.aplus-header {
+    background: #1e1b4b;
+    color: #c084fc;
+    border: 1px solid #7c3aed;
+}
+.content-grid-header.locked-header {
+    background: #0f172a;
+    color: #94a3b8;
+    border: 1px solid #334155;
+}
+.content-grid-6 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    width: 100%;
+    box-sizing: border-box;
+}
+.content-grid-4 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    width: 100%;
+    box-sizing: border-box;
+}
+@media (max-width: 1100px) {
+    .content-grid-6 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+@media (max-width: 700px) {
+    .content-grid-6, .content-grid-4 {
+        grid-template-columns: 1fr;
+    }
+}
+.content-card-box {
+    border: 1.5px solid #2563eb;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #ffffff;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    transition: border-color .15s, box-shadow .15s;
+}
+.content-card-box:focus-within {
+    border-color: #1d4ed8;
+    box-shadow: 0 0 0 2px rgba(37,99,235,0.25);
+}
+.content-card-box.is-locked {
+    border-color: #64748b;
+}
+.content-box-head {
+    display: flex;
+    align-items: stretch;
+    height: 32px;
+    min-height: 32px;
+    border-bottom: 1.5px solid #2563eb;
+    box-sizing: border-box;
+}
+.content-card-box.is-locked .content-box-head {
+    border-bottom-color: #64748b;
+}
+.content-box-badge {
+    background: #2563eb;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 0 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    border-right: 1px solid #1d4ed8;
+    user-select: none;
+}
+.content-card-box.is-locked .content-box-badge {
+    background: #475569;
+    border-right-color: #334155;
+    color: #e2e8f0;
+}
+.content-box-title {
+    background: #dbeafe;
+    color: #1e3a8a;
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 0 10px;
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.content-card-box.is-locked .content-box-title {
+    background: #e2e8f0;
+    color: #334155;
+}
+.content-box-body {
+    background: #ffffff;
+    color: #0f172a;
+    font-size: 13px;
+    line-height: 1.6;
+    padding: 12px 14px;
+    min-height: 150px;
+    max-height: 320px;
+    overflow-y: auto;
+    outline: none;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: inherit;
+    box-sizing: border-box;
+    flex: 1;
+}
+.content-box-body[contenteditable="true"]:focus {
+    background: #f8faff;
+}
+.content-box-body.locked, .content-box-body[contenteditable="false"] {
+    background: #f8fafc;
+    color: #334155;
+    cursor: default;
+}
+.content-extra-bar {
+    margin-top: 10px;
+    background: #0f172a;
+    border: 1px dashed #334155;
+    border-radius: 6px;
+    padding: 10px 14px;
+}
+.content-extra-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #94a3b8;
+    margin-bottom: 6px;
+}
+.content-extra-body {
+    background: #ffffff;
+    color: #0f172a;
+    font-size: 12.5px;
+    line-height: 1.5;
+    padding: 8px 12px;
+    border-radius: 4px;
+    border: 1px solid #cbd5e1;
+    min-height: 48px;
+    outline: none;
+    white-space: pre-wrap;
+}
+
+
 /* ── Toggle button bigger tap area ───────────── */
 .card .toggle {
     min-width: 40px;
@@ -1389,7 +1560,7 @@ try {
 <!-- ── JS Modules ── -->
 <?php $v = '2.7.6'; ?>
 <script src="<?= $publicUrl ?>/js/core.js?v=<?= $v ?>"></script>
-<script src="<?= $publicUrl ?>/js/tasks.js?v=2.8.1"></script>
+<script src="<?= $publicUrl ?>/js/tasks.js?v=2.9.1"></script>
 <script src="<?= $publicUrl ?>/js/admin.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/invoices.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/payroll.js?v=2.7.11"></script>
