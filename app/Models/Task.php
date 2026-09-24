@@ -733,23 +733,11 @@ class Task {
         $newContent = '';
         if(!empty($existingContent)){
             $decoded = json_decode($existingContent, true);
-            if(is_array($decoded)){
+            if(is_array($decoded) && isset($decoded['_format']) && $decoded['_format'] === 'grid_v2'){
                 $decoded['aplus'] = ['b1'=>'', 'b2'=>'', 'b3'=>'', 'b4'=>'', 'extra'=>''];
                 $newContent = json_encode($decoded);
             } else {
-                $newContent = json_encode([
-                    '_format' => 'grid_v2',
-                    'info' => [
-                        'img1' => $existingContent,
-                        'img2' => '',
-                        'img3' => '',
-                        'img4' => '',
-                        'img5' => '',
-                        'img6' => '',
-                        'extra' => ''
-                    ],
-                    'aplus' => ['b1'=>'', 'b2'=>'', 'b3'=>'', 'b4'=>'', 'extra'=>'']
-                ]);
+                $newContent = $existingContent;
             }
         }
 

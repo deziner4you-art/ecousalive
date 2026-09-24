@@ -364,6 +364,37 @@ function escapeHtmlContent(str){
         .replace(/>/g, '&gt;');
 }
 
+/* Check if a task uses the new Multi-Box system or the classic legacy editor */
+function isMultiBoxTask(item){
+    if(!item) return false;
+    var content = String(item.content || '').trim();
+
+    // 1. If content is already explicitly stored in JSON grid_v2 format:
+    if(content.startsWith('{') && content.endsWith('}')){
+        try {
+            var data = JSON.parse(content);
+            if(data && (data._format === 'grid_v2' || (data.info && typeof data.info === 'object'))){
+                return true;
+            }
+        } catch(e){}
+    }
+
+    // 2. If it is an old product with existing legacy HTML or plain text content:
+    // It must stay in the original classic single editor!
+    if(content !== '' && content !== '<p><br></p>'){
+        return false;
+    }
+
+    // 3. If product has already been generated, approved, updated or completed in old system:
+    if(item.status !== 'Pending' || item.content_approved_at || item.content_updated_at){
+        return false;
+    }
+
+    // 4. Fresh new product in 'Pending' status with no content yet:
+    // Writer will create content using the new Multi-Box template!
+    return true;
+}
+
 function parseTaskContent(text, productType){
     if(!text) text = '';
     text = String(text).trim();
@@ -427,79 +458,76 @@ function parseTaskContent(text, productType){
     result._hasInfo = foundImg;
     result._hasAplus = foundBanner;
 
-    // Fallbacks if neither header format matched
-    if(!foundImg && !foundBanner){
-        if(productType === 'Infographics'){
-            result.info.img1 = text;
-        } else if(productType === 'A+' || productType === 'A Plus'){
-            result.aplus.b1 = text;
-        } else {
-            result.info.img1 = text;
-            result.aplus.b1 = text;
-        }
-    }
-
     return result;
 }
 
 function contentToReadableText(rawContent){
     if(!rawContent) return '';
-    var parsed = parseTaskContent(rawContent);
-    var parts = [];
+    var text = String(rawContent).trim();
+    if(text.startsWith('{') && text.endsWith('}')){
+        try {
+            var parsed = JSON.parse(text);
+            if(parsed && (parsed._format === 'grid_v2' || parsed.info || parsed.aplus)){
+                var parts = [];
+                var infoBoxes = parsed.info || {};
+                var hasInfo = false;
+                for(var i=1; i<=6; i++){
+                    if(infoBoxes['img' + i] && infoBoxes['img' + i].trim() !== ''){
+                        hasInfo = true; break;
+                    }
+                }
+                if(hasInfo || (infoBoxes.extra && infoBoxes.extra.trim() !== '')){
+                    if(infoBoxes.extra && infoBoxes.extra.trim() !== ''){
+                        parts.push(infoBoxes.extra.trim());
+                    }
+                    for(var i=1; i<=6; i++){
+                        var val = (infoBoxes['img' + i] || '').trim();
+                        if(val){
+                            parts.push('IMAGE ' + i + ':\n' + val);
+                        }
+                    }
+                }
 
-    var infoBoxes = parsed.info || {};
-    var hasInfo = false;
-    for(var i=1; i<=6; i++){
-        if(infoBoxes['img' + i] && infoBoxes['img' + i].trim() !== ''){
-            hasInfo = true; break;
-        }
-    }
-    if(hasInfo || (infoBoxes.extra && infoBoxes.extra.trim() !== '')){
-        if(infoBoxes.extra && infoBoxes.extra.trim() !== ''){
-            parts.push(infoBoxes.extra.trim());
-        }
-        for(var i=1; i<=6; i++){
-            var val = (infoBoxes['img' + i] || '').trim();
-            if(val){
-                parts.push('IMAGE ' + i + ':\n' + val);
+                var aplusBoxes = parsed.aplus || {};
+                var hasAplus = false;
+                for(var b=1; b<=4; b++){
+                    if(aplusBoxes['b' + b] && aplusBoxes['b' + b].trim() !== ''){
+                        hasAplus = true; break;
+                    }
+                }
+                if(hasAplus || (aplusBoxes.extra && aplusBoxes.extra.trim() !== '')){
+                    if(aplusBoxes.extra && aplusBoxes.extra.trim() !== ''){
+                        parts.push(aplusBoxes.extra.trim());
+                    }
+                    for(var b=1; b<=4; b++){
+                        var bVal = (aplusBoxes['b' + b] || '').trim();
+                        if(bVal){
+                            parts.push('BANNER ' + b + ':\n' + bVal);
+                        }
+                    }
+                }
+                if(parts.length > 0) return parts.join('\n\n');
             }
-        }
+        } catch(e){}
     }
-
-    var aplusBoxes = parsed.aplus || {};
-    var hasAplus = false;
-    for(var b=1; b<=4; b++){
-        if(aplusBoxes['b' + b] && aplusBoxes['b' + b].trim() !== ''){
-            hasAplus = true; break;
-        }
-    }
-    if(hasAplus || (aplusBoxes.extra && aplusBoxes.extra.trim() !== '')){
-        if(aplusBoxes.extra && aplusBoxes.extra.trim() !== ''){
-            parts.push(aplusBoxes.extra.trim());
-        }
-        for(var b=1; b<=4; b++){
-            var bVal = (aplusBoxes['b' + b] || '').trim();
-            if(bVal){
-                parts.push('BANNER ' + b + ':\n' + bVal);
-            }
-        }
-    }
-
-    if(!hasInfo && !hasAplus){
-        return typeof rawContent === 'string' ? rawContent.replace(/<[^>]+>/g, '').trim() : '';
-    }
-
-    return parts.join('\n\n');
+    return getPlainText(rawContent);
 }
 
 function getTaskContentToSave(id){
+    var task = (typeof ALL_TASKS !== 'undefined') ? ALL_TASKS.find(function(t){ return String(t.id) === String(id); }) : null;
+    
+    // If this is a legacy product, save directly from original classic editor:
+    if(task && !isMultiBoxTask(task)){
+        var oldEditor = document.getElementById('editor-' + id);
+        return oldEditor ? oldEditor.innerHTML : (task.content || '');
+    }
+
     var card = document.querySelector('.card[data-id="' + id + '"]');
     if(!card){
         var oldEditor = document.getElementById('editor-' + id);
-        return oldEditor ? oldEditor.innerHTML : '';
+        return oldEditor ? oldEditor.innerHTML : (task ? task.content : '');
     }
 
-    var task = (typeof ALL_TASKS !== 'undefined') ? ALL_TASKS.find(function(t){ return t.id == id; }) : null;
     var prevParsed = task ? parseTaskContent(task.content, task.product_type) : { info:{}, aplus:{} };
 
     var infoBoxes = {};
@@ -542,6 +570,11 @@ function clientContentGridChanged(id){
 }
 
 function buildProductContentSection(item, canEdit, lock, isWorker, isQa, originalForDiff){
+    // Legacy products: render classic single content editor exactly as before
+    if(!isMultiBoxTask(item)){
+        return `<div class="editor ${lock && !isWorker ? 'locked' : ''} ${isWorker || isQa ? 'locked' : ''}" id="editor-${item.id}" contenteditable="${canEdit ? 'true' : 'false'}" data-original="${encodeURIComponent(originalForDiff)}" oninput="clientEditorChanged(${item.id})" onblur="unmarkEditing(${item.id})">${item.content || ''}</div>`;
+    }
+
     var isInfoProd  = item.product_type === 'Infographics';
     var isAplusProd = item.product_type === 'A+' || item.product_type === 'A Plus';
     var isBothProd  = item.product_type === 'Info + A Plus';
@@ -1679,7 +1712,16 @@ function revertToOriginal(id){
     var editor = document.getElementById('editor-' + id);
     if(!editor) return;
     var originalRaw = decodeURIComponent(editor.getAttribute('data-original') || '');
-    var parsed = parseTaskContent(originalRaw);
+
+    var task = (typeof ALL_TASKS !== 'undefined') ? ALL_TASKS.find(function(t){ return String(t.id) === String(id); }) : null;
+    if(task && !isMultiBoxTask(task)){
+        editor.innerHTML = originalRaw;
+        IS_EDITING[id] = false;
+        clientEditorChanged(id);
+        return;
+    }
+
+    var parsed = parseTaskContent(originalRaw, task ? task.product_type : '');
 
     for(var i=1; i<=6; i++){
         var el = document.getElementById('cbox-' + id + '-info-' + i);
