@@ -197,8 +197,9 @@ function renderSmart(data){
             }
 
             var lock   = item.status === 'Approved' || item.status === 'Updated';
+            var isClientUser = (ROLE === 'eco_client' || (typeof USERNAME !== 'undefined' && USERNAME === 'ilyaeco'));
             var canEdit = ((ROLE === 'd4u_writer' || ROLE === 'seo_manager' || ROLE === 'ai_work') && item.status === 'Pending')
-                       || (ROLE === 'eco_client'  && item.status === 'Generated')
+                       || (isClientUser && item.status === 'Generated')
                        || (ROLE === 'administrator');
             var isWorker  = ROLE === 'worker';
             var isQa      = ROLE === 'qa';
@@ -368,12 +369,14 @@ function escapeHtmlContent(str){
 function isMultiBoxTask(item){
     if(!item) return false;
     var content = String(item.content || '').trim();
+    var stripped = content.replace(/^<p[^>]*>/i, '').replace(/<\/p>$/i, '').trim();
+    stripped = stripped.replace(/^<div[^>]*>/i, '').replace(/<\/div>$/i, '').trim();
 
-    // 1. If content is already explicitly stored in JSON grid_v2 format:
-    if(content.startsWith('{') && content.endsWith('}')){
+    // 1. If content is already explicitly stored in JSON grid_v2 format (even if wrapped in tags):
+    if((stripped.startsWith('{') && stripped.endsWith('}')) || (content.startsWith('{') && content.endsWith('}'))){
         try {
-            var data = JSON.parse(content);
-            if(data && (data._format === 'grid_v2' || (data.info && typeof data.info === 'object'))){
+            var data = JSON.parse(stripped.startsWith('{') ? stripped : content);
+            if(data && (data._format === 'grid_v2' || (data.info && typeof data.info === 'object') || (data.aplus && typeof data.aplus === 'object'))){
                 return true;
             }
         } catch(e){}
@@ -397,23 +400,61 @@ function isMultiBoxTask(item){
 
 function parseTaskContent(text, productType){
     if(!text) text = '';
-    text = String(text).trim();
+    text = String(text)
+        .replace(/&quot;/g, '"')
+        .replace(/&#34;/g, '"')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .trim();
 
-    if(text.startsWith('{') && text.endsWith('}')){
+    // Strip wrapping HTML tags like <p>{...}</p> or <div>{...}</div>
+    var stripped = text.replace(/^<p[^>]*>/i, '').replace(/<\/p>$/i, '').trim();
+    stripped = stripped.replace(/^<div[^>]*>/i, '').replace(/<\/div>$/i, '').trim();
+
+    // 1. Try JSON parsing
+    if((stripped.startsWith('{') && stripped.endsWith('}')) || (text.startsWith('{') && text.endsWith('}'))){
         try {
-            var data = JSON.parse(text);
-            if(data && (data._format === 'grid_v2' || data.info || data.aplus)){
-                if(!data.info) data.info = {};
-                if(!data.aplus) data.aplus = {};
-                var hasI = false, hasA = false;
-                for(var i=1; i<=6; i++){ if(data.info['img'+i] && data.info['img'+i].trim() !== '') hasI = true; }
-                for(var b=1; b<=4; b++){ if(data.aplus['b'+b] && data.aplus['b'+b].trim() !== '') hasA = true; }
-                data._hasInfo = hasI;
-                data._hasAplus = hasA;
-                return data;
+            var data = JSON.parse(stripped.startsWith('{') ? stripped : text);
+            if(data && typeof data === 'object'){
+                var result = {
+                    _format: 'grid_v2',
+                    info: { img1: '', img2: '', img3: '', img4: '', img5: '', img6: '', extra: '' },
+                    aplus: { b1: '', b2: '', b3: '', b4: '', extra: '' },
+                    _hasInfo: false,
+                    _hasAplus: false
+                };
+                var rawInfo = data.info || data;
+                for(var i=1; i<=6; i++){
+                    var val = rawInfo['img' + i] || rawInfo['image' + i] || rawInfo['img_' + i] || rawInfo['i' + i] || rawInfo[i] || rawInfo[String(i)] || '';
+                    if(!val && Array.isArray(rawInfo) && rawInfo[i-1]) val = rawInfo[i-1];
+                    if(!val && Array.isArray(data.images) && data.images[i-1]) val = data.images[i-1];
+                    if(val){ result.info['img' + i] = String(val).trim(); result._hasInfo = true; }
+                }
+                result.info.extra = (rawInfo.extra || data.extra || '').trim();
+
+                var rawAplus = data.aplus || data;
+                for(var b=1; b<=4; b++){
+                    var bVal = rawAplus['b' + b] || rawAplus['banner' + b] || rawAplus['banner_' + b] || rawAplus[b] || rawAplus[String(b)] || '';
+                    if(!bVal && Array.isArray(rawAplus) && rawAplus[b-1]) bVal = rawAplus[b-1];
+                    if(!bVal && Array.isArray(data.banners) && data.banners[b-1]) bVal = data.banners[b-1];
+                    if(bVal){ result.aplus['b' + b] = String(bVal).trim(); result._hasAplus = true; }
+                }
+                result.aplus.extra = (rawAplus.extra || data.aplus_extra || '').trim();
+
+                if(result._hasInfo || result._hasAplus || data._format === 'grid_v2'){
+                    return result;
+                }
             }
         } catch(e){}
     }
+
+    // 2. Text / HTML parsing
+    var plain = text.replace(/<br\s*\/?>/gi, '\n')
+                    .replace(/<\/p>/gi, '\n\n')
+                    .replace(/<\/div>/gi, '\n')
+                    .replace(/<[^>]+>/g, '')
+                    .trim();
 
     var result = {
         _format: 'grid_v2',
@@ -423,40 +464,80 @@ function parseTaskContent(text, productType){
         _hasAplus: false
     };
 
-    if(!text) return result;
+    if(!plain) return result;
 
-    // Check if plain text contains IMAGE 1..6
-    var imgRegex = /(?:^|\n)\s*(?:IMAGE|Image|IMG|Img)\s*#?\s*([1-6])\b[^\n]*\n([\s\S]*?)(?=(?:\n\s*(?:IMAGE|Image|IMG|Img)\s*#?\s*[1-6]\b)|$)/gi;
-    var match;
-    var foundImg = false;
-    var firstImgIdx = -1;
-    while((match = imgRegex.exec(text)) !== null){
-        foundImg = true;
-        if(firstImgIdx === -1) firstImgIdx = match.index;
-        var num = match[1];
-        result.info['img' + num] = match[2].trim();
-    }
-    if(foundImg && firstImgIdx > 0){
-        result.info.extra = text.substring(0, firstImgIdx).trim();
+    // Split by lines and parse section headers
+    var lines = plain.split(/\r?\n/);
+    var currentSection = null; // 'info' or 'aplus'
+    var currentNum = 0;
+    var extraLines = [];
+
+    var imgHeaderRegex = /^(?:[-*•\d.]*\s*)?(?:IMAGE|Image|IMG|Img|PHOTO|Photo|Graphic|Box)\s*#?\s*([1-6])\b\s*[:\-–—]?\s*(.*)$/i;
+    var bannerHeaderRegex = /^(?:[-*•\d.]*\s*)?(?:BANNER|Banner|Module|Section)\s*#?\s*([1-4])\b\s*[:\-–—]?\s*(.*)$/i;
+
+    for(var li=0; li<lines.length; li++){
+        var line = lines[li];
+        var trimLine = line.trim();
+
+        var imgM = trimLine.match(imgHeaderRegex);
+        if(imgM){
+            currentSection = 'info';
+            currentNum = parseInt(imgM[1]);
+            result._hasInfo = true;
+            var inlineRest = imgM[2].trim();
+            inlineRest = inlineRest.replace(/^\([^)]+\)\s*[:\-–—]?\s*/, '').trim();
+            if(inlineRest){
+                result.info['img' + currentNum] = (result.info['img' + currentNum] ? result.info['img' + currentNum] + '\n' : '') + inlineRest;
+            }
+            continue;
+        }
+
+        var bM = trimLine.match(bannerHeaderRegex);
+        if(bM){
+            currentSection = 'aplus';
+            currentNum = parseInt(bM[1]);
+            result._hasAplus = true;
+            var bInline = bM[2].trim();
+            bInline = bInline.replace(/^\([^)]+\)\s*[:\-–—]?\s*/, '').trim();
+            if(bInline){
+                result.aplus['b' + currentNum] = (result.aplus['b' + currentNum] ? result.aplus['b' + currentNum] + '\n' : '') + bInline;
+            }
+            continue;
+        }
+
+        if(currentSection === 'info' && currentNum >= 1 && currentNum <= 6){
+            result.info['img' + currentNum] = (result.info['img' + currentNum] ? result.info['img' + currentNum] + '\n' : '') + line;
+        } else if(currentSection === 'aplus' && currentNum >= 1 && currentNum <= 4){
+            result.aplus['b' + currentNum] = (result.aplus['b' + currentNum] ? result.aplus['b' + currentNum] + '\n' : '') + line;
+        } else {
+            extraLines.push(line);
+        }
     }
 
-    // Check if plain text contains BANNER 1..4
-    var bannerRegex = /(?:^|\n)\s*(?:BANNER|Banner)\s*#?\s*([1-4])\b[^\n]*\n([\s\S]*?)(?=(?:\n\s*(?:BANNER|Banner)\s*#?\s*[1-4]\b)|$)/gi;
-    var bMatch;
-    var foundBanner = false;
-    var firstBannerIdx = -1;
-    while((bMatch = bannerRegex.exec(text)) !== null){
-        foundBanner = true;
-        if(firstBannerIdx === -1) firstBannerIdx = bMatch.index;
-        var bNum = bMatch[1];
-        result.aplus['b' + bNum] = bMatch[2].trim();
-    }
-    if(foundBanner && firstBannerIdx > 0){
-        result.aplus.extra = text.substring(0, firstBannerIdx).trim();
+    // Trim all parsed values
+    for(var k=1; k<=6; k++){ result.info['img' + k] = (result.info['img' + k] || '').trim(); }
+    for(var bk=1; bk<=4; bk++){ result.aplus['b' + bk] = (result.aplus['b' + bk] || '').trim(); }
+    if(extraLines.length > 0 && !result.info.extra){
+        result.info.extra = extraLines.join('\n').trim();
     }
 
-    result._hasInfo = foundImg;
-    result._hasAplus = foundBanner;
+    // Fallback: If no headers matched at all, split by paragraphs
+    if(!result._hasInfo && !result._hasAplus && plain){
+        var paras = plain.split(/\n\s*\n/).map(function(s){ return s.trim(); }).filter(Boolean);
+        if(paras.length > 0){
+            if(productType === 'A+' || productType === 'A Plus'){
+                for(var p=0; p<Math.min(4, paras.length); p++){
+                    result.aplus['b' + (p+1)] = paras[p];
+                }
+                result._hasAplus = true;
+            } else {
+                for(var ip=0; ip<Math.min(6, paras.length); ip++){
+                    result.info['img' + (ip+1)] = paras[ip];
+                }
+                result._hasInfo = true;
+            }
+        }
+    }
 
     return result;
 }
@@ -533,30 +614,32 @@ function getTaskContentToSave(id){
     var infoBoxes = {};
     for(var i=1; i<=6; i++){
         var el = document.getElementById('cbox-' + id + '-info-' + i);
+        var prevVal = prevParsed.info ? (prevParsed.info['img' + i] || prevParsed.info['image' + i] || prevParsed.info[i] || '') : '';
         if(el){
-            infoBoxes['img' + i] = (el.innerText || el.textContent || '').trim();
-        } else if(prevParsed.info && prevParsed.info['img' + i]){
-            infoBoxes['img' + i] = prevParsed.info['img' + i];
+            var val = (el.innerText || el.textContent || '').trim();
+            infoBoxes['img' + i] = (val !== '') ? val : prevVal;
         } else {
-            infoBoxes['img' + i] = '';
+            infoBoxes['img' + i] = prevVal;
         }
     }
     var infoExtraEl = document.getElementById('cbox-' + id + '-info-extra');
-    infoBoxes['extra'] = infoExtraEl ? (infoExtraEl.innerText || infoExtraEl.textContent || '').trim() : (prevParsed.info && prevParsed.info.extra ? prevParsed.info.extra : '');
+    var prevExtra = (prevParsed.info && prevParsed.info.extra) ? prevParsed.info.extra : '';
+    infoBoxes['extra'] = infoExtraEl ? ((infoExtraEl.innerText || infoExtraEl.textContent || '').trim() || prevExtra) : prevExtra;
 
     var aplusBoxes = {};
     for(var b=1; b<=4; b++){
         var bEl = document.getElementById('cbox-' + id + '-aplus-' + b);
+        var prevBVal = prevParsed.aplus ? (prevParsed.aplus['b' + b] || prevParsed.aplus['banner' + b] || prevParsed.aplus[b] || '') : '';
         if(bEl){
-            aplusBoxes['b' + b] = (bEl.innerText || bEl.textContent || '').trim();
-        } else if(prevParsed.aplus && prevParsed.aplus['b' + b]){
-            aplusBoxes['b' + b] = prevParsed.aplus['b' + b];
+            var bVal = (bEl.innerText || bEl.textContent || '').trim();
+            aplusBoxes['b' + b] = (bVal !== '') ? bVal : prevBVal;
         } else {
-            aplusBoxes['b' + b] = '';
+            aplusBoxes['b' + b] = prevBVal;
         }
     }
     var aplusExtraEl = document.getElementById('cbox-' + id + '-aplus-extra');
-    aplusBoxes['extra'] = aplusExtraEl ? (aplusExtraEl.innerText || aplusExtraEl.textContent || '').trim() : (prevParsed.aplus && prevParsed.aplus.extra ? prevParsed.aplus.extra : '');
+    var prevAplusExtra = (prevParsed.aplus && prevParsed.aplus.extra) ? prevParsed.aplus.extra : '';
+    aplusBoxes['extra'] = aplusExtraEl ? ((aplusExtraEl.innerText || aplusExtraEl.textContent || '').trim() || prevAplusExtra) : prevAplusExtra;
 
     return JSON.stringify({
         _format: 'grid_v2',
@@ -578,6 +661,7 @@ function buildProductContentSection(item, canEdit, lock, isWorker, isQa, origina
     var isInfoProd  = item.product_type === 'Infographics';
     var isAplusProd = item.product_type === 'A+' || item.product_type === 'A Plus';
     var isBothProd  = item.product_type === 'Info + A Plus';
+    var isAdminUser = (ROLE === 'administrator');
 
     var parsed = parseTaskContent(item.content, item.product_type);
 
@@ -605,7 +689,8 @@ function buildProductContentSection(item, canEdit, lock, isWorker, isQa, origina
     var html = `<div class="content-grid-wrap" id="content-grid-wrap-${item.id}">`;
     html += `<div class="editor" id="editor-${item.id}" style="display:none;" data-original="${encodeURIComponent(originalForDiff)}">${escapeHtmlContent(item.content || '')}</div>`;
 
-    if(canEdit && !lock){
+    // CRITICAL: Auto-Fill button is ONLY visible to Administrator! Client (ilyaeco) or workers will NEVER see it.
+    if(isAdminUser && !lock){
         var autoFillLabel = 'Auto-Fill All Boxes from Single Text';
         var autoFillTarget = 'auto';
         if(isBothProd){
@@ -645,9 +730,33 @@ function buildProductContentSection(item, canEdit, lock, isWorker, isQa, origina
 
         html += `<div class="content-grid-6" id="grid-info-${item.id}">`;
         INFO_BOX_DEFS.forEach(function(box){
-            var text = (parsed.info && parsed.info['img' + box.num]) ? parsed.info['img' + box.num] : '';
+            var text = '';
+            if(parsed && parsed.info){
+                text = parsed.info['img' + box.num]
+                    || parsed.info['image' + box.num]
+                    || parsed.info['img_' + box.num]
+                    || parsed.info['i' + box.num]
+                    || parsed.info[box.num]
+                    || parsed.info[String(box.num)]
+                    || '';
+            }
+            if(!text && parsed){
+                text = parsed['img' + box.num] || parsed['image' + box.num] || parsed[box.num] || '';
+            }
+
             var boxId = 'cbox-' + item.id + '-info-' + box.num;
-            var origBoxText = (parsedOrig && parsedOrig.info && parsedOrig.info['img' + box.num] !== undefined) ? parsedOrig.info['img' + box.num] : text;
+            var origBoxText = '';
+            if(parsedOrig && parsedOrig.info){
+                origBoxText = parsedOrig.info['img' + box.num]
+                           || parsedOrig.info['image' + box.num]
+                           || parsedOrig.info[box.num]
+                           || '';
+            }
+            if(!origBoxText && parsedOrig){
+                origBoxText = parsedOrig['img' + box.num] || parsedOrig['image' + box.num] || parsedOrig[box.num] || '';
+            }
+            if(!origBoxText) origBoxText = text;
+
             var boxChanged = (parsedOrig !== null && origBoxText.trim() !== text.trim());
 
             html += `<div class="content-card-box ${infoIsLocked ? 'is-locked' : ''}" style="${boxChanged ? 'border-color:#f59e0b;box-shadow:0 0 0 2px rgba(245,158,11,0.2);' : ''}">
@@ -692,7 +801,7 @@ function buildProductContentSection(item, canEdit, lock, isWorker, isQa, origina
                     <span>🎨 A+ Banners Content (Phase 2)</span>
                     <span style="font-size:11px;font-weight:normal;color:#e9d5ff;">4 Banners Template</span>
                 </div>
-                ${(aplusCanEdit && !aplusIsLocked) ? `
+                ${(isAdminUser && !aplusIsLocked) ? `
                 <button type="button" class="btn-quick-paste" onclick="openQuickPasteModal(${item.id}, 'aplus')" style="background:#581c87;border:1px solid #c084fc;color:#f3e8ff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;transition:all .15s;">
                     <span>📋</span> Auto-Fill A+ Banners
                 </button>` : ''}
@@ -701,9 +810,32 @@ function buildProductContentSection(item, canEdit, lock, isWorker, isQa, origina
 
         html += `<div class="content-grid-4" id="grid-aplus-${item.id}">`;
         APLUS_BOX_DEFS.forEach(function(box){
-            var text = (parsed.aplus && parsed.aplus['b' + box.num]) ? parsed.aplus['b' + box.num] : '';
+            var text = '';
+            if(parsed && parsed.aplus){
+                text = parsed.aplus['b' + box.num]
+                    || parsed.aplus['banner' + box.num]
+                    || parsed.aplus['banner_' + box.num]
+                    || parsed.aplus[box.num]
+                    || parsed.aplus[String(box.num)]
+                    || '';
+            }
+            if(!text && parsed){
+                text = parsed['b' + box.num] || parsed['banner' + box.num] || parsed[box.num] || '';
+            }
+
             var boxId = 'cbox-' + item.id + '-aplus-' + box.num;
-            var origBoxText = (parsedOrig && parsedOrig.aplus && parsedOrig.aplus['b' + box.num] !== undefined) ? parsedOrig.aplus['b' + box.num] : text;
+            var origBoxText = '';
+            if(parsedOrig && parsedOrig.aplus){
+                origBoxText = parsedOrig.aplus['b' + box.num]
+                           || parsedOrig.aplus['banner' + box.num]
+                           || parsedOrig.aplus[box.num]
+                           || '';
+            }
+            if(!origBoxText && parsedOrig){
+                origBoxText = parsedOrig['b' + box.num] || parsedOrig['banner' + box.num] || parsedOrig[box.num] || '';
+            }
+            if(!origBoxText) origBoxText = text;
+
             var boxChanged = (parsedOrig !== null && origBoxText.trim() !== text.trim());
 
             html += `<div class="content-card-box ${aplusIsLocked ? 'is-locked' : ''}" style="${boxChanged ? 'border-color:#f59e0b;box-shadow:0 0 0 2px rgba(245,158,11,0.2);' : ''}">
@@ -875,8 +1007,8 @@ function applyQuickPaste(taskId){
         }
     }
 
-    // Fallback: If user explicitly targeted 'aplus' or 'info' without headers, split by double newlines if needed
-    if(targetMode === 'aplus' && !parsed._hasAplus){
+    // Fallback: If no explicit headers matched, split text into paragraphs and distribute
+    if(updateAplus && !parsed._hasAplus){
         var paragraphs = rawText.split(/\n\s*\n/).map(function(s){ return s.trim(); }).filter(Boolean);
         if(paragraphs.length > 1){
             for(var p=0; p<Math.min(4, paragraphs.length); p++){
@@ -885,7 +1017,8 @@ function applyQuickPaste(taskId){
         } else {
             parsed.aplus.b1 = rawText;
         }
-    } else if(targetMode === 'info' && !parsed._hasInfo){
+    }
+    if(updateInfo && !parsed._hasInfo){
         var infoParagraphs = rawText.split(/\n\s*\n/).map(function(s){ return s.trim(); }).filter(Boolean);
         if(infoParagraphs.length > 1){
             for(var ip=0; ip<Math.min(6, infoParagraphs.length); ip++){
@@ -898,12 +1031,11 @@ function applyQuickPaste(taskId){
 
     var updatedCount = 0;
 
-    // 1. Update Infographics boxes ONLY if updateInfo is true AND box is editable
+    // 1. Update Infographics boxes ONLY if updateInfo is true
     if(updateInfo){
         for(var i=1; i<=6; i++){
             var el = document.getElementById('cbox-' + taskId + '-info-' + i);
-            // CRITICAL: NEVER modify locked box!
-            if(el && el.getAttribute('contenteditable') === 'true'){
+            if(el && (el.getAttribute('contenteditable') === 'true' || ROLE === 'administrator')){
                 var newVal = parsed.info ? (parsed.info['img' + i] || '').trim() : '';
                 // CRITICAL: NEVER blank out existing content! Only set if newVal is non-empty!
                 if(newVal !== ''){
@@ -913,7 +1045,7 @@ function applyQuickPaste(taskId){
             }
         }
         var infoExtraEl = document.getElementById('cbox-' + taskId + '-info-extra');
-        if(infoExtraEl && infoExtraEl.getAttribute('contenteditable') === 'true'){
+        if(infoExtraEl && (infoExtraEl.getAttribute('contenteditable') === 'true' || ROLE === 'administrator')){
             var newExtra = parsed.info ? (parsed.info.extra || '').trim() : '';
             if(newExtra !== ''){
                 infoExtraEl.innerText = newExtra;
@@ -921,12 +1053,11 @@ function applyQuickPaste(taskId){
         }
     }
 
-    // 2. Update A+ boxes ONLY if updateAplus is true AND box is editable
+    // 2. Update A+ boxes ONLY if updateAplus is true
     if(updateAplus){
         for(var b=1; b<=4; b++){
             var bEl = document.getElementById('cbox-' + taskId + '-aplus-' + b);
-            // CRITICAL: NEVER modify locked box!
-            if(bEl && bEl.getAttribute('contenteditable') === 'true'){
+            if(bEl && (bEl.getAttribute('contenteditable') === 'true' || ROLE === 'administrator')){
                 var newBVal = parsed.aplus ? (parsed.aplus['b' + b] || '').trim() : '';
                 // CRITICAL: NEVER blank out existing content! Only set if newBVal is non-empty!
                 if(newBVal !== ''){
@@ -936,12 +1067,19 @@ function applyQuickPaste(taskId){
             }
         }
         var aplusExtraEl = document.getElementById('cbox-' + taskId + '-aplus-extra');
-        if(aplusExtraEl && aplusExtraEl.getAttribute('contenteditable') === 'true'){
+        if(aplusExtraEl && (aplusExtraEl.getAttribute('contenteditable') === 'true' || ROLE === 'administrator')){
             var newAplusExtra = parsed.aplus ? (parsed.aplus.extra || '').trim() : '';
             if(newAplusExtra !== ''){
                 aplusExtraEl.innerText = newAplusExtra;
             }
         }
+    }
+
+    // Synchronize hidden editor with full serialized grid content
+    var updatedContent = getTaskContentToSave(taskId);
+    var hiddenEditor = document.getElementById('editor-' + taskId);
+    if(hiddenEditor){
+        hiddenEditor.innerHTML = escapeHtmlContent(updatedContent);
     }
 
     // Trigger change detection
@@ -965,10 +1103,10 @@ function buildCard(item){
     var isQa         = ROLE === 'qa';
     var isAdmin      = ROLE === 'administrator';
     var isListing    = ROLE === 'eco_listing';
-    var isClient     = ROLE === 'eco_client';
+    var isClient     = ROLE === 'eco_client' || (typeof USERNAME !== 'undefined' && USERNAME === 'ilyaeco');
     var showWorkerBadges = !isListing && !isClient && (typeof USERNAME === 'undefined' || (USERNAME.toLowerCase() !== 'ecolisting' && USERNAME.toLowerCase() !== 'ilyaeco'));
     var canEdit      = ((ROLE === 'd4u_writer' || ROLE === 'seo_manager' || ROLE === 'ai_work') && item.status === 'Pending')
-                    || (ROLE === 'eco_client'  && item.status === 'Generated')
+                    || (isClient && item.status === 'Generated')
                     || isAdmin;
     var approvedDisabled  = lock || item.status !== 'Generated';
     var originalForDiff   = item.original_content || item.content || '';
@@ -1508,7 +1646,8 @@ function buildActionButtons(item, isAdmin, isWorker, isQa, isListing, isUrgent, 
             }
         }
     }
-    if(ROLE === 'eco_client'){
+    var isClientAct = (ROLE === 'eco_client' || (typeof USERNAME !== 'undefined' && USERNAME === 'ilyaeco'));
+    if(isClientAct){
         if(item.status === 'Generated' || item.status === 'Hold'){
             btns += `<button class="actionbtn" style="background:#0f766e;color:#fff;" onclick="holdProduct(${item.id},${item.status==='Hold'?0:1})">${item.status==='Hold'?'▶ Unhold':'⏸ Hold'}</button>`;
         }
@@ -1523,7 +1662,7 @@ function buildActionButtons(item, isAdmin, isWorker, isQa, isListing, isUrgent, 
         btns += `<div style="display:flex;gap:8px;margin-top:6px;width:100%;"><button class="actionbtn" style="background:#d97706;color:#fff;flex:1;" onclick="openRevisionBox(${item.id},'design')">🎨 Revise Design</button><button class="actionbtn" style="background:#db2777;color:#fff;flex:1;" onclick="openRevisionBox(${item.id},'content')">✍ Revise Content</button></div>`;
     }
     if(isListing && item.work_status === 'Republish') btns += `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;width:100%;margin-top:4px;"><input type="url" id="pub-link-${item.id}" placeholder="Amazon Re-Publish link (required)" style="flex:1;min-width:160px;padding:9px 12px;border:2px solid #dc2626;border-radius:5px;background:#1a0505;color:#fca5a5;font-size:13px;outline:none;"><button class="btn2 actionbtn" style="flex-shrink:0;background:#dc2626;" onclick="publishProduct(${item.id})">📦 Re-Publish</button></div>`;
-    if(((ROLE === 'eco_client' && item.status === 'Generated') || isAdmin) && item.work_status !== 'Work Done'){
+    if(((isClientAct && item.status === 'Generated') || isAdmin) && item.work_status !== 'Work Done'){
         btns = `<button class="btn1 actionbtn" id="u-${item.id}" disabled onclick="save(${item.id},'Updated')">UPDATED</button><button class="btn2 actionbtn" id="a-${item.id}" ${approvedDisabled?'disabled':''} onclick="save(${item.id},'Approved')">APPROVED</button>` + btns;
     }
     return btns;
@@ -1801,7 +1940,8 @@ function renderDiff(id, overrideOriginal, overrideCurrent){
 
 function clientEditorChanged(id){
     IS_EDITING[id] = true;
-    if(ROLE !== 'eco_client' && ROLE !== 'administrator') return;
+    var isClientUser = (ROLE === 'eco_client' || (typeof USERNAME !== 'undefined' && USERNAME === 'ilyaeco'));
+    if(!isClientUser && ROLE !== 'administrator') return;
     var uBtn   = document.getElementById('u-' + id);
     var aBtn   = document.getElementById('a-' + id);
     if(!uBtn || !aBtn) return;

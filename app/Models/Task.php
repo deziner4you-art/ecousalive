@@ -784,8 +784,8 @@ class Task {
                 db()->prepare("UPDATE wp_eco_aplus_tasks SET content=?, original_content=?, status=?, work_status='Pending', last_activity_at=NOW() WHERE id=?")
                     ->execute([$content, $content, $status, $id]);
             }
-        } elseif($role === 'eco_client' || ($role === 'administrator' && in_array($status, ['Approved','Updated']))){
-            if($role === 'eco_client' && $task['status'] !== 'Generated'){
+        } elseif($role === 'eco_client' || ($user['username'] ?? '') === 'ilyaeco' || ($role === 'administrator' && in_array($status, ['Approved','Updated']))){
+            if(($role === 'eco_client' || ($user['username'] ?? '') === 'ilyaeco') && $task['status'] !== 'Generated'){
                 return ['ok'=>false,'message'=>'Unauthorized: product is not in a stage relevant to your role (must be Generated).'];
             }
             $tsApproved = ($status === 'Approved') ? ',content_approved_at=UTC_TIMESTAMP(),content_updated_at=NULL' : '';
