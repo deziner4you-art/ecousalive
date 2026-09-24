@@ -728,6 +728,19 @@ class Task {
         // Delete current assignment so product goes into writer pool for content generation
         // db()->prepare("DELETE FROM eco_tool_assignments WHERE task_id=?")->execute([$taskId]);
 
+        // Preserve existing Infographics content so worker and client can reference it
+        $existingContent = $task['content'] ?? '';
+        $newContent = '';
+        if(!empty($existingContent)){
+            $decoded = json_decode($existingContent, true);
+            if(is_array($decoded) && isset($decoded['_format']) && $decoded['_format'] === 'grid_v2'){
+                $decoded['aplus'] = ['b1'=>'', 'b2'=>'', 'b3'=>'', 'b4'=>'', 'extra'=>''];
+                $newContent = json_encode($decoded);
+            } else {
+                $newContent = $existingContent;
+            }
+        }
+
         // Transition to standard A+ content generation workflow
         db()->prepare("
             UPDATE wp_eco_aplus_tasks
@@ -735,8 +748,8 @@ class Task {
                 info_subtasks=?,
                 status='Pending',
                 work_status='Pending',
-                content='',
-                original_content='',
+                content=?,
+                original_content=?,
                 content_approved_at=NULL,
                 content_updated_at=NULL,
                 seo_doc_link=NULL,
@@ -745,7 +758,7 @@ class Task {
                 published_link=NULL,
                 last_activity_at=NOW()
             WHERE id=?
-        ")->execute([$infoSubtasks, $taskId]);
+        ")->execute([$infoSubtasks, $newContent, $newContent, $taskId]);
 
         return ['ok'=>true, 'message'=>'A+ Banner workflow shuru ho gaya. Product writer content generation ke liye Pending ho gaya hai.'];
     }

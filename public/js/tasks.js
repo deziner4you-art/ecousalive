@@ -197,15 +197,28 @@ function renderSmart(data){
             }
 
             var lock   = item.status === 'Approved' || item.status === 'Updated';
-            var editor = existing.querySelector('.editor');
-            if(editor){
-                var editorContent = (item.content || '');
-                if(!IS_EDITING[item.id]) editor.innerHTML = editorContent;
-                var canEdit = ((ROLE === 'd4u_writer' || ROLE === 'seo_manager' || ROLE === 'ai_work') && item.status === 'Pending')
-                           || (ROLE === 'eco_client'  && item.status === 'Generated')
-                           || (ROLE === 'administrator');
-                editor.contentEditable = canEdit ? 'true' : 'false';
-                editor.className = 'editor' + (lock ? ' locked' : '');
+            var canEdit = ((ROLE === 'd4u_writer' || ROLE === 'seo_manager' || ROLE === 'ai_work') && item.status === 'Pending')
+                       || (ROLE === 'eco_client'  && item.status === 'Generated')
+                       || (ROLE === 'administrator');
+            var isWorker  = ROLE === 'worker';
+            var isQa      = ROLE === 'qa';
+            var gridWrap = existing.querySelector('#content-grid-wrap-' + item.id);
+            if(gridWrap && !IS_EDITING[item.id]){
+                var origDiff = item.original_content || item.content || '';
+                var newGridHtml = buildProductContentSection(item, canEdit, lock, isWorker, isQa, origDiff);
+                var tempDiv = document.createElement('div');
+                tempDiv.innerHTML = newGridHtml;
+                var newWrap = tempDiv.firstElementChild;
+                if(newWrap){
+                    gridWrap.replaceWith(newWrap);
+                }
+            } else {
+                var editor = existing.querySelector('.editor');
+                if(editor && !IS_EDITING[item.id]){
+                    editor.innerHTML = (item.content || '');
+                    editor.contentEditable = canEdit ? 'true' : 'false';
+                    editor.className = 'editor' + (lock ? ' locked' : '');
+                }
             }
 
             if(ROLE === 'administrator'){
@@ -323,6 +336,623 @@ function updateButtons(cardEl, item){
         } else {
             uBtn.disabled = true; aBtn.disabled = true;
         }
+    }
+}
+
+/* ── Multi-Box Content Grid Definitions & Helpers ── */
+var INFO_BOX_DEFS = [
+    { num: 1, label: 'Image 1', title: '(Features / Qualities / Specialities)' },
+    { num: 2, label: 'Image 2', title: '(Product Name Size Dimensions, Volume, Weight)' },
+    { num: 3, label: 'Image 3', title: '(Call outs / Closeups / Others)' },
+    { num: 4, label: 'Image 4', title: 'Lifestyle Daily routine home indoor usage' },
+    { num: 5, label: 'Image 5', title: 'Lifestyle Daily routine office school outdoor usage' },
+    { num: 6, label: 'Image 6', title: 'Lifestyle Commercial bulk corporate usage' }
+];
+
+var APLUS_BOX_DEFS = [
+    { num: 1, label: 'Banner 1', title: '' },
+    { num: 2, label: 'Banner 2', title: '' },
+    { num: 3, label: 'Banner 3', title: '' },
+    { num: 4, label: 'Banner 4', title: '' }
+];
+
+function escapeHtmlContent(str){
+    if(!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+/* Check if a task uses the new Multi-Box system or the classic legacy editor */
+function isMultiBoxTask(item){
+    if(!item) return false;
+    var content = String(item.content || '').trim();
+
+    // 1. If content is already explicitly stored in JSON grid_v2 format:
+    if(content.startsWith('{') && content.endsWith('}')){
+        try {
+            var data = JSON.parse(content);
+            if(data && (data._format === 'grid_v2' || (data.info && typeof data.info === 'object'))){
+                return true;
+            }
+        } catch(e){}
+    }
+
+    // 2. If it is an old product with existing legacy HTML or plain text content:
+    // It must stay in the original classic single editor!
+    if(content !== '' && content !== '<p><br></p>'){
+        return false;
+    }
+
+    // 3. If product has already been generated, approved, updated or completed in old system:
+    if(item.status !== 'Pending' || item.content_approved_at || item.content_updated_at){
+        return false;
+    }
+
+    // 4. Fresh new product in 'Pending' status with no content yet:
+    // Writer will create content using the new Multi-Box template!
+    return true;
+}
+
+function parseTaskContent(text, productType){
+    if(!text) text = '';
+    text = String(text).trim();
+
+    if(text.startsWith('{') && text.endsWith('}')){
+        try {
+            var data = JSON.parse(text);
+            if(data && (data._format === 'grid_v2' || data.info || data.aplus)){
+                if(!data.info) data.info = {};
+                if(!data.aplus) data.aplus = {};
+                var hasI = false, hasA = false;
+                for(var i=1; i<=6; i++){ if(data.info['img'+i] && data.info['img'+i].trim() !== '') hasI = true; }
+                for(var b=1; b<=4; b++){ if(data.aplus['b'+b] && data.aplus['b'+b].trim() !== '') hasA = true; }
+                data._hasInfo = hasI;
+                data._hasAplus = hasA;
+                return data;
+            }
+        } catch(e){}
+    }
+
+    var result = {
+        _format: 'grid_v2',
+        info: { img1: '', img2: '', img3: '', img4: '', img5: '', img6: '', extra: '' },
+        aplus: { b1: '', b2: '', b3: '', b4: '', extra: '' },
+        _hasInfo: false,
+        _hasAplus: false
+    };
+
+    if(!text) return result;
+
+    // Check if plain text contains IMAGE 1..6
+    var imgRegex = /(?:^|\n)\s*(?:IMAGE|Image|IMG|Img)\s*#?\s*([1-6])\b[^\n]*\n([\s\S]*?)(?=(?:\n\s*(?:IMAGE|Image|IMG|Img)\s*#?\s*[1-6]\b)|$)/gi;
+    var match;
+    var foundImg = false;
+    var firstImgIdx = -1;
+    while((match = imgRegex.exec(text)) !== null){
+        foundImg = true;
+        if(firstImgIdx === -1) firstImgIdx = match.index;
+        var num = match[1];
+        result.info['img' + num] = match[2].trim();
+    }
+    if(foundImg && firstImgIdx > 0){
+        result.info.extra = text.substring(0, firstImgIdx).trim();
+    }
+
+    // Check if plain text contains BANNER 1..4
+    var bannerRegex = /(?:^|\n)\s*(?:BANNER|Banner)\s*#?\s*([1-4])\b[^\n]*\n([\s\S]*?)(?=(?:\n\s*(?:BANNER|Banner)\s*#?\s*[1-4]\b)|$)/gi;
+    var bMatch;
+    var foundBanner = false;
+    var firstBannerIdx = -1;
+    while((bMatch = bannerRegex.exec(text)) !== null){
+        foundBanner = true;
+        if(firstBannerIdx === -1) firstBannerIdx = bMatch.index;
+        var bNum = bMatch[1];
+        result.aplus['b' + bNum] = bMatch[2].trim();
+    }
+    if(foundBanner && firstBannerIdx > 0){
+        result.aplus.extra = text.substring(0, firstBannerIdx).trim();
+    }
+
+    result._hasInfo = foundImg;
+    result._hasAplus = foundBanner;
+
+    return result;
+}
+
+function contentToReadableText(rawContent){
+    if(!rawContent) return '';
+    var text = String(rawContent).trim();
+    if(text.startsWith('{') && text.endsWith('}')){
+        try {
+            var parsed = JSON.parse(text);
+            if(parsed && (parsed._format === 'grid_v2' || parsed.info || parsed.aplus)){
+                var parts = [];
+                var infoBoxes = parsed.info || {};
+                var hasInfo = false;
+                for(var i=1; i<=6; i++){
+                    if(infoBoxes['img' + i] && infoBoxes['img' + i].trim() !== ''){
+                        hasInfo = true; break;
+                    }
+                }
+                if(hasInfo || (infoBoxes.extra && infoBoxes.extra.trim() !== '')){
+                    if(infoBoxes.extra && infoBoxes.extra.trim() !== ''){
+                        parts.push(infoBoxes.extra.trim());
+                    }
+                    for(var i=1; i<=6; i++){
+                        var val = (infoBoxes['img' + i] || '').trim();
+                        if(val){
+                            parts.push('IMAGE ' + i + ':\n' + val);
+                        }
+                    }
+                }
+
+                var aplusBoxes = parsed.aplus || {};
+                var hasAplus = false;
+                for(var b=1; b<=4; b++){
+                    if(aplusBoxes['b' + b] && aplusBoxes['b' + b].trim() !== ''){
+                        hasAplus = true; break;
+                    }
+                }
+                if(hasAplus || (aplusBoxes.extra && aplusBoxes.extra.trim() !== '')){
+                    if(aplusBoxes.extra && aplusBoxes.extra.trim() !== ''){
+                        parts.push(aplusBoxes.extra.trim());
+                    }
+                    for(var b=1; b<=4; b++){
+                        var bVal = (aplusBoxes['b' + b] || '').trim();
+                        if(bVal){
+                            parts.push('BANNER ' + b + ':\n' + bVal);
+                        }
+                    }
+                }
+                if(parts.length > 0) return parts.join('\n\n');
+            }
+        } catch(e){}
+    }
+    return getPlainText(rawContent);
+}
+
+function getTaskContentToSave(id){
+    var task = (typeof ALL_TASKS !== 'undefined') ? ALL_TASKS.find(function(t){ return String(t.id) === String(id); }) : null;
+    
+    // If this is a legacy product, save directly from original classic editor:
+    if(task && !isMultiBoxTask(task)){
+        var oldEditor = document.getElementById('editor-' + id);
+        return oldEditor ? oldEditor.innerHTML : (task.content || '');
+    }
+
+    var card = document.querySelector('.card[data-id="' + id + '"]');
+    if(!card){
+        var oldEditor = document.getElementById('editor-' + id);
+        return oldEditor ? oldEditor.innerHTML : (task ? task.content : '');
+    }
+
+    var prevParsed = task ? parseTaskContent(task.content, task.product_type) : { info:{}, aplus:{} };
+
+    var infoBoxes = {};
+    for(var i=1; i<=6; i++){
+        var el = document.getElementById('cbox-' + id + '-info-' + i);
+        if(el){
+            infoBoxes['img' + i] = (el.innerText || el.textContent || '').trim();
+        } else if(prevParsed.info && prevParsed.info['img' + i]){
+            infoBoxes['img' + i] = prevParsed.info['img' + i];
+        } else {
+            infoBoxes['img' + i] = '';
+        }
+    }
+    var infoExtraEl = document.getElementById('cbox-' + id + '-info-extra');
+    infoBoxes['extra'] = infoExtraEl ? (infoExtraEl.innerText || infoExtraEl.textContent || '').trim() : (prevParsed.info && prevParsed.info.extra ? prevParsed.info.extra : '');
+
+    var aplusBoxes = {};
+    for(var b=1; b<=4; b++){
+        var bEl = document.getElementById('cbox-' + id + '-aplus-' + b);
+        if(bEl){
+            aplusBoxes['b' + b] = (bEl.innerText || bEl.textContent || '').trim();
+        } else if(prevParsed.aplus && prevParsed.aplus['b' + b]){
+            aplusBoxes['b' + b] = prevParsed.aplus['b' + b];
+        } else {
+            aplusBoxes['b' + b] = '';
+        }
+    }
+    var aplusExtraEl = document.getElementById('cbox-' + id + '-aplus-extra');
+    aplusBoxes['extra'] = aplusExtraEl ? (aplusExtraEl.innerText || aplusExtraEl.textContent || '').trim() : (prevParsed.aplus && prevParsed.aplus.extra ? prevParsed.aplus.extra : '');
+
+    return JSON.stringify({
+        _format: 'grid_v2',
+        info: infoBoxes,
+        aplus: aplusBoxes
+    });
+}
+
+function clientContentGridChanged(id){
+    clientEditorChanged(id);
+}
+
+function buildProductContentSection(item, canEdit, lock, isWorker, isQa, originalForDiff){
+    // Legacy products: render classic single content editor exactly as before
+    if(!isMultiBoxTask(item)){
+        return `<div class="editor ${lock && !isWorker ? 'locked' : ''} ${isWorker || isQa ? 'locked' : ''}" id="editor-${item.id}" contenteditable="${canEdit ? 'true' : 'false'}" data-original="${encodeURIComponent(originalForDiff)}" oninput="clientEditorChanged(${item.id})" onblur="unmarkEditing(${item.id})">${item.content || ''}</div>`;
+    }
+
+    var isInfoProd  = item.product_type === 'Infographics';
+    var isAplusProd = item.product_type === 'A+' || item.product_type === 'A Plus';
+    var isBothProd  = item.product_type === 'Info + A Plus';
+
+    var parsed = parseTaskContent(item.content, item.product_type);
+
+    // Is A+ workflow active for this product?
+    var aplusStarted = false;
+    if(isBothProd){
+        var hasAplusContent = false;
+        if(parsed && parsed.aplus){
+            for(var b=1; b<=4; b++){
+                if(parsed.aplus['b' + b] && parsed.aplus['b' + b].trim() !== ''){
+                    hasAplusContent = true; break;
+                }
+            }
+        }
+        if(item.aplus_worker_name || hasAplusContent || (item.work_status === 'Info Done' && item.status === 'Pending') || (item.product_type === 'Info + A Plus' && item.work_completed_worker_name)){
+            aplusStarted = true;
+        }
+    }
+
+    var parsedOrig = null;
+    if(item.original_content && item.original_content !== item.content){
+        parsedOrig = parseTaskContent(item.original_content, item.product_type);
+    }
+
+    var html = `<div class="content-grid-wrap" id="content-grid-wrap-${item.id}">`;
+    html += `<div class="editor" id="editor-${item.id}" style="display:none;" data-original="${encodeURIComponent(originalForDiff)}">${escapeHtmlContent(item.content || '')}</div>`;
+
+    if(canEdit && !lock){
+        var autoFillLabel = 'Auto-Fill All Boxes from Single Text';
+        var autoFillTarget = 'auto';
+        if(isBothProd){
+            if(aplusStarted){
+                autoFillLabel = 'Auto-Fill A+ Banners';
+                autoFillTarget = 'aplus';
+            } else {
+                autoFillLabel = 'Auto-Fill Infographics';
+                autoFillTarget = 'info';
+            }
+        } else if(isAplusProd){
+            autoFillLabel = 'Auto-Fill A+ Banners';
+            autoFillTarget = 'aplus';
+        } else {
+            autoFillLabel = 'Auto-Fill Infographics';
+            autoFillTarget = 'info';
+        }
+
+        html += `<div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+            <button type="button" class="btn-quick-paste" onclick="openQuickPasteModal(${item.id}, '${autoFillTarget}')" style="background:#0f2035;border:1px solid #0284c7;color:#38bdf8;font-size:11.5px;font-weight:700;padding:5px 12px;border-radius:5px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s;">
+                <span>📋</span> ${autoFillLabel}
+            </button>
+        </div>`;
+    }
+
+    // 1. Infographics 6-Image Grid
+    if(isInfoProd || isBothProd){
+        var infoIsLocked = isBothProd ? (aplusStarted || lock || isWorker || isQa) : (lock || isWorker || isQa);
+        var infoCanEdit  = isBothProd ? (!aplusStarted && canEdit && !lock) : (canEdit && !lock);
+
+        if(isBothProd && aplusStarted){
+            html += `<div class="content-grid-header locked-header">
+                <span>🔒 Infographics Content (Phase 1 — Locked Reference)</span>
+                <span style="font-size:11px;font-weight:normal;color:#94a3b8;">Completed & Approved</span>
+            </div>`;
+        }
+
+        html += `<div class="content-grid-6" id="grid-info-${item.id}">`;
+        INFO_BOX_DEFS.forEach(function(box){
+            var text = (parsed.info && parsed.info['img' + box.num]) ? parsed.info['img' + box.num] : '';
+            var boxId = 'cbox-' + item.id + '-info-' + box.num;
+            var origBoxText = (parsedOrig && parsedOrig.info && parsedOrig.info['img' + box.num] !== undefined) ? parsedOrig.info['img' + box.num] : text;
+            var boxChanged = (parsedOrig !== null && origBoxText.trim() !== text.trim());
+
+            html += `<div class="content-card-box ${infoIsLocked ? 'is-locked' : ''}" style="${boxChanged ? 'border-color:#f59e0b;box-shadow:0 0 0 2px rgba(245,158,11,0.2);' : ''}">
+                <div class="content-box-head">
+                    <div class="content-box-badge">${box.label}</div>
+                    <div class="content-box-title" title="${escapeHtmlContent(box.title)}">
+                        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${box.title}</span>
+                        ${boxChanged ? '<span style="margin-left:auto;background:#78350f;color:#fef3c7;border:1px solid #f59e0b;font-size:9.5px;padding:1px 6px;border-radius:10px;font-weight:800;letter-spacing:.3px;white-space:nowrap;">✏ Modified</span>' : ''}
+                    </div>
+                </div>
+                <div class="content-box-body ${infoIsLocked ? 'locked' : ''}"
+                     id="${boxId}"
+                     contenteditable="${infoCanEdit ? 'true' : 'false'}"
+                     oninput="clientContentGridChanged(${item.id})"
+                     onfocus="markEditing(${item.id})"
+                     onblur="unmarkEditing(${item.id})">${escapeHtmlContent(text)}</div>
+            </div>`;
+        });
+        html += `</div>`;
+
+        var extraText = (parsed.info && parsed.info.extra) ? parsed.info.extra : '';
+        if(extraText || (!infoIsLocked && canEdit)){
+            html += `<div class="content-extra-bar" style="${!extraText && infoIsLocked ? 'display:none;' : ''}">
+                <div class="content-extra-title">📝 Additional Product Info / Overview:</div>
+                <div class="content-extra-body" id="cbox-${item.id}-info-extra"
+                     contenteditable="${infoCanEdit ? 'true' : 'false'}"
+                     oninput="clientContentGridChanged(${item.id})"
+                     onfocus="markEditing(${item.id})"
+                     onblur="unmarkEditing(${item.id})">${escapeHtmlContent(extraText)}</div>
+            </div>`;
+        }
+    }
+
+    // 2. A+ Banners 4-Banner Grid
+    if(isAplusProd || (isBothProd && aplusStarted)){
+        var aplusIsLocked = lock || isWorker || isQa;
+        var aplusCanEdit  = canEdit && !lock;
+
+        if(isBothProd){
+            html += `<div class="content-grid-header aplus-header" style="margin-top:14px;display:flex;justify-content:space-between;align-items:center;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span>🎨 A+ Banners Content (Phase 2)</span>
+                    <span style="font-size:11px;font-weight:normal;color:#e9d5ff;">4 Banners Template</span>
+                </div>
+                ${(aplusCanEdit && !aplusIsLocked) ? `
+                <button type="button" class="btn-quick-paste" onclick="openQuickPasteModal(${item.id}, 'aplus')" style="background:#581c87;border:1px solid #c084fc;color:#f3e8ff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;transition:all .15s;">
+                    <span>📋</span> Auto-Fill A+ Banners
+                </button>` : ''}
+            </div>`;
+        }
+
+        html += `<div class="content-grid-4" id="grid-aplus-${item.id}">`;
+        APLUS_BOX_DEFS.forEach(function(box){
+            var text = (parsed.aplus && parsed.aplus['b' + box.num]) ? parsed.aplus['b' + box.num] : '';
+            var boxId = 'cbox-' + item.id + '-aplus-' + box.num;
+            var origBoxText = (parsedOrig && parsedOrig.aplus && parsedOrig.aplus['b' + box.num] !== undefined) ? parsedOrig.aplus['b' + box.num] : text;
+            var boxChanged = (parsedOrig !== null && origBoxText.trim() !== text.trim());
+
+            html += `<div class="content-card-box ${aplusIsLocked ? 'is-locked' : ''}" style="${boxChanged ? 'border-color:#f59e0b;box-shadow:0 0 0 2px rgba(245,158,11,0.2);' : ''}">
+                <div class="content-box-head">
+                    <div class="content-box-badge">${box.label}</div>
+                    <div class="content-box-title">
+                        ${boxChanged ? '<span style="margin-left:auto;background:#78350f;color:#fef3c7;border:1px solid #f59e0b;font-size:9.5px;padding:1px 6px;border-radius:10px;font-weight:800;letter-spacing:.3px;white-space:nowrap;">✏ Modified</span>' : ''}
+                    </div>
+                </div>
+                <div class="content-box-body ${aplusIsLocked ? 'locked' : ''}"
+                     id="${boxId}"
+                     contenteditable="${aplusCanEdit ? 'true' : 'false'}"
+                     oninput="clientContentGridChanged(${item.id})"
+                     onfocus="markEditing(${item.id})"
+                     onblur="unmarkEditing(${item.id})">${escapeHtmlContent(text)}</div>
+            </div>`;
+        });
+        html += `</div>`;
+
+        var aplusExtraText = (parsed.aplus && parsed.aplus.extra) ? parsed.aplus.extra : '';
+        if(aplusExtraText || (!aplusIsLocked && canEdit)){
+            html += `<div class="content-extra-bar" style="${!aplusExtraText && aplusIsLocked ? 'display:none;' : ''}">
+                <div class="content-extra-title">📝 A+ Notes / Overview:</div>
+                <div class="content-extra-body" id="cbox-${item.id}-aplus-extra"
+                     contenteditable="${aplusCanEdit ? 'true' : 'false'}"
+                     oninput="clientContentGridChanged(${item.id})"
+                     onfocus="markEditing(${item.id})"
+                     onblur="unmarkEditing(${item.id})">${escapeHtmlContent(aplusExtraText)}</div>
+            </div>`;
+        }
+    }
+
+    // Informational note for Info + A Plus in Phase 1
+    if(isBothProd && !aplusStarted){
+        html += `<div style="margin-top:10px;padding:8px 14px;background:#0c1a2e;border:1px dashed #1e3a5f;border-radius:6px;font-size:11.5px;color:#7dd3fc;display:flex;align-items:center;gap:8px;">
+            <span>ℹ️ <strong>Phase 1 (Infographics):</strong> Active now. <strong>Phase 2 (A+ Banners 4-Box Template):</strong> Infographics complete/approve hone ke baad start hoga.</span>
+        </div>`;
+    }
+
+    html += `</div>`;
+    return html;
+}
+
+function openQuickPasteModal(taskId, preferredTarget){
+    var existingModal = document.getElementById('quick-paste-modal');
+    if(existingModal) existingModal.remove();
+
+    var task = (typeof ALL_TASKS !== 'undefined') ? ALL_TASKS.find(function(t){ return t.id == taskId; }) : null;
+    var pType = task ? task.product_type : 'Infographics';
+    var isBothProd = pType === 'Info + A Plus';
+    var isAplusProd = pType === 'A+' || pType === 'A Plus';
+
+    // Check if Infographics is locked in DOM (Phase 2 reference)
+    var infoBox1 = document.getElementById('cbox-' + taskId + '-info-1');
+    var isInfoLocked = infoBox1 ? (infoBox1.getAttribute('contenteditable') === 'false') : false;
+
+    var defaultTarget = preferredTarget || 'auto';
+    if(!preferredTarget){
+        if(isAplusProd){
+            defaultTarget = 'aplus';
+        } else if(isBothProd && isInfoLocked){
+            defaultTarget = 'aplus';
+        } else if(pType === 'Infographics'){
+            defaultTarget = 'info';
+        }
+    }
+
+    var modal = document.createElement('div');
+    modal.id = 'quick-paste-modal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px);';
+    modal.innerHTML = `
+    <div style="background:#0f1d32;border:1.5px solid #2563eb;border-radius:10px;width:100%;max-width:640px;padding:22px;box-shadow:0 10px 40px rgba(0,0,0,0.6);display:flex;flex-direction:column;gap:14px;color:#e2e8f0;font-family:inherit;">
+        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1e3a5f;padding-bottom:10px;">
+            <div style="font-size:15px;font-weight:700;color:#38bdf8;display:flex;align-items:center;gap:8px;">
+                <span>📋</span> Auto-Fill Content Boxes
+            </div>
+            <button type="button" onclick="document.getElementById('quick-paste-modal').remove()" style="background:transparent;border:none;color:#94a3b8;font-size:18px;cursor:pointer;line-height:1;">✕</button>
+        </div>
+
+        <div style="background:#0b192e;border:1px solid #1e3a5f;border-radius:6px;padding:10px 14px;font-size:12px;color:#94a3b8;display:flex;flex-direction:column;gap:6px;">
+            <div style="color:#f8fafc;font-weight:600;display:flex;align-items:center;gap:6px;">
+                <span>🎯 Target Section:</span>
+            </div>
+            <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;color:#e2e8f0;">
+                <label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;">
+                    <input type="radio" name="quick-paste-target" value="auto" ${defaultTarget === 'auto' ? 'checked' : ''}> 
+                    <span>⚡ Auto-Detect (Smart)</span>
+                </label>
+                ${(isBothProd || isAplusProd) ? `
+                <label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;">
+                    <input type="radio" name="quick-paste-target" value="aplus" ${defaultTarget === 'aplus' ? 'checked' : ''}> 
+                    <span style="color:#c084fc;font-weight:600;">🟪 A+ Banners Only (Banners 1-4)</span>
+                </label>` : ''}
+                ${(isBothProd || pType === 'Infographics') ? `
+                <label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;">
+                    <input type="radio" name="quick-paste-target" value="info" ${defaultTarget === 'info' ? 'checked' : ''}> 
+                    <span style="color:#38bdf8;font-weight:600;">🖼 Infographics Only (Images 1-6)</span>
+                </label>` : ''}
+            </div>
+            <div style="font-size:11px;color:#38bdf8;margin-top:2px;display:flex;align-items:center;gap:5px;">
+                <span>🛡️</span> <strong>Existing &amp; locked boxes safe rahengay:</strong> Pehlay se mojood content blank ya change nahi ho ga.
+            </div>
+        </div>
+
+        <textarea id="quick-paste-input" style="width:100%;min-height:220px;background:#060d1a;border:1px solid #334155;border-radius:6px;padding:12px;color:#f8fafc;font-size:13px;font-family:inherit;line-height:1.6;resize:vertical;outline:none;box-sizing:border-box;" placeholder="${defaultTarget === 'aplus' ? 'BANNER 1 — HERO PRODUCT\nEcoQuality Containers...\n\nBANNER 2 — FEATURES\nMicrowave & Freezer Safe...' : 'IMAGE 1 — FEATURES\nEcoQuality Food Container...\n\nIMAGE 2 — DIMENSIONS\nLength 5.5 inch...'}"></textarea>
+
+        <div style="display:flex;justify-content:flex-end;gap:10px;">
+            <button type="button" onclick="document.getElementById('quick-paste-modal').remove()" style="background:#334155;color:#fff;border:none;padding:8px 16px;border-radius:5px;font-size:13px;cursor:pointer;">Cancel</button>
+            <button type="button" onclick="applyQuickPaste(${taskId})" style="background:#2563eb;color:#fff;border:none;padding:8px 18px;border-radius:5px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">⚡ Distribute into Boxes</button>
+        </div>
+    </div>`;
+    document.body.appendChild(modal);
+    setTimeout(function(){ 
+        var inp = document.getElementById('quick-paste-input');
+        if(inp) inp.focus(); 
+    }, 100);
+}
+
+function applyQuickPaste(taskId){
+    var input = document.getElementById('quick-paste-input');
+    if(!input) return;
+    var rawText = input.value.trim();
+    if(!rawText){ alert('Kuch text paste karein!'); return; }
+
+    var targetRadio = document.querySelector('input[name="quick-paste-target"]:checked');
+    var targetMode = targetRadio ? targetRadio.value : 'auto';
+
+    var task = (typeof ALL_TASKS !== 'undefined') ? ALL_TASKS.find(function(t){ return t.id == taskId; }) : null;
+    var pType = task ? task.product_type : 'Infographics';
+    var isBothProd = pType === 'Info + A Plus';
+
+    var parsed = parseTaskContent(rawText, pType);
+
+    // Check locked state in DOM
+    var infoBox1 = document.getElementById('cbox-' + taskId + '-info-1');
+    var isInfoLocked = infoBox1 ? (infoBox1.getAttribute('contenteditable') === 'false') : false;
+
+    // Decide whether to update info and/or aplus
+    var updateInfo = false;
+    var updateAplus = false;
+
+    if(targetMode === 'info'){
+        updateInfo = true;
+    } else if(targetMode === 'aplus'){
+        updateAplus = true;
+    } else {
+        // 'auto' mode:
+        if(parsed._hasInfo){
+            updateInfo = true;
+        }
+        if(parsed._hasAplus){
+            updateAplus = true;
+        }
+        // If neither explicit header was matched:
+        if(!parsed._hasInfo && !parsed._hasAplus){
+            if(pType === 'Infographics'){
+                updateInfo = true;
+            } else if(pType === 'A+' || pType === 'A Plus'){
+                updateAplus = true;
+            } else if(isBothProd){
+                if(isInfoLocked){
+                    // Phase 2: Info is locked reference, so update A+!
+                    updateAplus = true;
+                } else {
+                    // Phase 1: Update info
+                    updateInfo = true;
+                }
+            }
+        }
+    }
+
+    // Fallback: If user explicitly targeted 'aplus' or 'info' without headers, split by double newlines if needed
+    if(targetMode === 'aplus' && !parsed._hasAplus){
+        var paragraphs = rawText.split(/\n\s*\n/).map(function(s){ return s.trim(); }).filter(Boolean);
+        if(paragraphs.length > 1){
+            for(var p=0; p<Math.min(4, paragraphs.length); p++){
+                parsed.aplus['b' + (p+1)] = paragraphs[p];
+            }
+        } else {
+            parsed.aplus.b1 = rawText;
+        }
+    } else if(targetMode === 'info' && !parsed._hasInfo){
+        var infoParagraphs = rawText.split(/\n\s*\n/).map(function(s){ return s.trim(); }).filter(Boolean);
+        if(infoParagraphs.length > 1){
+            for(var ip=0; ip<Math.min(6, infoParagraphs.length); ip++){
+                parsed.info['img' + (ip+1)] = infoParagraphs[ip];
+            }
+        } else {
+            parsed.info.img1 = rawText;
+        }
+    }
+
+    var updatedCount = 0;
+
+    // 1. Update Infographics boxes ONLY if updateInfo is true AND box is editable
+    if(updateInfo){
+        for(var i=1; i<=6; i++){
+            var el = document.getElementById('cbox-' + taskId + '-info-' + i);
+            // CRITICAL: NEVER modify locked box!
+            if(el && el.getAttribute('contenteditable') === 'true'){
+                var newVal = parsed.info ? (parsed.info['img' + i] || '').trim() : '';
+                // CRITICAL: NEVER blank out existing content! Only set if newVal is non-empty!
+                if(newVal !== ''){
+                    el.innerText = newVal;
+                    updatedCount++;
+                }
+            }
+        }
+        var infoExtraEl = document.getElementById('cbox-' + taskId + '-info-extra');
+        if(infoExtraEl && infoExtraEl.getAttribute('contenteditable') === 'true'){
+            var newExtra = parsed.info ? (parsed.info.extra || '').trim() : '';
+            if(newExtra !== ''){
+                infoExtraEl.innerText = newExtra;
+            }
+        }
+    }
+
+    // 2. Update A+ boxes ONLY if updateAplus is true AND box is editable
+    if(updateAplus){
+        for(var b=1; b<=4; b++){
+            var bEl = document.getElementById('cbox-' + taskId + '-aplus-' + b);
+            // CRITICAL: NEVER modify locked box!
+            if(bEl && bEl.getAttribute('contenteditable') === 'true'){
+                var newBVal = parsed.aplus ? (parsed.aplus['b' + b] || '').trim() : '';
+                // CRITICAL: NEVER blank out existing content! Only set if newBVal is non-empty!
+                if(newBVal !== ''){
+                    bEl.innerText = newBVal;
+                    updatedCount++;
+                }
+            }
+        }
+        var aplusExtraEl = document.getElementById('cbox-' + taskId + '-aplus-extra');
+        if(aplusExtraEl && aplusExtraEl.getAttribute('contenteditable') === 'true'){
+            var newAplusExtra = parsed.aplus ? (parsed.aplus.extra || '').trim() : '';
+            if(newAplusExtra !== ''){
+                aplusExtraEl.innerText = newAplusExtra;
+            }
+        }
+    }
+
+    // Trigger change detection
+    clientContentGridChanged(taskId);
+
+    var modal = document.getElementById('quick-paste-modal');
+    if(modal) modal.remove();
+
+    if(updatedCount > 0){
+        var targetLabel = (updateAplus && !updateInfo) ? 'A+ Banners' : (updateInfo && !updateAplus ? 'Infographics' : 'Content');
+        console.log('⚡ ' + updatedCount + ' ' + targetLabel + ' boxes updated successfully. Existing boxes preserved.');
     }
 }
 
@@ -710,7 +1340,7 @@ ${workerStatusBar}
 ${workTimeBadge}
 ${adminTimeBlock}
 ${buildFamilyGroupingSection(item, isAdmin)}
-${((!isWorker && !isQa) || workerCanSee) && !hideEditor ? `<div class="editor ${lock&&!isWorker?'locked':''} ${isWorker||isQa?'locked':''}" id="editor-${item.id}" contenteditable="${canEdit?'true':'false'}" data-original="${encodeURIComponent(originalForDiff)}" oninput="clientEditorChanged(${item.id})" onblur="unmarkEditing(${item.id})">${item.content||''}</div>` : ''}
+${((!isWorker && !isQa) || workerCanSee) && !hideEditor ? buildProductContentSection(item, canEdit, lock, isWorker, isQa, originalForDiff) : ''}
 ${(isAdmin || isWorker) && lock && item.original_content && item.original_content !== item.content ? `<div class="diff-bar" id="diff-label-${item.id}"><span class="diff-legend">🔍 Client Changes — <span class="diff-legend-add">■ Added</span> &nbsp; <span class="diff-legend-del">■ Deleted</span></span></div><div class="diff-preview" id="diff-${item.id}"></div>` : ''}
 ${(ROLE === 'eco_client' || isAdmin) && !lock ? `<div class="diff-bar" id="diff-label-${item.id}" style="display:none;"><span class="diff-legend">📝 Changes — <span class="diff-legend-add">■ Added</span> &nbsp; <span class="diff-legend-del">■ Deleted</span></span><button class="btn-revert" id="revert-${item.id}" onclick="revertToOriginal(${item.id})">↩ Go Back to Original</button></div><div class="diff-preview" id="diff-${item.id}" style="display:none;"></div>` : ''}
 ${buildQABoxes(item, isAdmin, isQa)}
@@ -1081,7 +1711,33 @@ function unmarkEditing(id){ setTimeout(function(){ IS_EDITING[id] = false; }, 50
 function revertToOriginal(id){
     var editor = document.getElementById('editor-' + id);
     if(!editor) return;
-    editor.innerHTML = decodeURIComponent(editor.getAttribute('data-original'));
+    var originalRaw = decodeURIComponent(editor.getAttribute('data-original') || '');
+
+    var task = (typeof ALL_TASKS !== 'undefined') ? ALL_TASKS.find(function(t){ return String(t.id) === String(id); }) : null;
+    if(task && !isMultiBoxTask(task)){
+        editor.innerHTML = originalRaw;
+        IS_EDITING[id] = false;
+        clientEditorChanged(id);
+        return;
+    }
+
+    var parsed = parseTaskContent(originalRaw, task ? task.product_type : '');
+
+    for(var i=1; i<=6; i++){
+        var el = document.getElementById('cbox-' + id + '-info-' + i);
+        if(el) el.innerText = (parsed.info && parsed.info['img' + i]) ? parsed.info['img' + i] : '';
+    }
+    var infoExtraEl = document.getElementById('cbox-' + id + '-info-extra');
+    if(infoExtraEl) infoExtraEl.innerText = (parsed.info && parsed.info.extra) ? parsed.info.extra : '';
+
+    for(var b=1; b<=4; b++){
+        var bEl = document.getElementById('cbox-' + id + '-aplus-' + b);
+        if(bEl) bEl.innerText = (parsed.aplus && parsed.aplus['b' + b]) ? parsed.aplus['b' + b] : '';
+    }
+    var aplusExtraEl = document.getElementById('cbox-' + id + '-aplus-extra');
+    if(aplusExtraEl) aplusExtraEl.innerText = (parsed.aplus && parsed.aplus.extra) ? parsed.aplus.extra : '';
+
+    editor.innerHTML = escapeHtmlContent(originalRaw);
     IS_EDITING[id] = false;
     clientEditorChanged(id);
 }
@@ -1116,13 +1772,13 @@ function renderDiff(id, overrideOriginal, overrideCurrent){
     if(!preview) return;
     var originalText, currentText;
     if(overrideOriginal !== undefined){
-        originalText = getPlainText(overrideOriginal);
-        currentText  = getPlainText(overrideCurrent);
+        originalText = contentToReadableText(overrideOriginal);
+        currentText  = contentToReadableText(overrideCurrent);
     } else {
         var editor = document.getElementById('editor-' + id);
         if(!editor) return;
-        originalText = getPlainText(decodeURIComponent(editor.getAttribute('data-original')));
-        currentText  = getPlainText(editor.innerHTML);
+        originalText = contentToReadableText(decodeURIComponent(editor.getAttribute('data-original') || ''));
+        currentText  = contentToReadableText(getTaskContentToSave(id));
     }
     if(currentText.trim() === originalText.trim()){
         preview.style.display = 'none'; preview.innerHTML = '';
@@ -1146,12 +1802,13 @@ function renderDiff(id, overrideOriginal, overrideCurrent){
 function clientEditorChanged(id){
     IS_EDITING[id] = true;
     if(ROLE !== 'eco_client' && ROLE !== 'administrator') return;
-    var editor = document.getElementById('editor-' + id);
     var uBtn   = document.getElementById('u-' + id);
     var aBtn   = document.getElementById('a-' + id);
-    if(!editor || !uBtn || !aBtn) return;
-    var originalText = getPlainText(decodeURIComponent(editor.getAttribute('data-original')));
-    var currentText  = getPlainText(editor.innerHTML);
+    if(!uBtn || !aBtn) return;
+    var editor = document.getElementById('editor-' + id);
+    var originalRaw = editor ? decodeURIComponent(editor.getAttribute('data-original') || '') : '';
+    var originalText = contentToReadableText(originalRaw);
+    var currentText  = contentToReadableText(getTaskContentToSave(id));
     var changed = currentText.trim() !== originalText.trim();
     if(changed){ uBtn.disabled = false; aBtn.disabled = true; }
     else        { uBtn.disabled = true;  aBtn.disabled = false; }
@@ -1211,12 +1868,13 @@ function headTouch(e, id){
 
 /* ── Save task (client approve/update) ───────── */
 function save(id, status){
-    var editor  = document.getElementById('editor-' + id);
-    var content = editor.innerHTML;
-    if(content.trim() === '') return;
+    var content = getTaskContentToSave(id);
+    var readable = contentToReadableText(content);
+    if(readable.trim() === '') return;
     var fd = new FormData();
     fd.append('action', 'save_task'); fd.append('id', id);
     fd.append('content', content);   fd.append('status', status);
+    if(typeof CSRF_TOKEN !== 'undefined') fd.append('_csrf', CSRF_TOKEN);
     fetch('index.php', {method:'POST', body:fd})
         .then(r => r.json())
         .then(r => { if(r.success) loadTasks(); });
@@ -1224,12 +1882,13 @@ function save(id, status){
 
 /* ── Writer save ─────────────────────────────── */
 function writerSave(id){
-    var editor  = document.getElementById('editor-' + id);
-    var content = editor.innerHTML;
-    if(content.replace(/<[^>]+>/g, '').trim() === ''){ alert('Content khali hai!'); return; }
+    var content = getTaskContentToSave(id);
+    var readable = contentToReadableText(content);
+    if(readable.trim() === ''){ alert('Content khali hai!'); return; }
     var fd = new FormData();
     fd.append('action', 'save_task'); fd.append('id', id);
     fd.append('content', content);   fd.append('status', 'Generated');
+    if(typeof CSRF_TOKEN !== 'undefined') fd.append('_csrf', CSRF_TOKEN);
     fetch('index.php', {method:'POST', body:fd})
         .then(r => r.json())
         .then(r => { if(r.success){ IS_EDITING[id] = false; loadTasks(); } });
