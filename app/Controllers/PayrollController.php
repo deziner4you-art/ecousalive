@@ -19,11 +19,12 @@ class PayrollController {
         AuthMiddleware::requireAuth();
         RoleMiddleware::requireAdmin();
         verify_csrf();
-        $workerId  = intval($_POST['worker_id']         ?? 0);
-        $rateInfo  = floatval($_POST['rate_infographics'] ?? 0);
-        $rateAplus = floatval($_POST['rate_aplus']        ?? 0);
-        $fine      = floatval($_POST['fine']              ?? 0);
-        Payslip::saveWorkerRate($workerId, $rateInfo, $rateAplus, $fine);
+        $workerId   = intval($_POST['worker_id'] ?? 0);
+        $rateInfo   = floatval($_POST['rate_infographics'] ?? 0);
+        $rateAplus  = floatval($_POST['rate_aplus'] ?? 0);
+        $fine       = floatval($_POST['fine'] ?? 0);
+        $rateAiWork = isset($_POST['rate_ai_work']) ? floatval($_POST['rate_ai_work']) : (isset($_POST['rate_per_product']) ? floatval($_POST['rate_per_product']) : null);
+        Payslip::saveWorkerRate($workerId, $rateInfo, $rateAplus, $fine, $rateAiWork);
         json_success();
     }
 

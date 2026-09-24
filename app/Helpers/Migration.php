@@ -168,6 +168,7 @@ function runMigrations(): void {
     try{ db()->exec("ALTER TABLE eco_worker_rates ADD COLUMN fine_per_revision  DECIMAL(10,2) DEFAULT 0.00"); }catch(Exception $e){}
     try{ db()->exec("ALTER TABLE eco_worker_rates ADD COLUMN rate_infographics DECIMAL(10,2) DEFAULT 0.00"); }catch(Exception $e){}
     try{ db()->exec("ALTER TABLE eco_worker_rates ADD COLUMN rate_aplus        DECIMAL(10,2) DEFAULT 0.00"); }catch(Exception $e){}
+    try{ db()->exec("ALTER TABLE eco_worker_rates ADD COLUMN rate_ai_work      DECIMAL(10,2) DEFAULT 0.00"); }catch(Exception $e){}
 
     /* ── Penalties & Revisions ──────────────────────── */
     try{ db()->exec("
