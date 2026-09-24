@@ -110,6 +110,9 @@
             <button class="tab-btn" onclick="switchView('both-phases')">
                 <span>🔄</span> 4. Info + A Plus Phases
             </button>
+            <button class="tab-btn" onclick="switchView('ai-worker-payroll')">
+                <span>🤖</span> 5. AI Worker Rate &amp; Payroll View
+            </button>
         </div>
     </div>
 
@@ -170,6 +173,19 @@
         <div id="both-card-container"></div>
     </div>
 
+    <!-- ══════════════════════════════════════════════════════════
+         VIEW 5: AI WORKER RATE & PAYROLL ACCOUNT
+         ══════════════════════════════════════════════════════════ -->
+    <div id="view-ai-worker-payroll" class="view-panel">
+        <div class="explainer-box">
+            <strong>🤖 AI Worker Pricing Rate &amp; Payroll Account (Live Demo):</strong><br>
+            • <strong>AI Worker (Irfan):</strong> Is ke liye <code>Info:</code> aur <code>A+:</code> ke inputs hata diye gaye hain. Sirf <span style="color:#c084fc;font-weight:bold;">AI Work:</span> aur <strong>Fine:</strong> ka input nazar aata hai!<br>
+            • <strong>Regular Worker (Pakeeza):</strong> Us ke pass normal <code>Info:</code> aur <code>A+:</code> ke alag alag rates rehte hain.<br>
+            • <strong>Automatic AI Work Counting:</strong> AI Worker ke tamam completed <strong>AI Work Done</strong> tasks portal mein us ke account mein count hotay hain aur rate ke mutabiq <strong>Earned (This Cycle)</strong> aur <strong>Payroll Payslip</strong> calculate hoti hai!
+        </div>
+        <div id="ai-worker-payroll-container"></div>
+    </div>
+
     <!-- Global Mocks for tasks.js -->
     <script>
         var ROLE       = 'eco_client';
@@ -186,6 +202,7 @@
         function switchTab() {}
         function loadTasks() { renderAllViews(); }
         function formatDualTime(dt) { return { pak: 'Sep 24, 06:30 PM PKT', us: 'Sep 24, 09:30 AM ET' }; }
+        function formatWorkTime(sec) { return (sec ? Math.floor(sec/60) + 'm' : '0m'); }
         function updateNotifications() {}
         function buildFamilyGroupingSection() { return ''; }
         function buildSeoSection() { return ''; }
@@ -377,7 +394,157 @@
             document.getElementById('both-card-container').innerHTML = 
                 '<div class="card open" data-id="104">' + buildCard(taskBoth) + '</div>';
 
+            // View 5: AI Worker Payroll Demo
+            renderAiWorkerPayrollDemo();
+
             ROLE = prevRole;
+        }
+
+        var demoAiRate = 150.00;
+        var demoAiFine = 0.00;
+        var demoCompletedTasks = 42;
+        var demoPendingPayslip = 2;
+
+        function saveAiRateDemo(workerId){
+            var inp = document.getElementById('rate-ai-' + workerId);
+            var finp = document.getElementById('fine-' + workerId);
+            if(inp) demoAiRate = parseFloat(inp.value) || 0;
+            if(finp) demoAiFine = parseFloat(finp.value) || 0;
+
+            renderAiWorkerPayrollDemo();
+
+            var msgEl = document.getElementById('ai-save-msg');
+            if(msgEl){
+                msgEl.style.display = 'inline-block';
+                setTimeout(function(){ msgEl.style.display = 'none'; }, 2500);
+            }
+        }
+
+        function renderAiWorkerPayrollDemo(){
+            var earnedThisCycle = demoCompletedTasks * demoAiRate;
+            var projectedTotal = (demoCompletedTasks + demoPendingPayslip) * demoAiRate;
+
+            var html = `
+            <div style="background:#0f2035;border:1px solid #1e3a5f;border-radius:10px;padding:18px;margin-bottom:16px;">
+                <div style="font-size:14px;font-weight:700;color:#38bdf8;margin-bottom:12px;display:flex;align-items:center;gap:8px;">
+                    <span>⚙️</span> Worker Rates Table (Live Comparison: AI Worker vs Graphic Designer)
+                </div>
+
+                <div style="display:flex;flex-direction:column;gap:10px;">
+                    <!-- ROW 1: AI WORKER (IRFAN) -->
+                    <div style="background:#071428;border:1.5px solid #8b5cf6;border-radius:8px;overflow:hidden;box-shadow:0 4px 14px rgba(139,92,246,0.15);">
+                        <div style="display:flex;align-items:center;gap:8px;padding:12px 16px;flex-wrap:wrap;">
+                            <div style="display:flex;align-items:center;gap:8px;width:210px;flex-shrink:0;">
+                                <div style="font-weight:bold;color:#f8fafc;font-size:14px;">Irfan</div>
+                                <div style="font-size:10px;color:#f3e8ff;background:#581c87;border:1px solid #9333ea;padding:2px 8px;border-radius:4px;font-weight:700;letter-spacing:.5px;">AI WORKER</div>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:#0c1a2e;padding:6px 12px;border-radius:6px;border:1px solid #1e3a5f;">
+                                <span style="color:#a78bfa;font-size:11px;font-weight:700;white-space:nowrap;">AI Work:</span>
+                                <input type="number" class="rate-input" id="rate-ai-99" value="${demoAiRate.toFixed(2)}" min="0" step="0.01" style="width:75px;padding:4px 6px;background:#060d1a;border:1px solid #7c3aed;color:#f3e8ff;border-radius:4px;outline:none;font-weight:bold;" title="AI Work rate">
+                                
+                                <span style="color:#94a3b8;font-size:11px;white-space:nowrap;margin-left:6px;">Fine:</span>
+                                <input type="number" class="rate-input" id="fine-99" value="${demoAiFine.toFixed(2)}" min="0" step="0.01" style="width:55px;padding:4px 6px;background:#060d1a;border:1px solid #334155;color:#e2e8f0;border-radius:4px;outline:none;">
+                                
+                                <button class="inv-btn inv-btn-blue" style="background:#7c3aed;color:#fff;border:none;padding:5px 12px;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;" onclick="saveAiRateDemo(99)">Save</button>
+                                <span id="ai-save-msg" style="display:none;color:#4ade80;font-size:11px;font-weight:700;margin-left:6px;">✅ Saved!</span>
+                                <span style="font-size:10px;color:#a78bfa;margin-left:4px;">(✨ Info &amp; A+ removed!)</span>
+                            </div>
+                            <div style="display:flex;gap:6px;align-items:center;margin-left:auto;flex-shrink:0;flex-wrap:wrap;">
+                                <div style="background:#0a1628;border:1px solid #1e3a5f;border-radius:6px;padding:5px 10px;text-align:center;min-width:75px;">
+                                    <div style="color:#64748b;font-size:9px;font-weight:700;">RATE / TASK</div>
+                                    <div style="color:#a78bfa;font-size:12px;font-weight:bold;margin-top:2px;">PKR ${demoAiRate.toFixed(0)}</div>
+                                </div>
+                                <div style="background:#0a1628;border:1px solid #16a34a55;border-radius:6px;padding:5px 10px;text-align:center;min-width:85px;">
+                                    <div style="color:#475569;font-size:9px;font-weight:700;">LAST TOTAL PAID</div>
+                                    <div style="color:#4ade80;font-size:12px;font-weight:bold;margin-top:2px;">PKR ${earnedThisCycle.toFixed(0)}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Irfan Account Ledger Inline -->
+                        <div style="border-top:1px solid #1e3a5f;background:#060d1a;padding:16px;">
+                            <div style="font-size:12px;font-weight:700;color:#c084fc;margin-bottom:10px;display:flex;align-items:center;gap:6px;">
+                                <span>📊</span> Irfan (AI Worker) Live Progress &amp; Work Counts:
+                            </div>
+
+                            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+                                <div style="flex:1;min-width:70px;background:#0a1628;border:1px solid #0ea5e944;border-radius:7px;padding:10px;text-align:center;">
+                                    <div style="color:#475569;font-size:9px;font-weight:700;">PENDING</div>
+                                    <div style="color:#0ea5e9;font-size:20px;font-weight:bold;margin-top:3px;">0</div>
+                                </div>
+                                <div style="flex:1;min-width:70px;background:#0a1628;border:1px solid #ea580c44;border-radius:7px;padding:10px;text-align:center;">
+                                    <div style="color:#475569;font-size:9px;font-weight:700;">WORKING</div>
+                                    <div style="color:#ea580c;font-size:20px;font-weight:bold;margin-top:3px;">2</div>
+                                </div>
+                                <div style="flex:1;min-width:70px;background:#0a1628;border:1px solid #b4530944;border-radius:7px;padding:10px;text-align:center;">
+                                    <div style="color:#475569;font-size:9px;font-weight:700;">PAUSED</div>
+                                    <div style="color:#b45309;font-size:20px;font-weight:bold;margin-top:3px;">0</div>
+                                </div>
+                                <div style="flex:1;min-width:70px;background:#0a1628;border:1px solid #16a34a44;border-radius:7px;padding:10px;text-align:center;">
+                                    <div style="color:#475569;font-size:9px;font-weight:700;color:#4ade80;">AI WORK DONE</div>
+                                    <div style="color:#4ade80;font-size:20px;font-weight:bold;margin-top:3px;">${demoCompletedTasks}</div>
+                                </div>
+                                <div style="flex:1;min-width:70px;background:#0a1628;border:1px solid #2563eb44;border-radius:7px;padding:10px;text-align:center;">
+                                    <div style="color:#475569;font-size:9px;font-weight:700;">INVOICED</div>
+                                    <div style="color:#93c5fd;font-size:20px;font-weight:bold;margin-top:3px;">40</div>
+                                </div>
+                                <div style="flex:1;min-width:70px;background:#0a1628;border:1px solid #16a34a44;border-radius:7px;padding:10px;text-align:center;">
+                                    <div style="color:#475569;font-size:9px;font-weight:700;">PAID</div>
+                                    <div style="color:#4ade80;font-size:20px;font-weight:bold;margin-top:3px;">40</div>
+                                </div>
+                                <div style="flex:1;min-width:70px;background:#0a1628;border:1px solid #fbbf2444;border-radius:7px;padding:10px;text-align:center;">
+                                    <div style="color:#475569;font-size:9px;font-weight:700;color:#fbbf24;">PAYSLIP PENDING</div>
+                                    <div style="color:#fbbf24;font-size:20px;font-weight:bold;margin-top:3px;">${demoPendingPayslip}</div>
+                                </div>
+                            </div>
+
+                            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                                <div style="flex:1;min-width:110px;background:#0a1628;border:1px solid #f8717144;border-radius:7px;padding:10px;text-align:center;">
+                                    <div style="color:#64748b;font-size:9px;font-weight:700;">PREV. D4U (DEDUCT)</div>
+                                    <div style="color:#f87171;font-size:14px;font-weight:bold;">PKR 0.00</div>
+                                </div>
+                                <div style="flex:1;min-width:110px;background:#0a1628;border:1px solid #93c5fd44;border-radius:7px;padding:10px;text-align:center;">
+                                    <div style="color:#64748b;font-size:9px;font-weight:700;">EARNED (THIS CYCLE)</div>
+                                    <div style="color:#93c5fd;font-size:14px;font-weight:bold;">PKR ${earnedThisCycle.toFixed(2)}</div>
+                                    <div style="color:#4ade80;font-size:10px;margin-top:2px;">${demoCompletedTasks} AI Tasks Done</div>
+                                </div>
+                                <div style="flex:1;min-width:110px;background:#0a1628;border:1px solid #4ade8044;border-radius:7px;padding:10px;text-align:center;">
+                                    <div style="color:#64748b;font-size:9px;font-weight:700;">PROJECTED TOTAL</div>
+                                    <div style="color:#4ade80;font-size:14px;font-weight:bold;">PKR ${projectedTotal.toFixed(2)}</div>
+                                    <div style="color:#64748b;font-size:9px;margin-top:2px;">At payroll generation</div>
+                                </div>
+                                <div style="flex:1;min-width:110px;background:#0a1628;border:1px solid #7c3aed66;border-radius:7px;padding:10px;text-align:center;">
+                                    <div style="color:#64748b;font-size:9px;font-weight:700;">RATE / PRODUCT</div>
+                                    <div style="color:#a78bfa;font-size:14px;font-weight:bold;">PKR ${demoAiRate.toFixed(2)}</div>
+                                    <div style="color:#64748b;font-size:9px;margin-top:2px;">${demoPendingPayslip} pending payslip</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ROW 2: REGULAR WORKER (PAKEEZA) FOR COMPARISON -->
+                    <div style="background:#071428;border:1px solid #1e3a5f;border-radius:8px;overflow:hidden;opacity:0.85;">
+                        <div style="display:flex;align-items:center;gap:8px;padding:12px 16px;flex-wrap:wrap;">
+                            <div style="display:flex;align-items:center;gap:8px;width:210px;flex-shrink:0;">
+                                <div style="font-weight:bold;color:#f8fafc;font-size:14px;">pakeeza</div>
+                                <div style="font-size:10px;color:#94a3b8;background:#1e293b;padding:2px 8px;border-radius:4px;font-weight:600;">WORKER (DESIGNER)</div>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                                <span style="color:#64748b;font-size:10px;white-space:nowrap;">Info:</span>
+                                <input type="number" class="rate-input" value="100.00" style="width:60px;padding:3px;background:#071428;border:1px solid #1e3a5f;color:#e2e8f0;border-radius:4px;" readonly>
+                                <span style="color:#64748b;font-size:10px;white-space:nowrap;">A+:</span>
+                                <input type="number" class="rate-input" value="150.00" style="width:60px;padding:3px;background:#071428;border:1px solid #1e3a5f;color:#e2e8f0;border-radius:4px;" readonly>
+                                <span style="color:#64748b;font-size:10px;white-space:nowrap;margin-left:4px;">Fine:</span>
+                                <input type="number" class="rate-input" value="0.00" style="width:55px;padding:3px;background:#071428;border:1px solid #1e3a5f;color:#e2e8f0;border-radius:4px;" readonly>
+                                <button class="inv-btn" style="background:#334155;color:#fff;border:none;padding:4px 8px;font-size:11px;border-radius:4px;">Save</button>
+                                <span style="font-size:10px;color:#64748b;margin-left:4px;">(Normal Info &amp; A+ inputs)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+
+            document.getElementById('ai-worker-payroll-container').innerHTML = html;
         }
 
         function switchView(viewName) {
@@ -392,6 +559,9 @@
 
             if(viewName === 'admin-diff') {
                 setTimeout(function(){ renderDiff(102, taskAdminDiff.original_content, taskAdminDiff.content); }, 50);
+            }
+            if(viewName === 'ai-worker-payroll') {
+                renderAiWorkerPayrollDemo();
             }
         }
 

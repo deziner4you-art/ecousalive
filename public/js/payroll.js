@@ -304,10 +304,15 @@ function loadWorkerRates(filterMonth = null){
     <div style="font-size:10px;color:#94a3b8;background:#1e293b;padding:2px 6px;border-radius:4px;white-space:nowrap;font-weight:600;text-transform:uppercase;">${roleLabel[w.role]||w.role}</div>
   </div>
   <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;" onclick="event.stopPropagation()">
+    ${(w.role === 'ai_work') ? `
+    <span style="color:#a78bfa;font-size:10px;font-weight:700;white-space:nowrap;">AI Work:</span>
+    <input type="number" class="rate-input" id="rate-ai-${w.id}" value="${parseFloat(w.rate_ai_work || w.rate_per_product || w.rate_infographics || 0).toFixed(2)}" min="0" step="0.01" style="width:65px;padding:3px;background:#071428;border:1px solid #7c3aed66;color:#e2e8f0;border-radius:4px;outline:none;" title="AI Work rate">
+    ` : `
     <span style="color:#64748b;font-size:10px;white-space:nowrap;">Info:</span>
     <input type="number" class="rate-input" id="rate-info-${w.id}" value="${parseFloat(w.rate_infographics||0).toFixed(2)}" min="0" step="0.01" style="width:60px;padding:3px;background:#071428;border:1px solid #1e3a5f;color:#e2e8f0;border-radius:4px;outline:none;" title="Infographics rate">
     <span style="color:#64748b;font-size:10px;white-space:nowrap;">A+:</span>
     <input type="number" class="rate-input" id="rate-aplus-${w.id}" value="${parseFloat(w.rate_aplus||0).toFixed(2)}" min="0" step="0.01" style="width:60px;padding:3px;background:#071428;border:1px solid #1e3a5f;color:#e2e8f0;border-radius:4px;outline:none;" title="A+ Banners rate">
+    `}
     <span style="color:#64748b;font-size:10px;white-space:nowrap;margin-left:4px;">Fine:</span>
     <input type="number" class="rate-input" id="fine-${w.id}" value="${parseFloat(w.fine_per_revision||0).toFixed(2)}" min="0" step="0.01" style="width:55px;padding:3px;background:#071428;border:1px solid #1e3a5f;color:#e2e8f0;border-radius:4px;outline:none;">
     <button class="inv-btn inv-btn-blue" style="padding:4px 8px;font-size:11px;" onclick="saveWorkerRate(${w.id})">Save</button>
@@ -363,27 +368,40 @@ function toggleRateRow(id){
 function saveWorkerRate(workerId){
     var inpInfo  = document.getElementById('rate-info-'+workerId);
     var inpAplus = document.getElementById('rate-aplus-'+workerId);
+    var inpAi    = document.getElementById('rate-ai-'+workerId);
     var finp     = document.getElementById('fine-'+workerId);
-    if(!inpInfo || !inpAplus) return;
-    var rateInfo  = parseFloat(inpInfo.value)  || 0;
-    var rateAplus = parseFloat(inpAplus.value) || 0;
-    var fine      = finp ? (parseFloat(finp.value)||0) : 0;
+    var fine     = finp ? (parseFloat(finp.value)||0) : 0;
     var fd = new FormData();
     fd.append('action','save_worker_rate');
     fd.append('worker_id',workerId);
-    fd.append('rate_infographics',rateInfo);
-    fd.append('rate_aplus',rateAplus);
     fd.append('fine',fine);
+
+    if(inpAi){
+        var rateAi = parseFloat(inpAi.value) || 0;
+        fd.append('rate_ai_work', rateAi);
+        fd.append('rate_per_product', rateAi);
+        fd.append('rate_infographics', rateAi);
+        fd.append('rate_aplus', rateAi);
+    } else {
+        if(!inpInfo || !inpAplus) return;
+        var rateInfo  = parseFloat(inpInfo.value)  || 0;
+        var rateAplus = parseFloat(inpAplus.value) || 0;
+        fd.append('rate_infographics',rateInfo);
+        fd.append('rate_aplus',rateAplus);
+    }
+
     fetch('index.php',{method:'POST',body:fd}).then(r=>r.json()).then(r=>{
         if(r.success){
-            inpInfo.style.borderColor='#22c55e';
-            inpAplus.style.borderColor='#22c55e';
-            if(finp) finp.style.borderColor='#22c55e';
+            if(inpAi)    inpAi.style.borderColor='#22c55e';
+            if(inpInfo)  inpInfo.style.borderColor='#22c55e';
+            if(inpAplus) inpAplus.style.borderColor='#22c55e';
+            if(finp)     finp.style.borderColor='#22c55e';
         }
         setTimeout(function(){
-            inpInfo.style.borderColor='';
-            inpAplus.style.borderColor='';
-            if(finp) finp.style.borderColor='';
+            if(inpAi)    inpAi.style.borderColor='';
+            if(inpInfo)  inpInfo.style.borderColor='';
+            if(inpAplus) inpAplus.style.borderColor='';
+            if(finp)     finp.style.borderColor='';
         },1500);
     });
 }

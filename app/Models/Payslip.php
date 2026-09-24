@@ -11,7 +11,12 @@ class Payslip {
 
     public static function getWorkerRates(): array {
         return db()->query("
-            SELECT u.id, u.username, u.role, COALESCE(r.rate_per_product,0) AS rate_per_product, COALESCE(r.fine_per_revision,0) AS fine_per_revision, COALESCE(r.rate_infographics,0) AS rate_infographics, COALESCE(r.rate_aplus,0) AS rate_aplus
+            SELECT u.id, u.username, u.role, 
+                   COALESCE(r.rate_per_product,0) AS rate_per_product, 
+                   COALESCE(r.fine_per_revision,0) AS fine_per_revision, 
+                   COALESCE(r.rate_infographics,0) AS rate_infographics, 
+                   COALESCE(r.rate_aplus,0) AS rate_aplus,
+                   COALESCE(r.rate_ai_work, r.rate_per_product, r.rate_infographics, 0) AS rate_ai_work
             FROM eco_tool_users u
             LEFT JOIN eco_worker_rates r ON r.worker_id=u.id
             WHERE u.role IN ('worker','d4u_writer','qa','seo_manager','ai_work')
@@ -19,7 +24,24 @@ class Payslip {
         ")->fetchAll();
     }
 
-    public static function saveWorkerRate(int $workerId, float $rateInfo, float $rateAplus, float $fine = 0.00): void {
+    public static function saveWorkerRate(int $workerId, float $rateInfo, float $rateAplus, float $fine = 0.00, ?float $rateAiWork = null): void {
+        $uStmt = db()->prepare("SELECT role FROM eco_tool_users WHERE id=?");
+        $uStmt->execute([$workerId]);
+        $role = $uStmt->fetchColumn();
+
+        if ($role === 'ai_work' || $rateAiWork !== null) {
+            $aiRate = $rateAiWork !== null ? $rateAiWork : ($rateInfo > 0 ? $rateInfo : $rateAplus);
+            try {
+                db()->prepare("INSERT INTO eco_worker_rates (worker_id,rate_per_product,rate_ai_work,rate_infographics,rate_aplus,fine_per_revision) VALUES(?,?,?,?,?,?) ON DUPLICATE KEY UPDATE rate_per_product=?,rate_ai_work=?,rate_infographics=?,rate_aplus=?,fine_per_revision=?")
+                   ->execute([$workerId,$aiRate,$aiRate,$aiRate,$aiRate,$fine,$aiRate,$aiRate,$aiRate,$aiRate,$fine]);
+                return;
+            } catch(Exception $e) {
+                db()->prepare("INSERT INTO eco_worker_rates (worker_id,rate_per_product,rate_infographics,rate_aplus,fine_per_revision) VALUES(?,?,?,?,?) ON DUPLICATE KEY UPDATE rate_per_product=?,rate_infographics=?,rate_aplus=?,fine_per_revision=?")
+                   ->execute([$workerId,$aiRate,$aiRate,$aiRate,$fine,$aiRate,$aiRate,$aiRate,$fine]);
+                return;
+            }
+        }
+
         db()->prepare("INSERT INTO eco_worker_rates (worker_id,rate_infographics,rate_aplus,fine_per_revision) VALUES(?,?,?,?) ON DUPLICATE KEY UPDATE rate_infographics=?,rate_aplus=?,fine_per_revision=?")
            ->execute([$workerId,$rateInfo,$rateAplus,$fine,$rateInfo,$rateAplus,$fine]);
     }
@@ -109,7 +131,7 @@ class Payslip {
             $sql = "SELECT $sel FROM wp_eco_aplus_tasks t LEFT JOIN (eco_payslip_items pi JOIN eco_payslips p ON p.id = pi.payslip_id AND p.worker_id = ?) ON pi.task_id=t.id WHERE (t.written_by_user_id=? OR t.seo_submitted_by=?) AND $baseCond GROUP BY t.id ORDER BY t.id ASC";
             $params = array_merge([$workerId, $workerId, $workerId], $dateParams);
         } elseif($role === 'ai_work'){
-            $sql = "SELECT $sel FROM wp_eco_aplus_tasks t LEFT JOIN (eco_payslip_items pi JOIN eco_payslips p ON p.id = pi.payslip_id AND p.worker_id = ?) ON pi.task_id=t.id WHERE t.ai_worked_by=? AND $baseCond GROUP BY t.id ORDER BY t.id ASC";
+            $sql = "SELECT $sel FROM wp_eco_aplus_tasks t LEFT JOIN (eco_payslip_items pi JOIN eco_payslips p ON p.id = pi.payslip_id AND p.worker_id = ?) ON pi.task_id=t.id WHERE t.ai_worked_by=? AND t.deleted_at IS NULL AND (t.status = 'AI DONE' OR t.status != 'AI Work') $dateCond AND pi.id IS NULL GROUP BY t.id ORDER BY t.id ASC";
             $params = array_merge([$workerId, $workerId], $dateParams);
         } else {
             $sql = "SELECT $sel FROM wp_eco_aplus_tasks t
@@ -131,11 +153,16 @@ class Payslip {
         if(empty($taskIds)) return ['ok'=>false,'message'=>'Koi product select nahi kiya'];
 
         $monthLabel = $label ?: date('Y-m');
-        $ratesRow = db()->prepare("SELECT COALESCE(rate_infographics,0) AS rate_infographics, COALESCE(rate_aplus,0) AS rate_aplus FROM eco_worker_rates WHERE worker_id=?");
+        $ratesRow = db()->prepare("SELECT COALESCE(rate_infographics,0) AS rate_infographics, COALESCE(rate_aplus,0) AS rate_aplus, COALESCE(rate_ai_work, rate_per_product, rate_infographics, 0) AS rate_ai_work FROM eco_worker_rates WHERE worker_id=?");
         $ratesRow->execute([$workerId]);
         $ratesRow  = $ratesRow->fetch();
         $rateInfo  = floatval($ratesRow ? $ratesRow['rate_infographics'] : 0);
         $rateAplus = floatval($ratesRow ? $ratesRow['rate_aplus']        : 0);
+        $rateAi    = floatval($ratesRow ? ($ratesRow['rate_ai_work'] ?: $ratesRow['rate_per_product'] ?: $ratesRow['rate_infographics']) : 0);
+
+        $roleStmt = db()->prepare("SELECT role FROM eco_tool_users WHERE id=?");
+        $roleStmt->execute([$workerId]);
+        $workerRole = $roleStmt->fetchColumn();
 
         try {
             db()->beginTransaction();
@@ -162,29 +189,33 @@ class Payslip {
             $types = $typeStmt->fetchAll();
 
             $earnedAmt = 0.0;
-            foreach($types as $t){
-                $pt = $t['product_type'] ?? '';
-                if($pt === 'Info + A Plus'){
-                    $isInfo  = (!empty($t['info_worker_id']) && (int)$t['info_worker_id'] === $workerId);
-                    $isAplus = (!empty($t['aplus_worker_id']) && (int)$t['aplus_worker_id'] === $workerId);
-                    if($isInfo && $isAplus){
-                        $earnedAmt += ($rateInfo + $rateAplus);
-                    } elseif($isInfo && empty($t['aplus_worker_id'])){
-                        $earnedAmt += ($rateInfo + $rateAplus);
-                    } elseif($isAplus && empty($t['info_worker_id'])){
-                        $earnedAmt += ($rateInfo + $rateAplus);
-                    } elseif($isInfo){
+            if($workerRole === 'ai_work'){
+                $earnedAmt = count($types) * $rateAi;
+            } else {
+                foreach($types as $t){
+                    $pt = $t['product_type'] ?? '';
+                    if($pt === 'Info + A Plus'){
+                        $isInfo  = (!empty($t['info_worker_id']) && (int)$t['info_worker_id'] === $workerId);
+                        $isAplus = (!empty($t['aplus_worker_id']) && (int)$t['aplus_worker_id'] === $workerId);
+                        if($isInfo && $isAplus){
+                            $earnedAmt += ($rateInfo + $rateAplus);
+                        } elseif($isInfo && empty($t['aplus_worker_id'])){
+                            $earnedAmt += ($rateInfo + $rateAplus);
+                        } elseif($isAplus && empty($t['info_worker_id'])){
+                            $earnedAmt += ($rateInfo + $rateAplus);
+                        } elseif($isInfo){
+                            $earnedAmt += $rateInfo;
+                        } elseif($isAplus){
+                            $earnedAmt += $rateAplus;
+                        } else {
+                            // If not specifically flagged, fallback to full rate
+                            $earnedAmt += ($rateInfo + $rateAplus);
+                        }
+                    } elseif($pt === 'Infographics'){
                         $earnedAmt += $rateInfo;
-                    } elseif($isAplus){
-                        $earnedAmt += $rateAplus;
                     } else {
-                        // If not specifically flagged, fallback to full rate
-                        $earnedAmt += ($rateInfo + $rateAplus);
+                        $earnedAmt += $rateAplus;
                     }
-                } elseif($pt === 'Infographics'){
-                    $earnedAmt += $rateInfo;
-                } else {
-                    $earnedAmt += $rateAplus;
                 }
             }
 
@@ -325,6 +356,32 @@ class Payslip {
             $ppStmt = db()->prepare("SELECT COUNT(DISTINCT t.id) FROM wp_eco_aplus_tasks t JOIN eco_invoice_items ii ON ii.task_id=t.id JOIN eco_invoices inv ON inv.id=ii.invoice_id AND inv.status='Paid' LEFT JOIN (eco_payslip_items pi JOIN eco_payslips p ON p.id = pi.payslip_id AND p.worker_id = ?) ON pi.task_id=t.id WHERE (t.written_by_user_id=? OR t.seo_submitted_by=?) AND (t.invoice_status='Paid' OR t.info_invoice_status='Paid' OR t.aplus_invoice_status='Paid') AND pi.id IS NULL AND t.deleted_at IS NULL");
             $ppParams = [$workerId, $workerId, $workerId];
             $statsParams = [$workerId, $workerId];
+        } elseif($role === 'ai_work'){
+            $statsRow = db()->prepare("
+                SELECT COUNT(DISTINCT t.id) AS total,
+                SUM(CASE WHEN t.status='AI Work' AND t.work_status='Working' THEN 1 ELSE 0 END) AS working,
+                SUM(CASE WHEN t.status='AI Work' AND t.work_status='Paused'  THEN 1 ELSE 0 END) AS paused,
+                0 AS in_qa,
+                SUM(CASE WHEN t.status='AI DONE' OR t.status != 'AI Work' THEN 1 ELSE 0 END) AS work_done,
+                SUM(CASE WHEN t.status='AI Work' AND t.work_status NOT IN ('Working','Paused') THEN 1 ELSE 0 END) AS pending,
+                SUM(CASE WHEN (t.invoice_status='Invoiced' OR t.info_invoice_status='Invoiced' OR t.aplus_invoice_status='Invoiced') THEN 1 ELSE 0 END) AS invoiced_count,
+                SUM(CASE WHEN (t.invoice_status='Paid' OR t.info_invoice_status='Paid' OR t.aplus_invoice_status='Paid') THEN 1 ELSE 0 END) AS paid_count,
+                SUM(CASE WHEN (t.status='AI DONE' OR t.status != 'AI Work') AND t.invoice_status IS NULL AND t.info_invoice_status IS NULL AND t.aplus_invoice_status IS NULL THEN 1 ELSE 0 END) AS not_invoiced_count
+                FROM wp_eco_aplus_tasks t
+                WHERE t.ai_worked_by=? AND t.deleted_at IS NULL
+            ");
+            $ppStmt = db()->prepare("
+                SELECT COUNT(DISTINCT t.id)
+                FROM wp_eco_aplus_tasks t
+                JOIN eco_invoice_items ii ON ii.task_id=t.id
+                JOIN eco_invoices inv ON inv.id=ii.invoice_id AND inv.status='Paid'
+                LEFT JOIN (eco_payslip_items pi JOIN eco_payslips p ON p.id = pi.payslip_id AND p.worker_id = ?) ON pi.task_id=t.id
+                WHERE t.ai_worked_by=?
+                AND (t.invoice_status='Paid' OR t.info_invoice_status='Paid' OR t.aplus_invoice_status='Paid')
+                AND pi.id IS NULL AND t.deleted_at IS NULL
+            ");
+            $ppParams = [$workerId, $workerId];
+            $statsParams = [$workerId];
         } else {
             $statsRow = db()->prepare("
                 SELECT COUNT(DISTINCT t.id) AS total,
@@ -367,7 +424,7 @@ class Payslip {
         $paidStmt = db()->prepare("SELECT COALESCE(SUM(amount),0) FROM eco_worker_ledger WHERE worker_id=?");
         $paidStmt->execute([$workerId]); $totalPaid = floatval($paidStmt->fetchColumn());
 
-        $rateStmt = db()->prepare("SELECT COALESCE(rate_per_product,0) FROM eco_worker_rates WHERE worker_id=?");
+        $rateStmt = db()->prepare("SELECT COALESCE(rate_ai_work, rate_per_product, rate_infographics, 0) FROM eco_worker_rates WHERE worker_id=?");
         $rateStmt->execute([$workerId]); $rate = floatval($rateStmt->fetchColumn());
 
         return [
