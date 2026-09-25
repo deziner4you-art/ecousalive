@@ -258,7 +258,7 @@ function renderSmart(data){
         container.appendChild(div);
 
         if(ROLE === 'administrator' && ALL_WORKERS.length) populateCardWorkerDropdowns();
-        if((ROLE === 'administrator' || ROLE === 'worker') && (item.status === 'Approved' || item.status === 'Updated') &&
+        if(ROLE === 'administrator' && (item.status === 'Approved' || item.status === 'Updated') &&
            item.original_content && item.original_content !== item.content){
             renderDiff(item.id, item.original_content, item.content);
         }
@@ -760,12 +760,12 @@ function buildProductContentSection(item, canEdit, lock, isWorker, isQa, origina
 
             var boxChanged = (parsedOrig !== null && origBoxText.trim() !== text.trim());
 
-            html += `<div class="content-card-box ${infoIsLocked ? 'is-locked' : ''}" style="${boxChanged ? 'border-color:#f59e0b;box-shadow:0 0 0 2px rgba(245,158,11,0.2);' : ''}">
+            html += `<div class="content-card-box ${infoIsLocked ? 'is-locked' : ''}" style="${(isAdminUser && boxChanged) ? 'border-color:#f59e0b;box-shadow:0 0 0 2px rgba(245,158,11,0.2);' : ''}">
                 <div class="content-box-head">
                     <div class="content-box-badge">${box.label}</div>
                     <div class="content-box-title" title="${escapeHtmlContent(box.title)}">
                         <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${box.title}</span>
-                        ${boxChanged ? '<span style="margin-left:auto;background:#78350f;color:#fef3c7;border:1px solid #f59e0b;font-size:9.5px;padding:1px 6px;border-radius:10px;font-weight:800;letter-spacing:.3px;white-space:nowrap;">✏ Modified</span>' : ''}
+                        ${(isAdminUser && boxChanged) ? '<span style="margin-left:auto;background:#78350f;color:#fef3c7;border:1px solid #f59e0b;font-size:9.5px;padding:1px 6px;border-radius:10px;font-weight:800;letter-spacing:.3px;white-space:nowrap;">✏ Modified</span>' : ''}
                     </div>
                 </div>
                 <div class="content-box-body ${infoIsLocked ? 'locked' : ''}"
@@ -839,11 +839,11 @@ function buildProductContentSection(item, canEdit, lock, isWorker, isQa, origina
 
             var boxChanged = (parsedOrig !== null && origBoxText.trim() !== text.trim());
 
-            html += `<div class="content-card-box ${aplusIsLocked ? 'is-locked' : ''}" style="${boxChanged ? 'border-color:#f59e0b;box-shadow:0 0 0 2px rgba(245,158,11,0.2);' : ''}">
+            html += `<div class="content-card-box ${aplusIsLocked ? 'is-locked' : ''}" style="${(isAdminUser && boxChanged) ? 'border-color:#f59e0b;box-shadow:0 0 0 2px rgba(245,158,11,0.2);' : ''}">
                 <div class="content-box-head">
                     <div class="content-box-badge">${box.label}</div>
                     <div class="content-box-title">
-                        ${boxChanged ? '<span style="margin-left:auto;background:#78350f;color:#fef3c7;border:1px solid #f59e0b;font-size:9.5px;padding:1px 6px;border-radius:10px;font-weight:800;letter-spacing:.3px;white-space:nowrap;">✏ Modified</span>' : ''}
+                        ${(isAdminUser && boxChanged) ? '<span style="margin-left:auto;background:#78350f;color:#fef3c7;border:1px solid #f59e0b;font-size:9.5px;padding:1px 6px;border-radius:10px;font-weight:800;letter-spacing:.3px;white-space:nowrap;">✏ Modified</span>' : ''}
                     </div>
                 </div>
                 <div class="content-box-body ${aplusIsLocked ? 'locked' : ''}"
@@ -1481,8 +1481,8 @@ ${workTimeBadge}
 ${adminTimeBlock}
 ${buildFamilyGroupingSection(item, isAdmin)}
 ${((!isWorker && !isQa) || workerCanSee) && !hideEditor ? buildProductContentSection(item, canEdit, lock, isWorker, isQa, originalForDiff) : ''}
-${(isAdmin || isWorker) && lock && item.original_content && item.original_content !== item.content ? `<div class="diff-bar" id="diff-label-${item.id}"><span class="diff-legend">🔍 Client Changes — <span class="diff-legend-add">■ Added</span> &nbsp; <span class="diff-legend-del">■ Deleted</span></span></div><div class="diff-preview" id="diff-${item.id}"></div>` : ''}
-${(ROLE === 'eco_client' || isAdmin) && !lock ? `<div class="diff-bar" id="diff-label-${item.id}" style="display:none;"><span class="diff-legend">📝 Changes — <span class="diff-legend-add">■ Added</span> &nbsp; <span class="diff-legend-del">■ Deleted</span></span><button class="btn-revert" id="revert-${item.id}" onclick="revertToOriginal(${item.id})">↩ Go Back to Original</button></div><div class="diff-preview" id="diff-${item.id}" style="display:none;"></div>` : ''}
+${isAdmin && item.original_content && item.original_content.trim() !== (item.content || '').trim() ? `<div class="diff-bar" id="diff-label-${item.id}"><span class="diff-legend">🔍 Client Changes — <span class="diff-legend-add">■ Added</span> &nbsp; <span class="diff-legend-del">■ Deleted</span></span></div><div class="diff-preview" id="diff-${item.id}"></div>` : ''}
+${isAdmin && !lock ? `<div class="diff-bar" id="diff-label-${item.id}" style="display:none;"><span class="diff-legend">📝 Changes — <span class="diff-legend-add">■ Added</span> &nbsp; <span class="diff-legend-del">■ Deleted</span></span><button class="btn-revert" id="revert-${item.id}" onclick="revertToOriginal(${item.id})">↩ Go Back to Original</button></div><div class="diff-preview" id="diff-${item.id}" style="display:none;"></div>` : ''}
 ${buildQABoxes(item, isAdmin, isQa)}
 ${publishedInfo}
 ${buildSeoSection(item, isAdmin, isListing)}
@@ -1911,6 +1911,7 @@ function getPlainText(html){
 }
 
 function renderDiff(id, overrideOriginal, overrideCurrent){
+    if(ROLE !== 'administrator') return;
     var preview = document.getElementById('diff-' + id);
     if(!preview) return;
     var originalText, currentText;
@@ -1956,7 +1957,9 @@ function clientEditorChanged(id){
     var changed = currentText.trim() !== originalText.trim();
     if(changed){ uBtn.disabled = false; aBtn.disabled = true; }
     else        { uBtn.disabled = true;  aBtn.disabled = false; }
-    renderDiff(id);
+    if(ROLE === 'administrator'){
+        renderDiff(id);
+    }
 }
 
 /* ── Card toggle ─────────────────────────────── */
