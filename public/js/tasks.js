@@ -1390,7 +1390,8 @@ ${adminActionsHtml}
     if(canSeeStatusTime && item.last_activity_at && typeof formatDualTime === 'function'){
         var dTime = formatDualTime(item.last_activity_at);
         if(dTime){
-            var diffMs = new Date().getTime() - new Date(item.last_activity_at.replace(/-/g, '/').replace('T', ' ') + 'Z').getTime();
+            var _actDate = parsePKTDate(item.last_activity_at);
+            var diffMs = _actDate ? (new Date().getTime() - _actDate.getTime()) : -1;
             var pendingText = '';
             if(diffMs > 0){
                 var _days  = Math.floor(diffMs / 86400000);

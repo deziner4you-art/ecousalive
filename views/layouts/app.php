@@ -1568,9 +1568,9 @@ try {
 </div>
 
 <!-- ── JS Modules ── -->
-<?php $v = '2.7.9'; ?>
+<?php $v = '2.8.0'; ?>
 <script src="<?= $publicUrl ?>/js/core.js?v=<?= $v ?>"></script>
-<script src="<?= $publicUrl ?>/js/tasks.js?v=3.0.8"></script>
+<script src="<?= $publicUrl ?>/js/tasks.js?v=3.0.9"></script>
 <script src="<?= $publicUrl ?>/js/admin.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/invoices.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/payroll.js?v=2.7.13"></script>

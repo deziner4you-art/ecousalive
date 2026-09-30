@@ -102,16 +102,36 @@ function formatWorkTime(seconds){
     return s + 's';
 }
 
-/* Format a UTC datetime string → PAK + US time (12hr AM/PM) */
-function formatDualTime(utcStr){
-    if(!utcStr) return null;
-    var d = new Date(utcStr.replace(' ', 'T') + 'Z');
-    if(isNaN(d)) return null;
+/* Format a datetime string → PAK + US time (12hr AM/PM)
+ * Server PHP timezone = Asia/Karachi (UTC+5).
+ * MySQL NOW() stores PKT time. We MUST append '+05:00' (not 'Z') so the
+ * browser's Date() knows the offset and converts correctly to any timezone. */
+function formatDualTime(rawStr){
+    if(!rawStr) return null;
+    // Normalise: replace space with T, then append +05:00 offset (server = PKT = UTC+5)
+    var iso = rawStr.replace(' ', 'T');
+    // Only append offset if no timezone info present
+    if(!/[Z+\-]\d{2}:\d{2}$/.test(iso) && !/Z$/.test(iso)){
+        iso = iso + '+05:00';
+    }
+    var d = new Date(iso);
+    if(isNaN(d.getTime())) return null;
     var opts = {month:'short',day:'numeric',year:'numeric',
                 hour:'numeric',minute:'2-digit',second:'2-digit',hour12:true};
     var pak = d.toLocaleString('en-US', Object.assign({}, opts, {timeZone:'Asia/Karachi'}));
     var us  = d.toLocaleString('en-US', Object.assign({}, opts, {timeZone:'America/New_York'}));
     return {pak: pak + ' PKT', us: us + ' ET'};
+}
+
+/* Parse a PKT datetime string to a Date object correctly */
+function parsePKTDate(rawStr){
+    if(!rawStr) return null;
+    var iso = rawStr.replace(' ', 'T');
+    if(!/[Z+\-]\d{2}:\d{2}$/.test(iso) && !/Z$/.test(iso)){
+        iso = iso + '+05:00';
+    }
+    var d = new Date(iso);
+    return isNaN(d.getTime()) ? null : d;
 }
 
 /* ── Tab / panel switching ───────────────────── */
@@ -251,24 +271,23 @@ function getSortedFiltered(data){
             var rawDate = item.last_activity_at || item.content_updated_at || item.content_approved_at || item.work_completed_at || item.work_started_at || item.created_at;
             if(!rawDate) return false;
 
-            var d = new Date(typeof rawDate === 'string' ? rawDate.replace(' ', 'T') : rawDate);
-            if(isNaN(d.getTime())) return false;
+            var _dFixed = parsePKTDate(typeof rawDate === 'string' ? rawDate : String(rawDate));
+            var d = _dFixed;
+            if(!d || isNaN(d.getTime())) return false;
 
-            var y = d.getFullYear();
-            var m = String(d.getMonth() + 1).padStart(2, '0');
-            var day = String(d.getDate()).padStart(2, '0');
-            var itemDateStr = y + '-' + m + '-' + day;
+            // Extract date in PKT (Asia/Karachi) timezone for comparison
+            var pktDateStr = d.toLocaleDateString('en-CA', {timeZone:'Asia/Karachi'});
+            var itemDateStr = pktDateStr; // 'YYYY-MM-DD'
 
             var now = new Date();
-            var todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+            // Use Asia/Karachi for all date comparisons (server stores PKT times)
+            var todayStr = now.toLocaleDateString('en-CA', {timeZone:'Asia/Karachi'});
 
-            var yest = new Date(now);
-            yest.setDate(now.getDate() - 1);
-            var yestStr = yest.getFullYear() + '-' + String(yest.getMonth() + 1).padStart(2, '0') + '-' + String(yest.getDate()).padStart(2, '0');
+            var yest = new Date(now.getTime() - 86400000);
+            var yestStr = yest.toLocaleDateString('en-CA', {timeZone:'Asia/Karachi'});
 
-            var d7 = new Date(now);
-            d7.setDate(now.getDate() - 7);
-            var d7Str = d7.getFullYear() + '-' + String(d7.getMonth() + 1).padStart(2, '0') + '-' + String(d7.getDate()).padStart(2, '0');
+            var d7 = new Date(now.getTime() - 7 * 86400000);
+            var d7Str = d7.toLocaleDateString('en-CA', {timeZone:'Asia/Karachi'});
 
             if(dateFilter === 'today' && itemDateStr !== todayStr) return false;
             if(dateFilter === 'yesterday' && itemDateStr !== yestStr) return false;
