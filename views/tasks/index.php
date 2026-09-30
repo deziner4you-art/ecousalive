@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /*
 =====================================================
 ECO A+ PRO — Task list view
@@ -59,10 +59,10 @@ if(!in_array('Info Done', $allowed)){
 <div class="filter-bar" id="filter-bar">
 
     <!-- Search -->
-    <input id="search" type="text" placeholder="🔍 Search product..." class="filter-input" style="flex:2;min-width:140px;">
+    <input id="search" type="text" placeholder="🔍 Search product..." class="filter-input" oninput="resetPageAndRender()" style="flex:2;min-width:140px;">
 
     <!-- Status filter -->
-    <select id="filter" class="filter-select hidden sm:block">
+    <select id="filter" class="filter-select hidden sm:block" onchange="resetPageAndRender()">
         <?php foreach($allFilters as $val => $label):
             if($val === '' || $val === 'Info Done' || in_array($val, $allowed)): ?>
         <option value="<?= htmlspecialchars($val) ?>"><?= htmlspecialchars($label) ?></option>
@@ -99,9 +99,9 @@ if(!in_array('Info Done', $allowed)){
     </script>
 
     <!-- Sort -->
-    <select id="sort" class="filter-select">
+    <select id="sort" class="filter-select" onchange="resetPageAndRender()">
+        <option value="activity_desc" selected>Latest Activity</option>
         <option value="activity_asc">Oldest Activity</option>
-        <option value="activity_desc">Latest Activity</option>
         <option value="no_asc">Product # ↑</option>
         <option value="no_desc">Product # ↓</option>
         <option value="id_asc">ID ↑</option>
@@ -111,18 +111,18 @@ if(!in_array('Info Done', $allowed)){
     </select>
 
     <!-- Date filter -->
-    <select id="dateFilter" class="filter-select">
+    <select id="dateFilter" class="filter-select" onchange="var c=document.getElementById('customDate'); if(c) c.style.display=this.value==='custom'?'block':'none'; resetPageAndRender();">
         <option value="">All Dates</option>
         <option value="today">Today</option>
         <option value="yesterday">Yesterday</option>
         <option value="7days">Last 7 Days</option>
         <option value="custom">Custom Date</option>
     </select>
-    <input id="customDate" type="date" style="display:none;padding:7px 10px;border:1px solid #334155;border-radius:6px;background:#0a1628;color:#e2e8f0;font-size:13px;outline:none;">
+    <input id="customDate" type="date" onchange="resetPageAndRender()" style="display:none;padding:7px 10px;border:1px solid #334155;border-radius:6px;background:#0a1628;color:#e2e8f0;font-size:13px;outline:none;">
 
     <?php if($isAdmin || $isQA): ?>
     <!-- Worker filter (admin only) -->
-    <select id="workerFilter" class="filter-select" style="min-width:130px;">
+    <select id="workerFilter" class="filter-select" onchange="resetPageAndRender()" style="min-width:130px;">
         <option value="">All Workers</option>
     </select>
     <?php else: ?>

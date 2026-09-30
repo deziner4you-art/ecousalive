@@ -21,26 +21,20 @@ jobs:
           script: |
             set -e
 
-            DEPLOY_DIR="/www/wwwroot/testecousa.deziner4you.com"
-
-            echo "==> Navigating to deploy directory..."
-            cd "$DEPLOY_DIR"
-
-            echo "==> Fixing git safe directory..."
-            git config --global --add safe.directory "$DEPLOY_DIR"
-
-            echo "==> Configuring Git Remote securely..."
-            git remote remove origin 2>/dev/null || true
-            git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
-
-            echo "==> Pulling latest code from GitHub..."
-            git fetch origin main
-            git reset --hard origin/main
-
-            echo "==> Setting file permissions..."
-            find "$DEPLOY_DIR" -type f -name "*.php" -exec chmod 644 {} \;
-            find "$DEPLOY_DIR" -type d -exec chmod 755 {} \;
+            for DEPLOY_DIR in "/www/wwwroot/testecousa.deziner4you.com" "/www/wwwroot/ecousa.deziner4you.com"; do
+              if [ -d "$DEPLOY_DIR" ]; then
+                echo "==> Deploying to $DEPLOY_DIR..."
+                cd "$DEPLOY_DIR"
+                git config --global --add safe.directory "$DEPLOY_DIR"
+                git remote remove origin 2>/dev/null || true
+                git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+                git fetch origin main
+                git reset --hard origin/main
+                find "$DEPLOY_DIR" -type f -name "*.php" -exec chmod 644 {} \;
+                find "$DEPLOY_DIR" -type d -exec chmod 755 {} \;
+                echo "    Synced $DEPLOY_DIR successfully."
+              fi
+            done
 
             echo "==> Deploy complete!"
-            echo "    Site: https://testecousa.deziner4you.com"
             echo "    Time: $(date '+%Y-%m-%d %H:%M:%S')"

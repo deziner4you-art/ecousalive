@@ -163,6 +163,19 @@ function renderSmart(data){
         if(!still) card.remove();
     });
 
+    var emptyMsg = document.getElementById('no-tasks-msg');
+    if(filtered.length === 0){
+        if(!emptyMsg){
+            emptyMsg = document.createElement('div');
+            emptyMsg.id = 'no-tasks-msg';
+            emptyMsg.style.cssText = 'padding:40px 20px; text-align:center; color:#94a3b8; font-size:15px; font-weight:500; width:100%;';
+            emptyMsg.innerHTML = '<div style="font-size:32px; margin-bottom:12px; opacity:0.5;">🔍</div>No products found matching your search or filters.';
+            container.appendChild(emptyMsg);
+        }
+    } else {
+        if(emptyMsg) emptyMsg.remove();
+    }
+
     pageItems.forEach(function(item){
         var existing = container.querySelector('.card[data-id="' + item.id + '"]');
 
@@ -186,6 +199,7 @@ function renderSmart(data){
                 existing.innerHTML = buildCard(item);
                 if(ROLE === 'administrator' && ALL_WORKERS.length) populateCardWorkerDropdowns();
                 updateButtons(existing, item);
+                container.appendChild(existing);
                 return;
             }
 
@@ -241,6 +255,7 @@ function renderSmart(data){
             updateButtons(existing, item);
             if(item.is_urgent == 1 && item.work_status !== 'Work Done') existing.classList.add('urgent-card');
             else existing.classList.remove('urgent-card');
+            container.appendChild(existing);
             return;
         }
 

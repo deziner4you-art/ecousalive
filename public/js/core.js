@@ -1,4 +1,4 @@
-/*
+﻿/*
 =====================================================
 ECO A+ PRO — core.js
 Globals, CSRF interceptor, utilities, tab/panel switching,
@@ -194,19 +194,35 @@ function getSortedFiltered(data){
         else if(filter && currentStatus !== filter) return false;
 
         if(search){
-            var cleanSearch = search.replace(/^#/, '').trim();
-            var titleLower  = (item.title || '').toLowerCase();
-            var prodNoStr   = String(item.product_no || '');
-            var prodNoLower = prodNoStr.toLowerCase();
-            var cleanProdNo = prodNoLower.replace(/^#/, '').trim();
+            var cleanSearch = search.replace(/^#/, '').trim().toLowerCase();
+            if(cleanSearch){
+                var titleLower  = (item.title || '').toLowerCase();
+                var prodNoStr   = String(item.product_no || '').toLowerCase();
+                var cleanProdNo = prodNoStr.replace(/^#/, '').trim();
+                var idStr       = String(item.id || '');
+                var famCode     = String(item.family_code || '').toLowerCase();
+                var prodLink    = String(item.product_link || '').toLowerCase();
+                var origContent = String(item.original_content || '').toLowerCase();
+                var contentText = String(item.content || '').toLowerCase();
 
-            var matchTitle = titleLower.indexOf(search) !== -1 || (cleanSearch && titleLower.indexOf(cleanSearch) !== -1);
-            var matchProdNo = prodNoLower.indexOf(search) !== -1 ||
-                              (cleanSearch && prodNoLower.indexOf(cleanSearch) !== -1) ||
-                              (cleanSearch && cleanProdNo.indexOf(cleanSearch) !== -1) ||
-                              ('#' + cleanProdNo).indexOf(search) !== -1;
+                var matchExact = prodNoStr.indexOf(cleanSearch) !== -1 ||
+                                 cleanProdNo.indexOf(cleanSearch) !== -1 ||
+                                 ('#' + cleanProdNo).indexOf(cleanSearch) !== -1 ||
+                                 idStr === cleanSearch ||
+                                 titleLower.indexOf(cleanSearch) !== -1 ||
+                                 famCode.indexOf(cleanSearch) !== -1 ||
+                                 prodLink.indexOf(cleanSearch) !== -1 ||
+                                 origContent.indexOf(cleanSearch) !== -1 ||
+                                 contentText.indexOf(cleanSearch) !== -1;
 
-            if(!matchTitle && !matchProdNo) return false;
+                if(!matchExact){
+                    var words = cleanSearch.split(/\s+/).filter(Boolean);
+                    var allWordsMatch = words.length > 0 && words.every(function(w){
+                        return titleLower.indexOf(w) !== -1 || prodNoStr.indexOf(w) !== -1 || famCode.indexOf(w) !== -1 || origContent.indexOf(w) !== -1 || contentText.indexOf(w) !== -1;
+                    });
+                    if(!allWordsMatch) return false;
+                }
+            }
         }
 
         if(workerFilter){
@@ -232,28 +248,32 @@ function getSortedFiltered(data){
         }
 
         if(dateFilter){
-            var rawDate = item.work_completed_at || item.work_started_at || item.created_at;
-            if(rawDate){
-                var itemDate  = new Date(rawDate);
-                var now       = new Date();
-                var today     = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                var yesterday = new Date(today);
-                yesterday.setDate(today.getDate() - 1);
+            var rawDate = item.last_activity_at || item.content_updated_at || item.content_approved_at || item.work_completed_at || item.work_started_at || item.created_at;
+            if(!rawDate) return false;
 
-                if(dateFilter === 'today'     && itemDate < today) return false;
-                if(dateFilter === 'yesterday' && (itemDate < yesterday || itemDate >= today)) return false;
-                if(dateFilter === '7days'){
-                    var last7 = new Date(today);
-                    last7.setDate(today.getDate() - 7);
-                    if(itemDate < last7) return false;
-                }
-                if(dateFilter === 'custom' && customDate){
-                    var cd  = new Date(customDate);
-                    var cd2 = new Date(customDate);
-                    cd2.setDate(cd2.getDate() + 1);
-                    if(itemDate < cd || itemDate >= cd2) return false;
-                }
-            }
+            var d = new Date(typeof rawDate === 'string' ? rawDate.replace(' ', 'T') : rawDate);
+            if(isNaN(d.getTime())) return false;
+
+            var y = d.getFullYear();
+            var m = String(d.getMonth() + 1).padStart(2, '0');
+            var day = String(d.getDate()).padStart(2, '0');
+            var itemDateStr = y + '-' + m + '-' + day;
+
+            var now = new Date();
+            var todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+
+            var yest = new Date(now);
+            yest.setDate(now.getDate() - 1);
+            var yestStr = yest.getFullYear() + '-' + String(yest.getMonth() + 1).padStart(2, '0') + '-' + String(yest.getDate()).padStart(2, '0');
+
+            var d7 = new Date(now);
+            d7.setDate(now.getDate() - 7);
+            var d7Str = d7.getFullYear() + '-' + String(d7.getMonth() + 1).padStart(2, '0') + '-' + String(d7.getDate()).padStart(2, '0');
+
+            if(dateFilter === 'today' && itemDateStr !== todayStr) return false;
+            if(dateFilter === 'yesterday' && itemDateStr !== yestStr) return false;
+            if(dateFilter === '7days' && (itemDateStr < d7Str || itemDateStr > todayStr)) return false;
+            if(dateFilter === 'custom' && customDate && itemDateStr !== customDate) return false;
         }
         return true;
     });
@@ -263,20 +283,25 @@ function getSortedFiltered(data){
         var bUrgent = (b.is_urgent == 1 && b.work_status !== 'Work Done') ? 1 : 0;
         if(aUrgent !== bUrgent) return bUrgent - aUrgent;
 
-        if(sort === 'az')      return a.title.localeCompare(b.title);
-        if(sort === 'za')      return b.title.localeCompare(a.title);
-        if(sort === 'no_asc')  return parseInt(a.product_no) - parseInt(b.product_no);
-        if(sort === 'no_desc') return parseInt(b.product_no) - parseInt(a.product_no);
+        if(sort === 'az')      return (a.title || '').localeCompare(b.title || '');
+        if(sort === 'za')      return (b.title || '').localeCompare(a.title || '');
+        if(sort === 'no_asc')  return parseInt(a.product_no || 0) - parseInt(b.product_no || 0);
+        if(sort === 'no_desc') return parseInt(b.product_no || 0) - parseInt(a.product_no || 0);
         if(sort === 'id_asc')  return a.id - b.id;
         if(sort === 'id_desc') return b.id - a.id;
 
-        var aTime = a.last_activity_at || a.work_completed_at || a.work_started_at || a.created_at || '';
-        var bTime = b.last_activity_at || b.work_completed_at || b.work_started_at || b.created_at || '';
+        var aTime = a.last_activity_at || a.content_updated_at || a.content_approved_at || a.work_completed_at || a.work_started_at || a.created_at || '';
+        var bTime = b.last_activity_at || b.content_updated_at || b.content_approved_at || b.work_completed_at || b.work_started_at || b.created_at || '';
+
         if (sort === 'activity_asc') {
+            if (!aTime && bTime) return 1;
+            if (aTime && !bTime) return -1;
             if (aTime < bTime) return -1;
             if (aTime > bTime) return 1;
             return a.id - b.id;
-        } else {
+        } else { // activity_desc (Latest Activity - default!)
+            if (!aTime && bTime) return 1;
+            if (aTime && !bTime) return -1;
             if (aTime > bTime) return -1;
             if (aTime < bTime) return 1;
             return b.id - a.id;
@@ -293,21 +318,48 @@ function resetPageAndRender(){
 }
 
 /* ── Event listeners — filter bar ───────────── */
-document.addEventListener('DOMContentLoaded', function(){
-    document.getElementById('search').addEventListener('keyup', resetPageAndRender);
-    document.getElementById('filter').addEventListener('change', resetPageAndRender);
-    document.getElementById('sort').addEventListener('change', resetPageAndRender);
-
-    document.getElementById('dateFilter').addEventListener('change', function(){
-        var custom = document.getElementById('customDate');
-        custom.style.display = this.value === 'custom' ? 'block' : 'none';
-        resetPageAndRender();
-    });
-    document.getElementById('customDate').addEventListener('change', resetPageAndRender);
-
+function bindFilterBarEvents(){
+    var s = document.getElementById('search');
+    if(s && !s._bound){
+        s._bound = true;
+        s.addEventListener('input', resetPageAndRender);
+        s.addEventListener('keyup', resetPageAndRender);
+    }
+    var f = document.getElementById('filter');
+    if(f && !f._bound){
+        f._bound = true;
+        f.addEventListener('change', resetPageAndRender);
+    }
+    var so = document.getElementById('sort');
+    if(so && !so._bound){
+        so._bound = true;
+        so.addEventListener('change', resetPageAndRender);
+    }
+    var df = document.getElementById('dateFilter');
+    if(df && !df._bound){
+        df._bound = true;
+        df.addEventListener('change', function(){
+            var custom = document.getElementById('customDate');
+            if(custom) custom.style.display = this.value === 'custom' ? 'block' : 'none';
+            resetPageAndRender();
+        });
+    }
+    var cd = document.getElementById('customDate');
+    if(cd && !cd._bound){
+        cd._bound = true;
+        cd.addEventListener('change', resetPageAndRender);
+    }
     var wfEl = document.getElementById('workerFilter');
-    if(wfEl) wfEl.addEventListener('change', resetPageAndRender);
-});
+    if(wfEl && !wfEl._bound){
+        wfEl._bound = true;
+        wfEl.addEventListener('change', resetPageAndRender);
+    }
+}
+if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', bindFilterBarEvents);
+} else {
+    bindFilterBarEvents();
+}
 
 /* ── Work status actions ─────────────────────── */
 function updateWorkStatus(taskId, status){
