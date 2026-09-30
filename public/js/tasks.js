@@ -1402,10 +1402,10 @@ ${adminActionsHtml}
                     else pendingText = 'Just now';
                 }
             }
-            statusTimeBlock = `<div style="display:flex; flex-direction:column; text-align:right; font-size:10px; color:#64748b; line-height:1.2; margin-right:8px; justify-content:center;">
-                <div style="color:#f87171; font-weight:700; margin-bottom:2px;">${pendingText}</div>
-                <div>🇵🇰 ${dTime.pak.replace(' PKT', '')} PKT</div>
-                <div>🇺🇸 ${dTime.us.replace(' ET', '')} ET</div>
+            statusTimeBlock = `<div style="display:flex; flex-direction:column; text-align:right; font-size:10px; color:#64748b; line-height:1.2; margin-right:8px; justify-content:center; width:155px; min-width:155px; max-width:155px; box-sizing:border-box; flex-shrink:0;">
+                <div style="color:#f87171; font-weight:700; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${pendingText}</div>
+                <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">🇵🇰 ${dTime.pak.replace(' PKT', '')} PKT</div>
+                <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">🇺🇸 ${dTime.us.replace(' ET', '')} ET</div>
             </div>`;
         }
     }
@@ -1443,19 +1443,24 @@ ${item.published_link ? `<a href="${item.published_link}" target="_blank" rel="n
         ${typeBadge}
     </div>
 </div>
-<div class="title" style="flex:1;">${item.title}${linkIcon}</div>
-<div class="card-meta${isAdmin?' admin-meta':''}" style="display:flex; align-items:center;">
-${(showWorkerBadges && item.ai_worked_by_name) ? `<span style="background:#3b0764;border:1px solid #9333ea;color:#e9d5ff;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;margin-right:6px;" title="AI Work completed by ${item.ai_worked_by_name}">🤖 AI: ${item.ai_worked_by_name}</span>` : ''}
-${(showWorkerBadges && item.info_worker_name) ? `<span style="background:#082f49;border:1px solid #0284c7;color:#bae6fd;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;margin-right:6px;" title="Infographics Worker: ${item.info_worker_name}">🎨 Info: ${item.info_worker_name}</span>` : ''}
-${(showWorkerBadges && item.aplus_worker_name) ? `<span style="background:#2e1065;border:1px solid #7c3aed;color:#ddd6fe;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;margin-right:6px;" title="A+ Banners Worker: ${item.aplus_worker_name}">🏷 A+: ${item.aplus_worker_name}</span>` : ''}
-${revBadge}
-${invBadge}
-${item.family_code ? `<span onclick="event.stopPropagation(); viewFamily('${item.family_code}')" style="background:#581c87; border:1px solid #a855f7; color:#f3e8ff; padding:2px 8px; border-radius:12px; font-size:10px; font-weight:700; margin-right:6px; cursor:pointer; display:inline-flex; align-items:center; gap:3px;" title="Click to view all products in this family group">💜 Group</span>` : ''}
-${(typeof HAS_BULK_ACTION !== 'undefined' && HAS_BULK_ACTION) ? `<input type="checkbox" class="bulk-chk" data-id="${item.id}" ${(typeof SELECTED_BULK_PRODUCTS !== 'undefined' && SELECTED_BULK_PRODUCTS.indexOf(item.id) !== -1) ? 'checked' : ''} onclick="event.stopPropagation(); toggleBulkSelection();" style="width:16px; height:16px; margin-right:8px; cursor:pointer; accent-color:#8b5cf6; vertical-align:middle;">` : ''}
-${statusTimeBlock}
-<div class="status ${ds.cls}">${ds.label}</div>
-${adminAssign}
-${qaSendSEO}
+<div class="title" style="flex:1; min-width:200px; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 12px; box-sizing:border-box; overflow:hidden;">
+    <span class="title-text" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;" title="${item.title ? item.title.replace(/"/g, '&quot;') : ''}">${item.title}</span>
+    <span class="research-link-slot" style="flex-shrink:0; display:inline-flex; align-items:center; justify-content:flex-end; width:155px; min-width:155px;">
+        ${linkIcon || ''}
+    </span>
+</div>
+<div class="card-meta${isAdmin?' admin-meta':''}" style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+    ${showWorkerBadges ? (item.ai_worked_by_name ? `<span class="badge-ai-slot" style="background:#3b0764;border:1px solid #9333ea;color:#e9d5ff;" title="AI Work: ${item.ai_worked_by_name}">🤖 AI: ${item.ai_worked_by_name}</span>` : `<span class="badge-ai-slot" style="visibility:hidden;"></span>`) : ''}
+    ${showWorkerBadges ? (item.info_worker_name ? `<span class="badge-info-slot" style="background:#082f49;border:1px solid #0284c7;color:#bae6fd;" title="Info Worker: ${item.info_worker_name}">🎨 Info: ${item.info_worker_name}</span>` : `<span class="badge-info-slot" style="visibility:hidden;"></span>`) : ''}
+    ${showWorkerBadges ? (item.aplus_worker_name ? `<span class="badge-aplus-slot" style="background:#2e1065;border:1px solid #7c3aed;color:#ddd6fe;" title="A+ Worker: ${item.aplus_worker_name}">🏷 A+: ${item.aplus_worker_name}</span>` : '') : ''}
+    ${revBadge}
+    ${invBadge}
+    ${item.family_code ? `<span onclick="event.stopPropagation(); viewFamily('${item.family_code}')" class="badge-group-slot" style="background:#581c87; border:1px solid #a855f7; color:#f3e8ff;" title="Click to view all products in this family group">💜 Group</span>` : `<span class="badge-group-slot" style="visibility:hidden;"></span>`}
+    ${(typeof HAS_BULK_ACTION !== 'undefined' && HAS_BULK_ACTION) ? `<input type="checkbox" class="bulk-chk" data-id="${item.id}" ${(typeof SELECTED_BULK_PRODUCTS !== 'undefined' && SELECTED_BULK_PRODUCTS.indexOf(item.id) !== -1) ? 'checked' : ''} onclick="event.stopPropagation(); toggleBulkSelection();" style="width:16px; height:16px; margin:0 6px; cursor:pointer; accent-color:#8b5cf6; vertical-align:middle; flex-shrink:0;">` : ''}
+    ${statusTimeBlock || `<div style="width:155px; min-width:155px; flex-shrink:0; margin-right:8px;"></div>`}
+    <div class="status ${ds.cls}">${ds.label}</div>
+    ${adminAssign}
+    ${qaSendSEO}
 </div>
 <button class="toggle" type="button"><span class="toggle-icon" style="display:inline-block; transition:transform 0.3s; transform:${OPEN[item.id] ? 'rotate(180deg)' : 'rotate(0deg)'};">▼</span></button>
 </div>

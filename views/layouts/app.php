@@ -120,7 +120,7 @@ tailwind.config = {
 </script>
 
 <!-- App CSS (cards, status badges, task styles from monolith) -->
-<link rel="stylesheet" href="<?= $publicUrl ?>/css/app.css?v=2.8.1">
+<link rel="stylesheet" href="<?= $publicUrl ?>/css/app.css?v=2.8.2">
 
 <style>
 /* ── Topbar ────────────────────────────────────── */
@@ -1568,9 +1568,9 @@ try {
 </div>
 
 <!-- ── JS Modules ── -->
-<?php $v = '2.8.1'; ?>
+<?php $v = '2.8.2'; ?>
 <script src="<?= $publicUrl ?>/js/core.js?v=<?= $v ?>"></script>
-<script src="<?= $publicUrl ?>/js/tasks.js?v=3.1.0"></script>
+<script src="<?= $publicUrl ?>/js/tasks.js?v=3.1.1"></script>
 <script src="<?= $publicUrl ?>/js/admin.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/invoices.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/payroll.js?v=2.7.13"></script>
