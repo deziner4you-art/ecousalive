@@ -1449,7 +1449,8 @@ ${(showWorkerBadges && item.info_worker_name) ? `<span style="background:#082f49
 ${(showWorkerBadges && item.aplus_worker_name) ? `<span style="background:#2e1065;border:1px solid #7c3aed;color:#ddd6fe;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;margin-right:6px;" title="A+ Banners Worker: ${item.aplus_worker_name}">🏷 A+: ${item.aplus_worker_name}</span>` : ''}
 ${revBadge}
 ${invBadge}
-${(typeof HAS_BULK_ACTION !== 'undefined' && HAS_BULK_ACTION && document.getElementById('filter') && document.getElementById('filter').value === 'Pending') ? `<input type="checkbox" class="bulk-chk" data-id="${item.id}" ${(typeof SELECTED_BULK_PRODUCTS !== 'undefined' && SELECTED_BULK_PRODUCTS.indexOf(item.id) !== -1) ? 'checked' : ''} onclick="event.stopPropagation(); toggleBulkSelection();" style="width:16px; height:16px; margin-right:8px; cursor:pointer; accent-color:#c2410c; vertical-align:middle;">` : ''}
+${item.family_code ? `<span onclick="event.stopPropagation(); viewFamily('${item.family_code}')" style="background:#581c87; border:1px solid #a855f7; color:#f3e8ff; padding:2px 8px; border-radius:12px; font-size:10px; font-weight:700; margin-right:6px; cursor:pointer; display:inline-flex; align-items:center; gap:3px;" title="Click to view all products in this family group">💜 Group</span>` : ''}
+${(typeof HAS_BULK_ACTION !== 'undefined' && HAS_BULK_ACTION) ? `<input type="checkbox" class="bulk-chk" data-id="${item.id}" ${(typeof SELECTED_BULK_PRODUCTS !== 'undefined' && SELECTED_BULK_PRODUCTS.indexOf(item.id) !== -1) ? 'checked' : ''} onclick="event.stopPropagation(); toggleBulkSelection();" style="width:16px; height:16px; margin-right:8px; cursor:pointer; accent-color:#8b5cf6; vertical-align:middle;">` : ''}
 ${statusTimeBlock}
 <div class="status ${ds.cls}">${ds.label}</div>
 ${adminAssign}
@@ -2331,11 +2332,9 @@ function updateBulkActionBar() {
     var bar = document.getElementById('bulk-action-bar');
     if (!bar) return;
     
-    var filterEl = document.getElementById('filter');
-    var isPending = filterEl && filterEl.value === 'Pending';
     var count = SELECTED_BULK_PRODUCTS.length;
     
-    if (typeof HAS_BULK_ACTION !== 'undefined' && HAS_BULK_ACTION && isPending && count > 0) {
+    if (typeof HAS_BULK_ACTION !== 'undefined' && HAS_BULK_ACTION && count > 0) {
         bar.style.display = 'flex';
         document.getElementById('bulk-selected-count').textContent = count;
         
@@ -2359,6 +2358,66 @@ function updateBulkActionBar() {
     }
 }
 
+function bulkGroupSelected() {
+    if (SELECTED_BULK_PRODUCTS.length < 2) {
+        alert('Kam az kam 2 products select karein taake group ban sakay.');
+        return;
+    }
+
+    var count = SELECTED_BULK_PRODUCTS.length;
+    _confirm('Kya aap in ' + count + ' products ko ek Group (Family) me add karna chahte hain?', function(){
+        var fd = new FormData();
+        fd.append('action', 'bulk_update_tasks');
+        fd.append('task_ids', SELECTED_BULK_PRODUCTS.join(','));
+        fd.append('bulk_action', 'group');
+        fetch('index.php', { method: 'POST', body: fd })
+            .then(function(r){ return r.json(); })
+            .then(function(r){
+                if (r.success) {
+                    var famCode = r.family_code;
+                    SELECTED_BULK_PRODUCTS = [];
+                    updateBulkActionBar();
+                    loadTasks();
+                    if (famCode) {
+                        setTimeout(function(){
+                            viewFamily(famCode);
+                        }, 500);
+                    }
+                } else {
+                    alert('Grouping failed: ' + (r.message || 'Error'));
+                }
+            })
+            .catch(function(err){ alert('Request failed: ' + err.message); });
+    });
+}
+
+function bulkUngroupSelected() {
+    if (SELECTED_BULK_PRODUCTS.length === 0) {
+        alert('Koi product select nahi hai.');
+        return;
+    }
+
+    var count = SELECTED_BULK_PRODUCTS.length;
+    _confirm('Kya aap in ' + count + ' products ko group se alag (ungroup) karna chahte hain?', function(){
+        var fd = new FormData();
+        fd.append('action', 'bulk_update_tasks');
+        fd.append('task_ids', SELECTED_BULK_PRODUCTS.join(','));
+        fd.append('bulk_action', 'ungroup');
+        fetch('index.php', { method: 'POST', body: fd })
+            .then(function(r){ return r.json(); })
+            .then(function(r){
+                if (r.success) {
+                    SELECTED_BULK_PRODUCTS = [];
+                    updateBulkActionBar();
+                    loadTasks();
+                } else {
+                    alert('Ungroup failed: ' + (r.message || 'Error'));
+                }
+            })
+            .catch(function(err){ alert('Request failed: ' + err.message); });
+    });
+}
+
 function applyBulkAction() {
     var actionSelect = document.getElementById('bulk-action-select');
     var action = actionSelect ? actionSelect.value : '';
@@ -2369,6 +2428,15 @@ function applyBulkAction() {
     
     if (SELECTED_BULK_PRODUCTS.length === 0) {
         alert('Koi product select nahi hai');
+        return;
+    }
+
+    if (action === 'group') {
+        bulkGroupSelected();
+        return;
+    }
+    if (action === 'ungroup') {
+        bulkUngroupSelected();
         return;
     }
     

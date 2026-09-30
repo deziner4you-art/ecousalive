@@ -584,6 +584,16 @@ body { background: #081223; margin: 0; padding: 0; color: #e2e8f0; }
     font-size: 13px;
     outline: none;
 }
+#search, input#search {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-weight: 600 !important;
+}
+#search::placeholder, input#search::placeholder {
+    color: #64748b !important;
+    opacity: 1 !important;
+    font-weight: normal !important;
+}
 
 /* ── Content editor — WHITE background ────────── */
 .editor {
@@ -1558,9 +1568,9 @@ try {
 </div>
 
 <!-- ── JS Modules ── -->
-<?php $v = '2.7.7'; ?>
+<?php $v = '2.7.8'; ?>
 <script src="<?= $publicUrl ?>/js/core.js?v=<?= $v ?>"></script>
-<script src="<?= $publicUrl ?>/js/tasks.js?v=3.0.6"></script>
+<script src="<?= $publicUrl ?>/js/tasks.js?v=3.0.7"></script>
 <script src="<?= $publicUrl ?>/js/admin.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/invoices.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/payroll.js?v=2.7.13"></script>

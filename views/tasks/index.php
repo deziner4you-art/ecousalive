@@ -59,7 +59,7 @@ if(!in_array('Info Done', $allowed)){
 <div class="filter-bar" id="filter-bar">
 
     <!-- Search -->
-    <input id="search" type="text" placeholder="🔍 Search product..." class="filter-input" oninput="resetPageAndRender()" style="flex:2;min-width:140px;">
+    <input id="search" type="text" placeholder="🔍 Search product..." class="filter-input" oninput="resetPageAndRender()" style="flex:2;min-width:140px;background:#ffffff !important;color:#000000 !important;font-weight:600;">
 
     <!-- Status filter -->
     <select id="filter" class="filter-select hidden sm:block" onchange="resetPageAndRender()">
@@ -181,9 +181,12 @@ if(!in_array('Info Done', $allowed)){
         </label>
         <button onclick="clearBulkSelection()" style="background:transparent; border:1px solid #475569; color:#94a3b8; padding:6px 12px; border-radius:6px; font-size:12px; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.borderColor='#94a3b8'; this.style.color='#f1f5f9';" onmouseout="this.style.borderColor='#475569'; this.style.color='#94a3b8';">Clear Selection</button>
     </div>
-    <div style="display:flex; align-items:center; gap:10px;">
+    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+        <button type="button" onclick="bulkGroupSelected()" style="background:#8b5cf6; color:#fff; border:none; padding:8px 16px; border-radius:6px; font-size:13px; font-weight:bold; cursor:pointer; display:inline-flex; align-items:center; gap:6px; transition:background-color 0.2s; box-shadow: 0 2px 4px rgba(139,92,246,0.3);" onmouseover="this.style.backgroundColor='#7c3aed';" onmouseout="this.style.backgroundColor='#8b5cf6';" title="Group all selected products together into one family">💜 Group Selected</button>
         <select id="bulk-action-select" style="background:#0f172a; border:1px solid #334155; border-radius:6px; color:#e2e8f0; padding:8px 12px; font-size:13px; outline:none; cursor:pointer; min-width:165px;">
             <option value="">⚡ Bulk Action...</option>
+            <option value="group">💜 Group Selected Products</option>
+            <option value="ungroup">❌ Remove from Group (Ungroup)</option>
             <option value="urgent">Mark as Urgent</option>
             <option value="hold">Mark as Hold</option>
         </select>

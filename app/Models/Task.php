@@ -1034,4 +1034,64 @@ class Task {
         }
     }
 
+    public static function bulkGroupTasks(array $taskIds): array {
+        if (count($taskIds) < 2) {
+            return ['ok' => false, 'message' => 'Please select at least 2 products to group.'];
+        }
+
+        $inQuery = implode(',', array_fill(0, count($taskIds), '?'));
+        $stmt = db()->prepare("SELECT id, product_no, family_code FROM wp_eco_aplus_tasks WHERE id IN ($inQuery) AND deleted_at IS NULL");
+        $stmt->execute($taskIds);
+        $tasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (empty($tasks)) {
+            return ['ok' => false, 'message' => 'Selected products not found.'];
+        }
+
+        // Find existing family code among selected tasks, if any
+        $famCode = null;
+        $existingCodes = [];
+        foreach ($tasks as $t) {
+            if (!empty($t['family_code'])) {
+                if (!$famCode) {
+                    $famCode = $t['family_code'];
+                }
+                if (!in_array($t['family_code'], $existingCodes)) {
+                    $existingCodes[] = $t['family_code'];
+                }
+            }
+        }
+
+        if (!$famCode) {
+            $famCode = 'fam_' . bin2hex(random_bytes(8));
+        }
+
+        // If multiple distinct family codes exist, merge them all into $famCode
+        foreach ($existingCodes as $oldCode) {
+            if ($oldCode !== $famCode) {
+                db()->prepare("UPDATE wp_eco_aplus_tasks SET family_code = ?, last_activity_at = NOW() WHERE family_code = ?")
+                    ->execute([$famCode, $oldCode]);
+            }
+        }
+
+        // Assign $famCode to all selected tasks
+        $params = array_merge([$famCode], $taskIds);
+        db()->prepare("UPDATE wp_eco_aplus_tasks SET family_code = ?, last_activity_at = NOW() WHERE id IN ($inQuery)")
+            ->execute($params);
+
+        return [
+            'ok' => true,
+            'family_code' => $famCode,
+            'count' => count($tasks),
+            'message' => count($tasks) . ' products grouped successfully.'
+        ];
+    }
+
+    public static function bulkUngroupTasks(array $taskIds): void {
+        if (empty($taskIds)) return;
+        $inQuery = implode(',', array_fill(0, count($taskIds), '?'));
+        db()->prepare("UPDATE wp_eco_aplus_tasks SET family_code = NULL, last_activity_at = NOW() WHERE id IN ($inQuery)")
+            ->execute($taskIds);
+    }
+
 }

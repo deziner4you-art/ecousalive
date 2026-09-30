@@ -59,13 +59,22 @@ class TaskController {
 
         if ($bulk_action === 'urgent') {
             Task::bulkMarkUrgent($task_ids);
+            json_success(['message' => 'Products marked as urgent']);
         } elseif ($bulk_action === 'hold') {
             Task::bulkMarkHold($task_ids);
+            json_success(['message' => 'Products marked as hold']);
+        } elseif ($bulk_action === 'group') {
+            $res = Task::bulkGroupTasks($task_ids);
+            if (!$res['ok']) {
+                json_error($res['message'] ?? 'Grouping failed');
+            }
+            json_success($res);
+        } elseif ($bulk_action === 'ungroup') {
+            Task::bulkUngroupTasks($task_ids);
+            json_success(['message' => 'Products removed from group']);
         } else {
             json_error('Invalid action');
         }
-
-        json_success();
     }
 
     public function assignProduct(): void {
