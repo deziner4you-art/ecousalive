@@ -2479,9 +2479,12 @@ if (ROLE === 'administrator') {
 }
 
 function buildFamilyGroupingSection(item, isAdmin) {
+    if (!item.family_code) return '';
+
+    var members = ALL_TASKS.filter(function(t) { return t.family_code === item.family_code; });
+
     if (isAdmin) {
         var familyTagsHtml = '';
-        var members = item.family_code ? ALL_TASKS.filter(function(t) { return t.family_code === item.family_code; }) : [];
         members.forEach(function(m) {
             var isCurrent = m.id === item.id;
             var currentStyle = isCurrent ? 'background:#1d4ed8; border: 1px solid #60a5fa;' : 'background:#2563eb;';
@@ -2497,18 +2500,31 @@ function buildFamilyGroupingSection(item, isAdmin) {
             <input type="text" id="group-input-${item.id}" placeholder="Product No. likhen" onkeydown="handleGroupInputKeydown(event, ${item.id})" style="flex:1; border:none; background:transparent; outline:none; color:#e2e8f0; font-size:13px; min-width:100px;">
         </div>
         <button onclick="addProductToFamily(${item.id}, document.getElementById('group-input-${item.id}').value, document.getElementById('group-input-${item.id}'))" style="height:36px;padding:0 14px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:bold;cursor:pointer;flex-shrink:0;">+ Add</button>
-        ${item.family_code ? `<button onclick="viewFamily('${item.family_code}')" class="adminbtn" style="background:#8b5cf6; color:#fff; font-weight:bold; font-size:12px; padding:0 16px; border-radius:6px; height:36px; cursor:pointer; border:none; flex-shrink:0;">VIEW GROUP</button>` : ''}
+        <button onclick="viewFamily('${item.family_code}')" class="adminbtn" style="background:#8b5cf6; color:#fff; font-weight:bold; font-size:12px; padding:0 16px; border-radius:6px; height:36px; cursor:pointer; border:none; flex-shrink:0;">💜 VIEW GROUP</button>
     </div>
     <div id="group-msg-${item.id}" style="font-size:11px;margin-top:4px;"></div>
 </div>`;
     } else {
-        if (item.family_code) {
-            return `
-<div class="group-product-container" style="margin-bottom:12px; background:#0f2035; border:1px solid #1e3a5f; border-radius:8px; padding:10px 14px; display:flex; justify-content:space-between; align-items:center;">
-    <span style="font-size:12px; color:#94a3b8; font-weight:500;">This product is part of a family group.</span>
-    <button onclick="viewFamily('${item.family_code}')" style="background:#8b5cf6; color:#fff; font-weight:bold; font-size:12px; padding:8px 16px; border-radius:6px; border:none; cursor:pointer;">💜 View Family</button>
+        /* All non-admin workers: show view-only group panel with member tags */
+        var memberTagsHtml = '';
+        members.forEach(function(m) {
+            var isCurrent = m.id === item.id;
+            var tagStyle = isCurrent
+                ? 'background:#1d4ed8; border:1px solid #60a5fa;'
+                : 'background:#3730a3; border:1px solid #6366f1;';
+            memberTagsHtml += `<span style="display:inline-flex; align-items:center; ${tagStyle} color:#fff; padding:3px 10px; border-radius:12px; font-size:12px; font-weight:bold; margin:2px 0;">${m.product_no}</span>`;
+        });
+
+        return `
+<div class="group-product-container" style="margin-bottom:12px; background:#0f2035; border:1px solid #4c1d95; border-radius:8px; padding:10px 14px;">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap;">
+        <div>
+            <div style="font-size:11px; font-weight:700; color:#a78bfa; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">💜 Group Products</div>
+            <div style="display:flex; flex-wrap:wrap; gap:6px;">${memberTagsHtml}</div>
+        </div>
+        <button onclick="viewFamily('${item.family_code}')" style="background:#7c3aed; color:#fff; font-weight:bold; font-size:12px; padding:7px 16px; border-radius:6px; border:none; cursor:pointer; flex-shrink:0; white-space:nowrap;">💜 View Group</button>
+    </div>
 </div>`;
-        }
     }
     return '';
 }
