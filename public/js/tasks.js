@@ -1437,8 +1437,8 @@ ${item.published_link ? `<a href="${item.published_link}" target="_blank" rel="n
 
     return `
 <div class="head" onclick="headClick(event,${item.id})" ontouchend="headTouch(event,${item.id})" style="cursor:pointer; display:flex; align-items:center;">
-<div class="pid${isUrgent?' urgent-pid':''}" style="position:relative; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; padding-top:12px;">
-    <div style="line-height:1;">#${item.product_no}</div>
+<div class="pid${isUrgent?' urgent-pid':''}" style="position:relative; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; padding-top:10px; width:125px; min-width:125px; font-family:'Agency FB', 'Arial Narrow', sans-serif; box-sizing:border-box;">
+    <div style="line-height:1.1; font-family:'Agency FB', 'Arial Narrow', sans-serif; font-size:15px; font-weight:700; letter-spacing:0.3px; text-align:center; width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0 4px; box-sizing:border-box;">#${item.product_no}</div>
     <div style="position:absolute; bottom:3px; z-index:10; display:flex; justify-content:center; width:100%;">
         ${typeBadge}
     </div>

@@ -141,8 +141,8 @@ cursor:pointer;
 }
 
 .pid{
-width:90px;
-min-width:90px;
+width:125px;
+min-width:125px;
 height:55px;
 display:flex;
 align-items:center;
@@ -151,7 +151,10 @@ background:#1d4ed8;
 color:#fff;
 font-weight:bold;
 font-size:15px;
-letter-spacing:.5px;
+font-family:'Agency FB', 'Arial Narrow', sans-serif;
+letter-spacing:.2px;
+padding:0 6px;
+box-sizing:border-box;
 }
 
 .title{
@@ -1233,10 +1236,11 @@ min-height:52px;
 }
 
 .pid{
-width:72px;
-min-width:72px;
+width:105px;
+min-width:105px;
 min-height:52px;
 font-size:14px;
+font-family:'Agency FB', 'Arial Narrow', sans-serif;
 }
 
 .title{
@@ -1394,11 +1398,12 @@ align-items:stretch;
 
 .pid{
 order:1;
-width:54px;
-min-width:54px;
+width:90px;
+min-width:90px;
 height:auto;
 min-height:44px;
 font-size:13px;
+font-family:'Agency FB', 'Arial Narrow', sans-serif;
 align-self:stretch;
 }
 
