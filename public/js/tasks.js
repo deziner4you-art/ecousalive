@@ -1244,7 +1244,7 @@ function buildCard(item){
       <option value="delete">🗑 Delete Task</option>
       ${item.work_status==='Work Done'&&!item.published_at?'<option value="publish">📦 Publish</option>':''}
       ${item.product_type==='Info + A Plus'&&item.work_status==='Pending'?'<option value="infowork">▶ Info Work</option>':''}
-      ${item.product_type==='Info + A Plus'&&item.work_status==='Info Work'?'<option value="send_content">📤 Send for Content</option>':''}
+      ${item.product_type==='Info + A Plus'&&item.work_status==='Info Work'?'<option value="qaready">📤 Send for QA</option>':''}
       ${item.work_status!=='Working'&&item.work_status!=='Changing'&&item.work_status!=='Paused'&&item.work_status!=='In QA'&&item.work_status!=='Work Done'&&item.work_status!=='Info Done'&&item.work_status!=='Info Work'&&item.work_status!=='Content Pending'?'<option value="working">' + (isInfoStage ? '▶ Info Working' : '▶ Working') + '</option>':''}
       ${item.work_status==='Working'?'<option value="pause">⏸ Pause</option>':''}
       ${item.work_status==='Paused'?'<option value="resume">▶ Resume</option>':''}
@@ -1624,10 +1624,10 @@ function buildActionButtons(item, isAdmin, isWorker, isQa, isListing, isUrgent, 
             }
         } else if(item.product_type === 'Info + A Plus'){
             if(item.work_status === 'Pending')         btns += `<button class="actionbtn" style="background:#c2410c;color:#fff;" onclick="updateWorkStatus(${item.id},'Info Work')">▶ Info Work</button>`;
-            if(item.work_status === 'Info Work')       btns += `<button class="actionbtn" style="background:#6d28d9;color:#fff;" onclick="sendForContent(${item.id})">📤 Send for Content</button>`;
+            if(item.work_status === 'Info Work')       btns += `<button class="btn2 actionbtn" onclick="updateWorkStatus(${item.id},'In QA')">📤 Send for QA</button>`;
             if(item.work_status === 'Content Pending') btns += `<div style="color:#94a3b8;font-size:12px;padding:8px 0;font-style:italic;">⏳ Content generate hone ka intezaar karein...</div>`;
             if(item.work_status !== 'Info Work' && item.work_status !== 'Content Pending' && item.work_status !== 'Pending'){
-                if(item.work_status !== 'Working' && item.work_status !== 'Changing' && item.work_status !== 'Paused' && item.work_status !== 'In QA' && item.work_status !== 'Work Done'){
+                if(item.work_status !== 'Working' && item.work_status !== 'Changing' && item.work_status !== 'Paused' && item.work_status !== 'In QA' && item.work_status !== 'Work Done' && item.work_status !== 'Info Done'){
                     btns += `<button class="btn1 actionbtn" onclick="updateWorkStatus(${item.id},'Working')">▶ Working</button>`;
                 }
                 if(item.work_status === 'Working')  btns += `<button class="actionbtn" style="background:#b45309;color:#fff;" onclick="pauseWork(${item.id})">⏸ Pause</button>`;
