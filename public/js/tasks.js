@@ -2802,12 +2802,22 @@ function fetchGroupSearchResults(taskId, query){
         .then(function(r){
             if(GROUP_SEARCH_REQ_ID[taskId] !== reqId) return;
 
-            if(r.success && Array.isArray(r.data)){
-                renderGroupSearchResultsDropdown(taskId, r.data, query);
+            var list = [];
+            if(r && r.success){
+                if(Array.isArray(r.data)){
+                    list = r.data;
+                } else if(Array.isArray(r)){
+                    list = r;
+                } else {
+                    list = Object.keys(r)
+                        .filter(function(k){ return !isNaN(k); })
+                        .map(function(k){ return r[k]; });
+                }
+                renderGroupSearchResultsDropdown(taskId, list, query);
             } else {
                 dropdown.innerHTML = `
                     <div style="padding:14px; text-align:center; color:#f87171; font-size:12px; display:flex; justify-content:space-between; align-items:center;">
-                        <span>❌ ${escapeHtmlContent(r.message || 'Product nahi mila')}</span>
+                        <span>❌ ${escapeHtmlContent((r && r.message) || 'Product nahi mila')}</span>
                         <button type="button" onclick="closeGroupDropdown(${taskId})" style="background:transparent;border:none;color:#94a3b8;font-size:14px;cursor:pointer;">✕</button>
                     </div>`;
                 dropdown.style.display = 'block';

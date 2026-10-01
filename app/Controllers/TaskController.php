@@ -505,7 +505,7 @@ class TaskController {
         $stmt->execute($params);
         $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        json_success($products);
+        json_success(['data' => $products]);
     }
 
     public function setProductType(): void {
