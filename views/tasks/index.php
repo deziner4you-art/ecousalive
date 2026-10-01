@@ -172,7 +172,7 @@ if(!in_array('Info Done', $allowed)){
 <?php endif; ?>
 
 <!-- ── Bulk Action Bar ── -->
-<div id="bulk-action-bar" style="display:none; background:#1e293b; border:1px solid #334155; border-radius:12px; padding:12px 18px; margin: 10px 12px 14px; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);">
+<div id="bulk-action-bar" style="display:none; position:sticky; top:104px; z-index:38; background:#1e293b; border:1px solid #334155; border-radius:12px; padding:12px 18px; margin: 6px 12px 12px; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; box-shadow: 0 8px 24px -4px rgba(0,0,0,0.6), 0 4px 8px -2px rgba(0,0,0,0.4);">
     <div style="display:flex; align-items:center; gap:15px; flex-wrap:wrap;">
         <span style="color:#f1f5f9; font-size:14px; font-weight:bold; display:inline-flex; align-items:center; gap:8px;">
             <span style="background:#c2410c; color:#fff; border-radius:50%; width:24px; height:24px; display:inline-flex; align-items:center; justify-content:center; font-size:12px;" id="bulk-selected-count">0</span>

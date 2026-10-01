@@ -154,8 +154,8 @@ function renderSmart(data){
     var filtered  = getSortedFiltered(data);
     var totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
     if(CURRENT_PAGE > totalPages) CURRENT_PAGE = totalPages;
-    var start     = (CURRENT_PAGE - 1) * PAGE_SIZE;
-    var pageItems = filtered.slice(start, start + PAGE_SIZE);
+    var visibleCount = Math.min(CURRENT_PAGE * PAGE_SIZE, filtered.length);
+    var pageItems = filtered.slice(0, visibleCount);
 
     container.querySelectorAll('.card').forEach(function(card){
         var cardId = parseInt(card.getAttribute('data-id'));
@@ -291,7 +291,7 @@ function renderSmart(data){
         }
     });
 
-    renderPagination(filtered.length, totalPages);
+    renderPagination(filtered.length, totalPages, visibleCount);
     updateHeaderSpacer();
     if(typeof updateBulkActionBar === 'function') updateBulkActionBar();
 }
@@ -338,22 +338,76 @@ function getDisplayStatus(item){
     return {cls: item.status, label: item.status};
 }
 
-function renderPagination(totalItems, totalPages){
+function renderPagination(totalItems, totalPages, visibleCount){
     var pager = document.getElementById('pager');
     if(!pager) return;
-    if(totalItems <= PAGE_SIZE){ pager.innerHTML = ''; return; }
-    var start = ((CURRENT_PAGE - 1) * PAGE_SIZE) + 1;
-    var end   = Math.min(CURRENT_PAGE * PAGE_SIZE, totalItems);
+    if(!totalItems || totalItems <= 0){
+        pager.innerHTML = '';
+        return;
+    }
+    if(typeof visibleCount === 'undefined'){
+        visibleCount = Math.min(CURRENT_PAGE * PAGE_SIZE, totalItems);
+    }
+    var hasMore = visibleCount < totalItems;
+    var remaining = totalItems - visibleCount;
+
     pager.innerHTML = `
-<button ${CURRENT_PAGE<=1?'disabled':''} onclick="changePage(${CURRENT_PAGE-1})">Previous</button>
-<span>${start}-${end} of ${totalItems} | Page ${CURRENT_PAGE} of ${totalPages}</span>
-<button ${CURRENT_PAGE>=totalPages?'disabled':''} onclick="changePage(${CURRENT_PAGE+1})">Next</button>`;
+    <div class="pager-container" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; width:100%; max-width:850px; margin:20px auto 35px; padding:18px 24px; background:#0f2035; border:1px solid #1e3a5f; border-radius:12px; box-shadow:0 4px 15px rgba(0,0,0,0.25);">
+        
+        <div style="display:flex; align-items:center; justify-content:space-between; width:100%; flex-wrap:wrap; gap:14px;">
+            <div style="color:#94a3b8; font-size:14px; font-weight:600; display:flex; align-items:center; gap:6px;">
+                <span>Showing <strong style="color:#38bdf8; font-size:15px;">${visibleCount}</strong> of <strong style="color:#f1f5f9; font-size:15px;">${totalItems}</strong> products</span>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:10px;">
+                <label for="pageSizeSelect" style="color:#94a3b8; font-size:13px; font-weight:600; cursor:pointer;">
+                    Products to Load:
+                </label>
+                <select id="pageSizeSelect" onchange="changePageSize(this.value)" style="background:#0a1628; border:1px solid #334155; border-radius:6px; color:#f8fafc; padding:6px 14px; font-size:13px; font-weight:700; cursor:pointer; outline:none; transition:border-color 0.2s;">
+                    <option value="10" ${PAGE_SIZE === 10 ? 'selected' : ''}>10</option>
+                    <option value="20" ${PAGE_SIZE === 20 ? 'selected' : ''}>20</option>
+                    <option value="50" ${PAGE_SIZE === 50 ? 'selected' : ''}>50</option>
+                    <option value="100" ${PAGE_SIZE === 100 ? 'selected' : ''}>100</option>
+                </select>
+            </div>
+        </div>
+
+        ${hasMore ? `
+            <button id="loadMoreBtn" onclick="loadMoreTasks()" class="load-more-btn" style="width:100%; max-width:340px; padding:12px 28px; background:linear-gradient(135deg, #2563eb, #7c3aed); color:#ffffff; border:none; border-radius:8px; font-size:14px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 4px 14px rgba(37, 99, 235, 0.4); transition:all 0.2s ease;">
+                <span>⬇️ Load More Products (${remaining} remaining)</span>
+            </button>
+        ` : `
+            <div style="color:#64748b; font-size:13px; font-weight:600; padding:8px 18px; background:rgba(30, 41, 59, 0.5); border-radius:20px; border:1px solid #334155;">
+                ✅ All ${totalItems} products loaded
+            </div>
+        `}
+    </div>`;
+}
+
+function loadMoreTasks() {
+    var btn = document.getElementById('loadMoreBtn');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span>⏳ Loading...</span>';
+    }
+    CURRENT_PAGE++;
+    renderSmart(ALL_TASKS);
+}
+
+function changePageSize(newSize) {
+    var size = parseInt(newSize, 10);
+    if (!size || size < 1) size = 20;
+    PAGE_SIZE = size;
+    try {
+        localStorage.setItem('eco_page_size', String(PAGE_SIZE));
+    } catch(e) {}
+    CURRENT_PAGE = 1;
+    renderSmart(ALL_TASKS);
 }
 
 function changePage(page){
     CURRENT_PAGE = page;
     renderSmart(ALL_TASKS);
-    window.scrollTo({top:0, behavior:'smooth'});
 }
 
 /* ── Update buttons ──────────────────────────── */
@@ -2529,6 +2583,17 @@ function clearBulkSelection() {
     updateBulkActionBar();
 }
 
+function updateBulkBarPosition() {
+    var bar = document.getElementById('bulk-action-bar');
+    var filterBar = document.getElementById('filter-bar');
+    if (!bar || !filterBar) return;
+    var topbar = document.getElementById('topbar');
+    var topbarH = topbar ? topbar.offsetHeight : 52;
+    var filterH = filterBar.offsetHeight || 50;
+    bar.style.top = (topbarH + filterH) + 'px';
+}
+window.addEventListener('resize', updateBulkBarPosition);
+
 function updateBulkActionBar() {
     var bar = document.getElementById('bulk-action-bar');
     if (!bar) return;
@@ -2537,6 +2602,7 @@ function updateBulkActionBar() {
     
     if (typeof HAS_BULK_ACTION !== 'undefined' && HAS_BULK_ACTION && count > 0) {
         bar.style.display = 'flex';
+        updateBulkBarPosition();
         document.getElementById('bulk-selected-count').textContent = count;
         
         var selectAll = document.getElementById('bulk-select-all');

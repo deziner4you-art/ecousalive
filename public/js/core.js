@@ -14,7 +14,7 @@ var OPEN            = {};
 var ALL_TASKS       = [];
 var IS_EDITING      = {};
 var CURRENT_PAGE    = 1;
-var PAGE_SIZE       = 30;
+var PAGE_SIZE       = parseInt(localStorage.getItem('eco_page_size')) || 20;
 var ALL_WORKERS     = [];
 var ALL_PAYROLL_WORKERS = [];
 var EXCHANGE_RATE   = 278.0;
@@ -337,6 +337,29 @@ function resetPageAndRender(){
     if(typeof updateBulkActionBar === 'function') updateBulkActionBar();
     renderSmart(ALL_TASKS);
 }
+
+function changePageSize(newSize) {
+    var size = parseInt(newSize, 10);
+    if (!size || size < 1) size = 20;
+    PAGE_SIZE = size;
+    try {
+        localStorage.setItem('eco_page_size', String(PAGE_SIZE));
+    } catch(e) {}
+    CURRENT_PAGE = 1;
+    renderSmart(ALL_TASKS);
+}
+window.changePageSize = changePageSize;
+
+function loadMoreTasks() {
+    var btn = document.getElementById('loadMoreBtn');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span>⏳ Loading...</span>';
+    }
+    CURRENT_PAGE++;
+    renderSmart(ALL_TASKS);
+}
+window.loadMoreTasks = loadMoreTasks;
 
 /* ── Event listeners — filter bar ───────────── */
 function bindFilterBarEvents(){

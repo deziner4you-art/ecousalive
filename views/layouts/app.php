@@ -639,6 +639,27 @@ body { background: #081223; margin: 0; padding: 0; color: #e2e8f0; }
     font-weight: normal !important;
 }
 
+/* ── Bulk Action Bar Sticky ──────────────────── */
+#bulk-action-bar {
+    position: sticky !important;
+    top: 104px;
+    z-index: 38 !important;
+    background: #1e293b !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.6), 0 4px 8px -2px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* ── Pager & Load More Button ───────────────── */
+.load-more-btn:hover {
+    filter: brightness(1.1);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(37, 99, 235, 0.5) !important;
+}
+.load-more-btn:active {
+    transform: translateY(0);
+}
+
 /* ── Content editor — WHITE background ────────── */
 .editor {
     background: #ffffff !important;
@@ -1398,6 +1419,38 @@ html.light-theme .nav-theme-toggle {
     color: #2563eb !important;
     border-color: #cbd5e1 !important;
 }
+html.light-theme #bulk-action-bar {
+    background: #ffffff !important;
+    border-color: #cbd5e1 !important;
+    box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.12), 0 4px 8px -2px rgba(0, 0, 0, 0.06) !important;
+}
+html.light-theme #bulk-action-bar span,
+html.light-theme #bulk-action-bar label {
+    color: #1e293b !important;
+}
+html.light-theme #bulk-action-select {
+    background: #f8fafc !important;
+    border-color: #cbd5e1 !important;
+    color: #0f172a !important;
+}
+html.light-theme .pager-container {
+    background: #ffffff !important;
+    border-color: #cbd5e1 !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.06) !important;
+}
+html.light-theme .pager-container strong {
+    color: #0f172a !important;
+}
+html.light-theme #pageSizeSelect {
+    background: #f8fafc !important;
+    border-color: #cbd5e1 !important;
+    color: #0f172a !important;
+}
+html.light-theme .load-more-btn {
+    background: linear-gradient(135deg, #2563eb, #6366f1) !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25) !important;
+}
 </style>
 </head>
 <body>
@@ -1679,9 +1732,9 @@ try {
 </div>
 
 <!-- ── JS Modules ── -->
-<?php $v = '2.8.2'; ?>
+<?php $v = '2.8.3'; ?>
 <script src="<?= $publicUrl ?>/js/core.js?v=<?= $v ?>"></script>
-<script src="<?= $publicUrl ?>/js/tasks.js?v=3.2.9"></script>
+<script src="<?= $publicUrl ?>/js/tasks.js?v=3.3.0"></script>
 <script src="<?= $publicUrl ?>/js/admin.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/invoices.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/payroll.js?v=2.7.13"></script>
