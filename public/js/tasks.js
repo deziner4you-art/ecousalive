@@ -750,7 +750,7 @@ function buildProductContentSection(item, canEdit, lock, isWorker, isQa, origina
 
         html += `<div style="display:flex;justify-content:flex-end;margin-bottom:8px;gap:8px;flex-wrap:wrap;">`;
         if(isBothProd && !aplusStarted && !isAllGenPhase){
-            html += `<button type="button" class="btn-enable-aplus" onclick="enableAplusSection(${item.id})" style="background:#581c87;border:1px solid #a855f7;color:#f3e8ff;font-size:11.5px;font-weight:700;padding:5px 12px;border-radius:5px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s;">
+            html += `<button type="button" class="btn-enable-aplus" onclick="enableAplusSection(${item.id})" style="background:#7f1d1d;border:1px solid #ef4444;color:#fee2e2;font-size:11.5px;font-weight:700;padding:5px 12px;border-radius:5px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s;">
                 <span>➕</span> Add A+ Banners Content (All Generated)
             </button>`;
         }
@@ -924,13 +924,13 @@ function buildProductContentSection(item, canEdit, lock, isWorker, isQa, origina
         html += `<div id="phase1-note-${item.id}" style="margin-top:10px;padding:8px 14px;background:#0c1a2e;border:1px dashed #1e3a5f;border-radius:6px;font-size:11.5px;color:#7dd3fc;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
             <span>ℹ️ <strong>Phase 1 (Infographics):</strong> Active now. <strong>Phase 2 (A+ Banners 4-Box Template):</strong> Infographics complete/approve hone ke baad start hoga.</span>
             ${isAdminUser ? `
-            <button type="button" class="btn-enable-aplus" onclick="enableAplusSection(${item.id})" style="background:#581c87;border:1px solid #a855f7;color:#f3e8ff;font-size:11px;font-weight:700;padding:4px 10px;border-radius:5px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;transition:all .15s;">
+            <button type="button" class="btn-enable-aplus" onclick="enableAplusSection(${item.id})" style="background:#7f1d1d;border:1px solid #ef4444;color:#fee2e2;font-size:11px;font-weight:700;padding:4px 10px;border-radius:5px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;transition:all .15s;">
                 <span>➕</span> Add A+ Banners Content Now (All Generated)
             </button>` : ''}
         </div>`;
     }
     if(isBothProd && isAllGenPhase){
-        html += `<div style="margin-top:10px;padding:8px 14px;background:#2e1065;border:1px dashed #a855f7;border-radius:6px;font-size:11.5px;color:#e9d5ff;display:flex;align-items:center;gap:8px;">
+        html += `<div style="margin-top:10px;padding:8px 14px;background:#450a0a;border:1px dashed #ef4444;border-radius:6px;font-size:11.5px;color:#fca5a5;display:flex;align-items:center;gap:8px;">
             <span>✨ <strong>All Generated Mode:</strong> Infographics aur A+ Banners dono ka content generate ho chuka hai. Client aik hi dafa dono approve kar sakta hai!</span>
         </div>`;
     }
@@ -948,9 +948,9 @@ function enableAplusSection(taskId){
     var note = document.getElementById('phase1-note-' + taskId);
     if(note){
         note.innerHTML = `<span>✨ <strong>All Generated Mode Active:</strong> Infographics aur A+ Banners dono ka content sath save hoga. Neechay <strong>Save All Generated</strong> button se draft save karein.</span>`;
-        note.style.borderColor = '#a855f7';
-        note.style.color = '#e9d5ff';
-        note.style.background = '#2e1065';
+        note.style.borderColor = '#ef4444';
+        note.style.color = '#fee2e2';
+        note.style.background = '#450a0a';
     }
     var btnSaveAll = document.getElementById('btn-save-allgen-' + taskId);
     if(btnSaveAll) btnSaveAll.style.display = 'inline-block';
@@ -1807,19 +1807,19 @@ function buildAdminButtons(item, isUrgent, lock){
                 btns += `<button class="btn-writer-save actionbtn" onclick="writerSave(${item.id})">💾 Save Draft</button>`;
                 if(item.product_type === 'Info + A Plus'){
                     var hasAplusInContent = item.content && (item.content.indexOf('aplus') !== -1 || item.content.indexOf('banner') !== -1 || item.content.indexOf('Banner') !== -1);
-                    btns += `<button id="btn-save-allgen-${item.id}" class="actionbtn" style="background:#7c3aed;color:#fff;display:${hasAplusInContent ? 'inline-block' : 'none'};" onclick="writerSave(${item.id}, 'All Generated')">💾 Save All Generated</button>`;
+                    btns += `<button id="btn-save-allgen-${item.id}" class="actionbtn" style="background:#7f1d1d;border:1px solid #ef4444;color:#fff;display:${hasAplusInContent ? 'inline-block' : 'none'};" onclick="writerSave(${item.id}, 'All Generated')">💾 Save All Generated</button>`;
                 }
             }
         }
     }
 
     if(item.status === 'All Generated'){
-        btns += `<button class="btn-writer-save actionbtn" style="background:#7c3aed;color:#fff;" onclick="writerSave(${item.id}, 'All Generated')">💾 Save All Generated</button>`;
+        btns += `<button class="btn-writer-save actionbtn" style="background:#7f1d1d;border:1px solid #ef4444;color:#fff;" onclick="writerSave(${item.id}, 'All Generated')">💾 Save All Generated</button>`;
     }
 
     if(item.product_type === 'Info + A Plus'){
         if(item.status === 'Generated'){
-            btns += `<button class="actionbtn" style="background:#7c3aed;color:#fff;" onclick="forceStage(${item.id},'All Generated')">✨ Tag All Generated</button>`;
+            btns += `<button class="actionbtn" style="background:#7f1d1d;border:1px solid #ef4444;color:#fff;" onclick="forceStage(${item.id},'All Generated')">✨ Tag All Generated</button>`;
         } else if(item.status === 'All Generated'){
             btns += `<button class="actionbtn" style="background:#b91c1c;color:#fff;" onclick="forceStage(${item.id},'Generated')">🏷 Tag Generated</button>`;
         }
