@@ -120,7 +120,7 @@ tailwind.config = {
 </script>
 
 <!-- App CSS (cards, status badges, task styles from monolith) -->
-<link rel="stylesheet" href="<?= $publicUrl ?>/css/app.css?v=2.8.3">
+<link rel="stylesheet" href="<?= $publicUrl ?>/css/app.css?v=2.8.4">
 
 <style>
 /* ── Topbar ────────────────────────────────────── */
@@ -531,11 +531,31 @@ html.light-theme .notif-footer {
 body { background: #081223; margin: 0; padding: 0; color: #e2e8f0; }
 
 /* ── Card: header styling ────────────────────── */
+.card {
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
 .card .head {
     position: relative;
     background: #162033;
     border-radius: 8px 8px 0 0;
     cursor: pointer;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    align-items: center !important;
+}
+.card .head .title {
+    flex: 1 1 auto !important;
+    max-width: none !important;
+    box-sizing: border-box !important;
+}
+.card .head .card-meta {
+    margin-left: auto !important;
+    flex-shrink: 0 !important;
+}
+.card .head .toggle {
+    flex-shrink: 0 !important;
 }
 .card.open {
     overflow: visible !important;
@@ -1570,7 +1590,7 @@ try {
 <!-- ── JS Modules ── -->
 <?php $v = '2.8.2'; ?>
 <script src="<?= $publicUrl ?>/js/core.js?v=<?= $v ?>"></script>
-<script src="<?= $publicUrl ?>/js/tasks.js?v=3.2.7"></script>
+<script src="<?= $publicUrl ?>/js/tasks.js?v=3.2.8"></script>
 <script src="<?= $publicUrl ?>/js/admin.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/invoices.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/payroll.js?v=2.7.13"></script>

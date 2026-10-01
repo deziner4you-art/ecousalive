@@ -180,22 +180,31 @@ function renderSmart(data){
         var existing = container.querySelector('.card[data-id="' + item.id + '"]');
 
         if(existing){
-            var _newWS  = String(item.work_status || '');
-            var _newCA  = item.content_approved_at || '';
-            var _newCU  = item.content_updated_at  || '';
-            var _newPub = item.published_at ? '1' : '0';
-            var _newFam = item.family_code || '';
+            var _newWS   = String(item.work_status || '');
+            var _newCA   = item.content_approved_at || '';
+            var _newCU   = item.content_updated_at  || '';
+            var _newPub  = item.published_at ? '1' : '0';
+            var _newFam  = item.family_code || '';
+            var _newAI   = item.ai_worked_by_name || '';
+            var _newInfo = item.info_worker_name || '';
+            var _newAplus = item.aplus_worker_name || '';
             var _needRebuild = existing.getAttribute('data-work-status') !== _newWS
                             || existing.getAttribute('data-approved-at')  !== _newCA
                             || existing.getAttribute('data-updated-at')   !== _newCU
                             || existing.getAttribute('data-published')    !== _newPub
-                            || existing.getAttribute('data-family-code')  !== _newFam;
+                            || existing.getAttribute('data-family-code')  !== _newFam
+                            || existing.getAttribute('data-ai-worker')    !== _newAI
+                            || existing.getAttribute('data-info-worker')  !== _newInfo
+                            || existing.getAttribute('data-aplus-worker') !== _newAplus;
             if(_needRebuild){
                 existing.setAttribute('data-work-status', _newWS);
                 existing.setAttribute('data-approved-at', _newCA);
                 existing.setAttribute('data-updated-at',  _newCU);
                 existing.setAttribute('data-published',   _newPub);
                 existing.setAttribute('data-family-code', _newFam);
+                existing.setAttribute('data-ai-worker',   _newAI);
+                existing.setAttribute('data-info-worker', _newInfo);
+                existing.setAttribute('data-aplus-worker',_newAplus);
                 existing.innerHTML = buildCard(item);
                 if(ROLE === 'administrator' && ALL_WORKERS.length) populateCardWorkerDropdowns();
                 updateButtons(existing, item);
@@ -269,6 +278,9 @@ function renderSmart(data){
         div.setAttribute('data-updated-at',  item.content_updated_at  || '');
         div.setAttribute('data-published',   item.published_at ? '1' : '0');
         div.setAttribute('data-family-code', item.family_code || '');
+        div.setAttribute('data-ai-worker',   item.ai_worked_by_name || '');
+        div.setAttribute('data-info-worker', item.info_worker_name || '');
+        div.setAttribute('data-aplus-worker',item.aplus_worker_name || '');
         div.innerHTML = buildCard(item);
         container.appendChild(div);
 
@@ -1327,7 +1339,7 @@ function buildCard(item){
         var updatedRow  = updatedTimes  ? `<div style="padding:6px 10px;background:#0f1f0a;border:1px solid #3f6212;border-radius:5px;"><div style="color:#a3e635;font-weight:bold;font-size:10px;margin-bottom:3px;">📝 CLIENT UPDATED CONTENT</div><div style="color:#bef264;font-size:10px;">🇺🇸 ${updatedTimes.us}</div><div style="color:#bef264;font-size:10px;">🇵🇰 ${updatedTimes.pak}</div></div>` : '';
 
         var adminActionsHtml = `
-<div style="flex:1.5;min-width:300px;display:flex;flex-direction:column;gap:8px;background:#0a1628;padding:10px 14px;border-radius:6px;border:1px solid #1e3a5f;">
+<div style="flex:1.2;min-width:240px;display:flex;flex-direction:column;gap:8px;background:#0a1628;padding:10px 14px;border-radius:6px;border:1px solid #1e3a5f;">
   <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1e3a5f;padding-bottom:5px;margin-bottom:5px;">
     <span style="color:#22d3ee;font-weight:bold;font-size:11px;letter-spacing:0.5px;">⚙️ ADMIN ACTIONS</span>
     <button type="button" onclick="openEditServices(${item.id})" style="background:#0284c7;color:#fff;border:none;padding:2px 8px;border-radius:4px;font-size:10px;cursor:pointer;font-weight:700;display:inline-flex;align-items:center;gap:3px;" title="Edit Services & Worker Assignments">✏️ Edit Services</button>
@@ -1406,7 +1418,7 @@ function buildCard(item){
 </div>`;
             }
         }
-        var publishedRow = pubTimes ? `<div style="flex:1;min-width:200px;display:flex;flex-direction:column;gap:4px;padding:6px 10px;background:#052e16;border:1px solid #16a34a;border-radius:5px;font-size:11px;color:#86efac;">
+        var publishedRow = pubTimes ? `<div style="flex:1;min-width:210px;display:flex;flex-direction:column;gap:4px;padding:6px 10px;background:#052e16;border:1px solid #16a34a;border-radius:5px;font-size:11px;color:#86efac;">
   <div style="font-weight:bold;font-size:10px;color:#4ade80;letter-spacing:.5px;margin-bottom:2px;">📦 PUBLISHED TIME</div>
   ${item.published_by_name ? `<div style="color:#4ade80;font-size:10px;">by <strong>${item.published_by_name}</strong></div>` : ''}
   <div>🇵🇰 ${pubTimes.pak}</div>
@@ -1414,19 +1426,62 @@ function buildCard(item){
   ${completionHtml}
 </div>` : '';
 
-        adminTimeBlock = `<div style="margin-bottom:10px;display:flex;gap:12px;align-items:stretch;flex-wrap:wrap;">
-${(approvedRow || updatedRow) ? `<div style="flex:1;min-width:200px;display:flex;flex-direction:column;gap:8px;">${approvedRow}${updatedRow}</div>` : ''}
-<div style="flex:1;min-width:200px;color:#fff;font-size:12px;line-height:1.6;background:#0a1628;padding:10px 14px;border-radius:6px;border:1px solid #1e3a5f;display:flex;flex-direction:column;justify-content:space-between;">
+        /* ── 4-Section Accordion Top Row ── */
+        /* Section 1: Content Approved / Updated Timestamps */
+        var timeSection = (approvedRow || updatedRow)
+            ? `<div style="flex:1;min-width:210px;display:flex;flex-direction:column;gap:8px;">${approvedRow}${updatedRow}</div>`
+            : `<div style="flex:1;min-width:210px;background:#0a1628;padding:10px 14px;border-radius:6px;border:1px solid #1e3a5f;display:flex;flex-direction:column;justify-content:center;align-items:center;color:#64748b;font-size:11px;text-align:center;">
+                 <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:.5px;margin-bottom:4px;">⏱ CONTENT STATUS</div>
+                 <span>No approval or update timestamps</span>
+               </div>`;
+
+        /* Section 2: Worker Time */
+        var workerTimeSection = `<div style="flex:1;min-width:210px;color:#fff;font-size:11.5px;line-height:1.5;background:#0a1628;padding:10px 14px;border-radius:6px;border:1px solid #1e3a5f;display:flex;flex-direction:column;justify-content:space-between;">
   <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:.5px;border-bottom:1px solid #1e3a5f;padding-bottom:4px;margin-bottom:6px;">⏱ WORKER TIME</div>
   <div>
-    <div style="margin-bottom:5px;">🕒 <strong style="color:#93c5fd;">Start Time</strong><br>${startTimes ? '<span style="color:#bfdbfe;">🇵🇰 '+startTimes.pak+'</span>' : '<span style="color:#475569;">-</span>'}</div>
-    <div style="margin-bottom:5px;">✅ <strong style="color:#86efac;">Completed Time</strong><br>${completedTimes ? '<span style="color:#bbf7d0;">🇵🇰 '+completedTimes.pak+'</span>' : '<span style="color:#475569;">-</span>'}</div>
-    <div style="margin-bottom:5px;">⏸ <strong style="color:#fcd34d;">Last Paused</strong><br>${pausedTimes ? '<span style="color:#fef3c7;">🇵🇰 '+pausedTimes.pak+'</span>' : '<span style="color:#475569;">-</span>'}</div>
+    <div style="margin-bottom:4px;">🕒 <strong style="color:#93c5fd;">Start Time</strong><br>${startTimes ? '<span style="color:#bfdbfe;font-size:10.5px;">🇵🇰 '+startTimes.pak+'</span>' : '<span style="color:#475569;">-</span>'}</div>
+    <div style="margin-bottom:4px;">✅ <strong style="color:#86efac;">Completed Time</strong><br>${completedTimes ? '<span style="color:#bbf7d0;font-size:10.5px;">🇵🇰 '+completedTimes.pak+'</span>' : '<span style="color:#475569;">-</span>'}</div>
+    <div style="margin-bottom:4px;">⏸ <strong style="color:#fcd34d;">Last Paused</strong><br>${pausedTimes ? '<span style="color:#fef3c7;font-size:10.5px;">🇵🇰 '+pausedTimes.pak+'</span>' : '<span style="color:#475569;">-</span>'}</div>
   </div>
-  <div style="margin-top:4px;border-top:1px solid #1e3a5f;padding-top:4px;">⏱ Total Work Time: <strong style="color:#4ade80;">${formatWorkTime(item.work_total_seconds || 0)}</strong></div>
-</div>
-${publishedRow}
+  <div style="margin-top:4px;border-top:1px solid #1e3a5f;padding-top:4px;font-size:11px;">⏱ Total Work Time: <strong style="color:#4ade80;">${formatWorkTime(item.work_total_seconds || 0)}</strong></div>
+</div>`;
+
+        /* Section 3: Task Workers (badges for who performed which task on product) */
+        var workerBadgesList = [];
+        if(item.ai_worked_by_name){
+            workerBadgesList.push(`<div style="background:#3b0764;border:1px solid #9333ea;color:#e9d5ff;padding:5px 8px;border-radius:4px;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:6px;">
+                <span>🤖 AI Work:</span>
+                <strong style="color:#f3e8ff;">${item.ai_worked_by_name}</strong>
+            </div>`);
+        }
+        if(item.info_worker_name){
+            workerBadgesList.push(`<div style="background:#082f49;border:1px solid #0284c7;color:#bae6fd;padding:5px 8px;border-radius:4px;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:6px;">
+                <span>🎨 Infographics:</span>
+                <strong style="color:#e0f2fe;">${item.info_worker_name}</strong>
+            </div>`);
+        }
+        if(item.aplus_worker_name){
+            workerBadgesList.push(`<div style="background:#2e1065;border:1px solid #7c3aed;color:#ddd6fe;padding:5px 8px;border-radius:4px;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:6px;">
+                <span>🏷 A+ Banners:</span>
+                <strong style="color:#ede9fe;">${item.aplus_worker_name}</strong>
+            </div>`);
+        }
+        var taskWorkersSection = `<div style="flex:1;min-width:210px;background:#0a1628;padding:10px 14px;border-radius:6px;border:1px solid #1e3a5f;display:flex;flex-direction:column;justify-content:flex-start;">
+  <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:.5px;border-bottom:1px solid #1e3a5f;padding-bottom:4px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+    <span>👥 TASK WORKERS</span>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:6px;flex:1;justify-content:center;">
+    ${workerBadgesList.length > 0 ? workerBadgesList.join('') : '<div style="color:#64748b;font-size:11px;font-style:italic;text-align:center;padding:10px 0;">No tasks completed yet</div>'}
+  </div>
+</div>`;
+
+        /* Assemble 1 2 3 4 Layout */
+        adminTimeBlock = `<div style="margin-bottom:12px;display:flex;gap:10px;align-items:stretch;flex-wrap:wrap;">
+${timeSection}
+${workerTimeSection}
+${taskWorkersSection}
 ${adminActionsHtml}
+${publishedRow ? `<div style="flex:100%;margin-top:6px;">${publishedRow}</div>` : ''}
 </div>`;
     }
 
@@ -1526,33 +1581,30 @@ ${item.published_link ? `<a href="${item.published_link}" target="_blank" rel="n
     var hideEditor = isInfoStage && item.work_status !== 'Content Pending' && item.status !== 'Generated' && item.status !== 'All Generated' && item.status !== 'Approved' && item.status !== 'Updated' && !item.content_approved_at && !item.content_updated_at;
 
     return `
-<div class="head" onclick="headClick(event,${item.id})" ontouchend="headTouch(event,${item.id})" style="cursor:pointer; display:flex; align-items:center;">
-<div class="pid${isUrgent?' urgent-pid':''}" style="position:relative; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; padding-top:10px; width:125px; min-width:125px; font-family:'Agency FB', 'Arial Narrow', sans-serif; box-sizing:border-box;">
+<div class="head" onclick="headClick(event,${item.id})" ontouchend="headTouch(event,${item.id})" style="cursor:pointer; display:flex; align-items:center; width:100%; box-sizing:border-box;">
+<div class="pid${isUrgent?' urgent-pid':''}" style="position:relative; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; padding-top:10px; width:125px; min-width:125px; font-family:'Agency FB', 'Arial Narrow', sans-serif; box-sizing:border-box; flex-shrink:0;">
     <div style="line-height:1.1; font-family:'Agency FB', 'Arial Narrow', sans-serif; font-size:15px; font-weight:700; letter-spacing:0.3px; text-align:center; width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0 4px; box-sizing:border-box;">#${item.product_no}</div>
     <div style="position:absolute; bottom:3px; z-index:10; display:flex; justify-content:center; width:100%;">
         ${typeBadge}
     </div>
 </div>
-<div class="title" style="flex:1; min-width:200px; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 12px; box-sizing:border-box; overflow:hidden;">
+<div class="title" style="flex:1 1 auto; max-width:none; min-width:180px; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 12px; box-sizing:border-box; overflow:hidden;">
     <span class="title-text" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;" title="${item.title ? item.title.replace(/"/g, '&quot;') : ''}">${item.title}</span>
     <span class="research-link-slot" style="flex-shrink:0; display:inline-flex; align-items:center; justify-content:flex-end; width:155px; min-width:155px;">
         ${linkIcon || ''}
     </span>
 </div>
-<div class="card-meta${isAdmin?' admin-meta':''}" style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
-    ${showWorkerBadges ? (item.ai_worked_by_name ? `<span class="badge-ai-slot" style="background:#3b0764;border:1px solid #9333ea;color:#e9d5ff;" title="AI Work: ${item.ai_worked_by_name}">🤖 AI: ${item.ai_worked_by_name}</span>` : `<span class="badge-ai-slot" style="visibility:hidden;"></span>`) : ''}
-    ${showWorkerBadges ? (item.info_worker_name ? `<span class="badge-info-slot" style="background:#082f49;border:1px solid #0284c7;color:#bae6fd;" title="Info Worker: ${item.info_worker_name}">🎨 Info: ${item.info_worker_name}</span>` : `<span class="badge-info-slot" style="visibility:hidden;"></span>`) : ''}
-    ${showWorkerBadges ? (item.aplus_worker_name ? `<span class="badge-aplus-slot" style="background:#2e1065;border:1px solid #7c3aed;color:#ddd6fe;" title="A+ Worker: ${item.aplus_worker_name}">🏷 A+: ${item.aplus_worker_name}</span>` : '') : ''}
+<div class="card-meta${isAdmin?' admin-meta':''}" style="display:flex; align-items:center; gap:6px; flex-shrink:0; margin-left:auto;">
     ${revBadge}
     ${invBadge}
-    ${item.family_code ? `<span onclick="event.stopPropagation(); viewFamily('${item.family_code}')" class="badge-group-slot" style="background:#581c87; border:1px solid #a855f7; color:#f3e8ff;" title="Click to view all products in this family group">💜 Group</span>` : `<span class="badge-group-slot" style="visibility:hidden;"></span>`}
+    ${item.family_code ? `<span onclick="event.stopPropagation(); viewFamily('${item.family_code}')" class="badge-group-slot" style="background:#581c87; border:1px solid #a855f7; color:#f3e8ff;" title="Click to view all products in this family group">💜 Group</span>` : ''}
     ${(typeof HAS_BULK_ACTION !== 'undefined' && HAS_BULK_ACTION) ? `<input type="checkbox" class="bulk-chk" data-id="${item.id}" ${(typeof SELECTED_BULK_PRODUCTS !== 'undefined' && SELECTED_BULK_PRODUCTS.indexOf(item.id) !== -1) ? 'checked' : ''} onclick="event.stopPropagation(); toggleBulkSelection();" style="width:16px; height:16px; margin:0 6px; cursor:pointer; accent-color:#8b5cf6; vertical-align:middle; flex-shrink:0;">` : ''}
     ${statusTimeBlock || `<div style="width:155px; min-width:155px; flex-shrink:0; margin-right:8px;"></div>`}
     <div class="status ${ds.cls}">${ds.label}</div>
     ${adminAssign}
     ${qaSendSEO}
 </div>
-<button class="toggle" type="button"><span class="toggle-icon" style="display:inline-block; transition:transform 0.3s; transform:${OPEN[item.id] ? 'rotate(180deg)' : 'rotate(0deg)'};">▼</span></button>
+<button class="toggle" type="button" style="flex-shrink:0;"><span class="toggle-icon" style="display:inline-block; transition:transform 0.3s; transform:${OPEN[item.id] ? 'rotate(180deg)' : 'rotate(0deg)'};">▼</span></button>
 </div>
 <div class="body${OPEN[item.id]?' open':''}" id="body-${item.id}">
 <div class="card-close-bar" onclick="toggle(${item.id})" ontouchend="headTouch(event,${item.id})">▲ &nbsp;Close</div>
