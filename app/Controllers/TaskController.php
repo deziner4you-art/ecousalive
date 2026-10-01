@@ -406,8 +406,37 @@ class TaskController {
         $taskId = intval($_POST['task_id'] ?? 0);
         $productNo = trim($_POST['product_no'] ?? '');
         $productNos = $_POST['product_nos'] ?? null;
+        $targetTaskIds = $_POST['target_task_ids'] ?? null;
 
         if(!$taskId) json_error('Missing task ID');
+
+        // Preferred: Add by exact unique database ID(s)
+        if(!empty($targetTaskIds)){
+            if(is_string($targetTaskIds)){
+                $decoded = json_decode($targetTaskIds, true);
+                if(is_array($decoded)){
+                    $targetTaskIds = $decoded;
+                } else {
+                    $targetTaskIds = explode(',', $targetTaskIds);
+                }
+            }
+            if(!is_array($targetTaskIds)) $targetTaskIds = [$targetTaskIds];
+            $added = 0;
+            $errors = [];
+            foreach($targetTaskIds as $tId){
+                $tId = intval($tId);
+                if(!$tId) continue;
+                $res = Task::addToFamilyById($taskId, $tId);
+                if($res['ok']) $added++;
+                else $errors[] = "ID #$tId: " . ($res['message'] ?? 'Error');
+            }
+            if($added > 0){
+                json_success(['added' => $added, 'errors' => $errors]);
+            } else {
+                json_error(!empty($errors) ? implode('; ', $errors) : 'Koi product add nahi ho saka');
+            }
+            return;
+        }
 
         if(!empty($productNos)){
             if(is_string($productNos)){

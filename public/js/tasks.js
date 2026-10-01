@@ -2853,7 +2853,7 @@ function renderGroupSearchResultsDropdown(taskId, matches, query){
     }
 
     var selectedSet = GROUP_SELECTED[taskId];
-    var allChecked = matches.length > 0 && matches.every(function(m){ return selectedSet.has(m.product_no); });
+    var allChecked = matches.length > 0 && matches.every(function(m){ return selectedSet.has(m.id); });
 
     var html = `
     <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:#0f2238; border-bottom:1px solid #1e3a5f; position:sticky; top:0; z-index:10;">
@@ -2869,18 +2869,19 @@ function renderGroupSearchResultsDropdown(taskId, matches, query){
     <div style="max-height:220px; overflow-y:auto;">`;
 
     matches.forEach(function(p){
-        var isChecked = selectedSet.has(p.product_no);
+        var isChecked = selectedSet.has(p.id);
         var cleanTitle = (p.title || 'Untitled').replace(/"/g, '&quot;');
         var cleanNo = (p.product_no || '').replace(/"/g, '&quot;');
         html += `
         <label style="display:flex; align-items:center; gap:10px; padding:7px 12px; border-bottom:1px solid #13233a; cursor:pointer; transition:background .1s; user-select:none; ${isChecked ? 'background:#132a4a;' : ''}" onmouseover="if(!this.querySelector('input').checked) this.style.background='#0e1f36'" onmouseout="if(!this.querySelector('input').checked) this.style.background='transparent'">
             <input type="checkbox"
                    class="group-chk-${taskId}"
-                   value="${cleanNo}"
+                   value="${p.id}"
                    ${isChecked ? 'checked' : ''}
-                   onchange="toggleGroupItemCheck(${taskId}, '${cleanNo}', this.checked)"
+                   onchange="toggleGroupItemCheck(${taskId}, ${p.id}, this.checked)"
                    style="accent-color:#2563eb; width:16px; height:16px; cursor:pointer; flex-shrink:0;">
             <span style="background:#1d4ed8; color:#fff; font-weight:bold; font-size:11.5px; padding:2px 7px; border-radius:4px; font-family:'Agency FB', sans-serif; letter-spacing:0.5px; white-space:nowrap; flex-shrink:0;">#${cleanNo}</span>
+            <span style="background:#0f172a; color:#94a3b8; font-size:10px; padding:2px 5px; border-radius:3px; border:1px solid #334155; font-family:monospace; white-space:nowrap; flex-shrink:0;" title="Unique Database ID #${p.id}">ID: ${p.id}</span>
             <span style="color:#f1f5f9; font-size:12px; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${cleanTitle}">${cleanTitle}</span>
             ${p.family_code ? `<span style="font-size:10px; color:#c084fc; background:#2e1065; padding:1px 6px; border-radius:4px; white-space:nowrap; flex-shrink:0;">💜 in group</span>` : ''}
         </label>`;
@@ -2901,12 +2902,13 @@ function renderGroupSearchResultsDropdown(taskId, matches, query){
     dropdown.style.display = 'block';
 }
 
-function toggleGroupItemCheck(taskId, productNo, isChecked){
+function toggleGroupItemCheck(taskId, memberTaskId, isChecked){
     if(!GROUP_SELECTED[taskId]) GROUP_SELECTED[taskId] = new Set();
+    memberTaskId = parseInt(memberTaskId, 10);
     if(isChecked){
-        GROUP_SELECTED[taskId].add(productNo);
+        GROUP_SELECTED[taskId].add(memberTaskId);
     } else {
-        GROUP_SELECTED[taskId].delete(productNo);
+        GROUP_SELECTED[taskId].delete(memberTaskId);
     }
     updateGroupUI(taskId);
 }
@@ -2916,12 +2918,13 @@ function toggleGroupSelectAll(taskId, isChecked){
     var chks = document.querySelectorAll('.group-chk-' + taskId);
     chks.forEach(function(chk){
         chk.checked = isChecked;
+        var mId = parseInt(chk.value, 10);
         if(isChecked){
-            GROUP_SELECTED[taskId].add(chk.value);
+            GROUP_SELECTED[taskId].add(mId);
             var parentLabel = chk.closest('label');
             if(parentLabel) parentLabel.style.background = '#132a4a';
         } else {
-            GROUP_SELECTED[taskId].delete(chk.value);
+            GROUP_SELECTED[taskId].delete(mId);
             var parentLabel = chk.closest('label');
             if(parentLabel) parentLabel.style.background = 'transparent';
         }
@@ -2979,29 +2982,35 @@ function closeGroupDropdown(taskId){
 }
 
 function addSelectedProductsToFamily(taskId) {
-    var list = [];
+    var selectedIds = [];
+    var rawText = '';
     if(GROUP_SELECTED[taskId] && GROUP_SELECTED[taskId].size > 0){
-        list = Array.from(GROUP_SELECTED[taskId]);
+        selectedIds = Array.from(GROUP_SELECTED[taskId]);
     } else {
         var inp = document.getElementById('group-input-' + taskId);
-        var raw = inp ? inp.value.trim().replace(/^#/, '').replace(/\+$/, '') : '';
-        if(raw) list = [raw];
+        rawText = inp ? inp.value.trim().replace(/^#/, '').replace(/\+$/, '') : '';
     }
 
     var msgEl = document.getElementById('group-msg-' + taskId);
-    if(!list.length){
+    if(!selectedIds.length && !rawText){
         if(msgEl) msgEl.innerHTML = '<span style="color:#f87171;">⚠️ Pehle search list me se products select karein ya product number likhen!</span>';
         var inp = document.getElementById('group-input-' + taskId);
         if(inp) inp.focus();
         return;
     }
 
-    if(msgEl) msgEl.innerHTML = `<span style="color:#38bdf8;">⏳ Adding ${list.length} product${list.length > 1 ? 's' : ''} to group...</span>`;
+    var totalCount = selectedIds.length || 1;
+    if(msgEl) msgEl.innerHTML = `<span style="color:#38bdf8;">⏳ Adding ${totalCount} product${totalCount > 1 ? 's' : ''} to group...</span>`;
 
     var fd = new FormData();
     fd.append('action', 'add_to_family');
     fd.append('task_id', taskId);
-    fd.append('product_nos', JSON.stringify(list));
+
+    if(selectedIds.length > 0){
+        fd.append('target_task_ids', JSON.stringify(selectedIds));
+    } else if(rawText){
+        fd.append('product_no', rawText);
+    }
     if(typeof CSRF_TOKEN !== 'undefined') fd.append('_csrf', CSRF_TOKEN);
 
     fetch('index.php', { method: 'POST', body: fd })
@@ -3013,7 +3022,7 @@ function addSelectedProductsToFamily(taskId) {
                 if(inp) inp.value = '';
                 closeGroupDropdown(taskId);
                 updateGroupUI(taskId);
-                var addedCount = r.data && r.data.added ? r.data.added : list.length;
+                var addedCount = r.data && r.data.added ? r.data.added : totalCount;
                 if(msgEl) msgEl.innerHTML = `<span style="color:#4ade80;">✅ ${addedCount} product${addedCount > 1 ? 's' : ''} successfully group me add ho gaye!</span>`;
                 loadTasks();
             } else {

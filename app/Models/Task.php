@@ -893,6 +893,46 @@ class Task {
         }
     }
 
+    public static function addToFamilyById(int $taskId, int $targetTaskId): array {
+        if ($taskId === $targetTaskId) {
+            return ['ok' => false, 'message' => 'Cannot group a product with itself'];
+        }
+
+        $stmt = db()->prepare("SELECT id, family_code, product_no FROM wp_eco_aplus_tasks WHERE id = ?");
+        $stmt->execute([$taskId]);
+        $taskA = $stmt->fetch();
+        if (!$taskA) {
+            return ['ok' => false, 'message' => 'Task not found'];
+        }
+
+        $stmt = db()->prepare("SELECT id, family_code, product_no FROM wp_eco_aplus_tasks WHERE id = ? AND deleted_at IS NULL");
+        $stmt->execute([$targetTaskId]);
+        $taskB = $stmt->fetch();
+        if (!$taskB) {
+            return ['ok' => false, 'message' => 'Target product not found in database'];
+        }
+
+        $famCode = null;
+        if (!empty($taskA['family_code'])) {
+            $famCode = $taskA['family_code'];
+        } elseif (!empty($taskB['family_code'])) {
+            $famCode = $taskB['family_code'];
+        } else {
+            $famCode = 'fam_' . bin2hex(random_bytes(8));
+        }
+
+        if (empty($taskA['family_code'])) {
+            db()->prepare("UPDATE wp_eco_aplus_tasks SET family_code = ? WHERE id = ?")->execute([$famCode, $taskA['id']]);
+        }
+        if (!empty($taskB['family_code']) && $taskB['family_code'] !== $famCode) {
+            db()->prepare("UPDATE wp_eco_aplus_tasks SET family_code = ? WHERE family_code = ?")->execute([$famCode, $taskB['family_code']]);
+        } else {
+            db()->prepare("UPDATE wp_eco_aplus_tasks SET family_code = ? WHERE id = ?")->execute([$famCode, $taskB['id']]);
+        }
+
+        return ['ok' => true];
+    }
+
     public static function addToFamily(int $taskId, string $targetProductNo): array {
         $targetProductNo = preg_replace('/^#/', '', $targetProductNo);
         $targetProductNo = preg_replace('/\+$/', '', $targetProductNo);
