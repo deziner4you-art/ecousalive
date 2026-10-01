@@ -1,4 +1,4 @@
-﻿/*
+/*
 =====================================================
 ECO A+ PRO — core.js
 Globals, CSRF interceptor, utilities, tab/panel switching,
@@ -187,6 +187,8 @@ function getSortedFiltered(data){
                 : item.status);
 
         if(filter === 'Info + A Plus'){ if(item.product_type !== 'Info + A Plus') return false; }
+        else if(filter === 'Generated'){ if(currentStatus !== 'Generated' && currentStatus !== 'All Generated') return false; }
+        else if(filter === 'All Generated'){ if(currentStatus !== 'All Generated') return false; }
         else if(filter === 'Infographics'){ if(item.product_type !== 'Infographics') return false; }
         else if(filter === 'A+'){ if(item.product_type !== 'A+') return false; }
         else if(filter === 'Invoiced'){ if(item.invoice_status !== 'Invoiced' && item.info_invoice_status !== 'Invoiced' && item.aplus_invoice_status !== 'Invoiced') return false; }
@@ -813,7 +815,7 @@ function updateNotifications(tasks){
         subtitle = 'Products in Generated awaiting review';
         notifItems = tasks.filter(function(t){
             if(t.status === 'Hold' || t.deleted_at) return false;
-            return t.status === 'Generated' && t.work_status !== 'Work Done' && t.work_status !== 'Info Done';
+            return (t.status === 'Generated' || t.status === 'All Generated') && t.work_status !== 'Work Done' && t.work_status !== 'Info Done';
         });
     } else if(uRole === 'administrator'){
         subtitle = 'Products requiring QA or ready to publish';

@@ -222,7 +222,7 @@ class TaskController {
 
         $taskId = intval($_POST['task_id'] ?? 0);
         $stage  = trim($_POST['stage']     ?? '');
-        $allowed = ['Pending','AI Work','AI DONE','Generated','Updated','Approved','Working','Paused','In QA','SEO Review','Work Done','Info Done','Republish','Changes','Changes in Content','Changing','Generate info Content','Generate Info Content'];
+        $allowed = ['Pending','AI Work','AI DONE','Generated','All Generated','Updated','Approved','Working','Paused','In QA','SEO Review','Work Done','Info Done','Republish','Changes','Changes in Content','Changing','Generate info Content','Generate Info Content'];
 
         if(!$taskId || !in_array($stage, $allowed)) json_error('Invalid task or stage');
 
@@ -245,7 +245,7 @@ class TaskController {
             $stmt->execute([$taskId]);
             $currStatus = $stmt->fetchColumn();
             if(!$currStatus) json_error('Task not found');
-            if($hold && $currStatus !== 'Generated'){
+            if($hold && $currStatus !== 'Generated' && $currStatus !== 'All Generated'){
                 json_error('Unauthorized: Can only hold product at Generated stage', 403);
             }
             if(!$hold && $currStatus !== 'Hold'){
@@ -272,7 +272,7 @@ class TaskController {
             $stmt->execute([$taskId]);
             $currStatus = $stmt->fetchColumn();
             if(!$currStatus) json_error('Task not found');
-            if($currStatus !== 'Generated'){
+            if($currStatus !== 'Generated' && $currStatus !== 'All Generated'){
                 json_error('Unauthorized: Can only toggle urgent at Generated stage', 403);
             }
         }

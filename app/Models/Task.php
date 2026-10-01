@@ -499,16 +499,17 @@ class Task {
                 break;
 
             case 'Generated':
+            case 'All Generated':
                 db()->prepare("DELETE FROM eco_tool_assignments WHERE task_id=?")->execute([$taskId]);
                 db()->prepare("
                     UPDATE wp_eco_aplus_tasks SET
-                        status='Generated', work_status='Pending',
+                        status=?, work_status='Pending',
                         work_started_at=NULL, work_completed_at=NULL, work_paused_at=NULL,
                         work_total_seconds=0, media_link=NULL, seo_doc_link=NULL,
                         qa_submitted_at=NULL, qa_submitted_by=NULL, is_urgent=0,
                         content_approved_at=NULL, content_updated_at=NULL, last_activity_at=NOW()
                     WHERE id=?
-                ")->execute([$taskId]);
+                ")->execute([$stage, $taskId]);
                 break;
 
             case 'Updated':
@@ -805,7 +806,7 @@ class Task {
 
         $role = $user['role'];
 
-        if(($role === 'd4u_writer' || $role === 'seo_manager' || $role === 'administrator') && $status === 'Generated'){
+        if(($role === 'd4u_writer' || $role === 'seo_manager' || $role === 'administrator') && in_array($status, ['Generated', 'All Generated'])){
             $writerId = ($role === 'd4u_writer' || $role === 'seo_manager') ? $user['id'] : null;
             if($writerId){
                 db()->prepare("UPDATE wp_eco_aplus_tasks SET content=?, original_content=?, status=?, work_status='Pending', written_by_user_id=?, last_activity_at=NOW() WHERE id=?")
@@ -815,8 +816,8 @@ class Task {
                     ->execute([$content, $content, $status, $id]);
             }
         } elseif($role === 'eco_client' || ($user['username'] ?? '') === 'ilyaeco' || ($role === 'administrator' && in_array($status, ['Approved','Updated']))){
-            if(($role === 'eco_client' || ($user['username'] ?? '') === 'ilyaeco') && $task['status'] !== 'Generated'){
-                return ['ok'=>false,'message'=>'Unauthorized: product is not in a stage relevant to your role (must be Generated).'];
+            if(($role === 'eco_client' || ($user['username'] ?? '') === 'ilyaeco') && !in_array($task['status'], ['Generated', 'All Generated'])){
+                return ['ok'=>false,'message'=>'Unauthorized: product is not in a stage relevant to your role (must be Generated or All Generated).'];
             }
             $tsApproved = ($status === 'Approved') ? ',content_approved_at=UTC_TIMESTAMP(),content_updated_at=NULL' : '';
             $tsUpdated  = ($status === 'Updated')  ? ',content_updated_at=UTC_TIMESTAMP()' : '';

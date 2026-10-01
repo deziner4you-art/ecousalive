@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /*
 =====================================================
 ECO A+ PRO — Task list view
@@ -25,6 +25,7 @@ $allFilters = [
     'AI Work'       => 'AI Work',
     'AI DONE'       => 'AI DONE',
     'Generated'     => 'Generated',
+    'All Generated' => 'All Generated',
     'Approved'      => 'Approved',
     'Updated'       => 'Updated',
     'Working'       => 'Working',

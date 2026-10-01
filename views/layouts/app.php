@@ -1392,7 +1392,7 @@ try {
             SELECT t.id, t.product_no, t.title, t.work_status, t.product_type, t.is_urgent
             FROM wp_eco_aplus_tasks t
             WHERE t.deleted_at IS NULL AND t.status != 'Hold'
-              AND t.status = 'Generated' AND t.work_status NOT IN ('Work Done', 'Info Done')
+              AND (t.status = 'Generated' OR t.status = 'All Generated') AND t.work_status NOT IN ('Work Done', 'Info Done')
             ORDER BY t.is_urgent DESC, t.id DESC
             LIMIT 50
         ");
@@ -1570,7 +1570,7 @@ try {
 <!-- ── JS Modules ── -->
 <?php $v = '2.8.2'; ?>
 <script src="<?= $publicUrl ?>/js/core.js?v=<?= $v ?>"></script>
-<script src="<?= $publicUrl ?>/js/tasks.js?v=3.1.1"></script>
+<script src="<?= $publicUrl ?>/js/tasks.js?v=3.2.0"></script>
 <script src="<?= $publicUrl ?>/js/admin.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/invoices.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/payroll.js?v=2.7.13"></script>
