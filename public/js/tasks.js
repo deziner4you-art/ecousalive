@@ -1605,7 +1605,7 @@ ${publishedRow ? `<div style="flex:100%;margin-top:6px;">${publishedRow}</div>` 
                 }
             }
             if(pendingText){
-                statusTimeBlock = `<span class="time-elapsed-badge" style="font-size:12px; font-weight:700; color:#f87171; background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.35); padding:4px 9px; border-radius:6px; margin-right:6px; white-space:nowrap; flex-shrink:0; display:inline-flex; align-items:center; gap:4px;" title="Dual Activity Time: 🇵🇰 ${dTime.pak} | 🇺🇸 ${dTime.us}">⏱ ${pendingText}</span>`;
+                statusTimeBlock = `<span class="time-elapsed-badge" style="font-size:12px; font-weight:700; color:#f87171; background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.35); padding:4px 9px; border-radius:6px; margin-right:6px; white-space:nowrap; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; min-width:85px; gap:4px;" title="Dual Activity Time: 🇵🇰 ${dTime.pak} | 🇺🇸 ${dTime.us}">⏱ ${pendingText}</span>`;
             }
         }
     }
@@ -1652,7 +1652,7 @@ ${item.published_link ? `<a href="${item.published_link}" target="_blank" rel="n
 <div class="card-meta${isAdmin?' admin-meta':''}" style="display:flex; align-items:center; gap:6px; flex-shrink:0; margin-left:auto;">
     ${revBadge}
     ${invBadge}
-    ${item.family_code ? `<span onclick="event.stopPropagation(); viewFamily('${item.family_code}')" class="badge-group-slot" style="background:#581c87; border:1px solid #a855f7; color:#f3e8ff; font-size:11.5px;" title="Click to view all products in this family group">💜 Group</span>` : ''}
+    ${item.family_code ? `<span onclick="event.stopPropagation(); viewFamily('${item.family_code}')" class="badge-group-slot" style="background:#581c87; border:1px solid #a855f7; color:#f3e8ff; font-size:11.5px;" title="Click to view all products in this family group">💜 Group</span>` : `<span class="badge-group-slot badge-group-placeholder" aria-hidden="true"></span>`}
     ${(typeof HAS_BULK_ACTION !== 'undefined' && HAS_BULK_ACTION) ? `<input type="checkbox" class="bulk-chk" data-id="${item.id}" ${(typeof SELECTED_BULK_PRODUCTS !== 'undefined' && SELECTED_BULK_PRODUCTS.indexOf(item.id) !== -1) ? 'checked' : ''} onclick="event.stopPropagation(); toggleBulkSelection();" style="width:16px; height:16px; margin:0 6px; cursor:pointer; accent-color:#8b5cf6; vertical-align:middle; flex-shrink:0;">` : ''}
     ${statusTimeBlock}
     <div class="status ${ds.cls}" style="font-size:12px; letter-spacing:0.5px;">${ds.label}</div>
