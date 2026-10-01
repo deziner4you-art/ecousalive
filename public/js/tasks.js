@@ -2626,31 +2626,63 @@ if (ROLE === 'administrator') {
     loadPayrollWorkers();
 }
 
-function buildFamilyGroupingSection(item, isAdmin) {
-    if (!item.family_code) return '';
+var GROUP_SELECTED = {};
 
-    var members = ALL_TASKS.filter(function(t) { return t.family_code === item.family_code; });
+function buildFamilyGroupingSection(item, isAdmin) {
+    if (!item.family_code && !isAdmin) return '';
+
+    var members = item.family_code ? ALL_TASKS.filter(function(t) { return t.family_code === item.family_code; }) : [];
 
     if (isAdmin) {
         var familyTagsHtml = '';
         members.forEach(function(m) {
             var isCurrent = m.id === item.id;
             var currentStyle = isCurrent ? 'background:#1d4ed8; border: 1px solid #60a5fa;' : 'background:#2563eb;';
-            familyTagsHtml += `<span class="product-tag" style="display:inline-flex; align-items:center; ${currentStyle} color:#fff; padding:3px 10px; border-radius:12px; font-size:12px; font-weight:bold; gap:6px; margin: 2px 0;">${m.product_no} <span onclick="removeProductFromFamily(event, ${m.id}, ${item.id})" style="cursor:pointer; font-weight:bold; font-size:11px; opacity:0.8; padding: 0 2px;">✕</span></span>`;
+            familyTagsHtml += `<span class="product-tag" style="display:inline-flex; align-items:center; ${currentStyle} color:#fff; padding:3px 10px; border-radius:12px; font-size:12px; font-weight:bold; gap:6px; margin: 2px 0;">${m.product_no} <span onclick="removeProductFromFamily(event, ${m.id}, ${item.id})" style="cursor:pointer; font-weight:bold; font-size:11px; opacity:0.8; padding: 0 2px;" title="Remove from group">✕</span></span>`;
         });
 
         return `
-<div class="group-product-container" style="margin-bottom:12px; background:#0f2035; border:1px solid #1e3a5f; border-radius:8px; padding:10px 14px;">
-    <div style="font-size:11px; font-weight:700; color:#60a5fa; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">GROUP PRODUCT</div>
-    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-        <div class="tags-input-container" style="flex:1; min-width:200px; display:flex; flex-wrap:wrap; align-items:center; gap:6px; background:#0a1628; border:1px solid #1e3a5f; border-radius:6px; padding:4px 10px; min-height:36px;">
-            <span id="family-tags-${item.id}" style="display:inline-flex; flex-wrap:wrap; gap:6px;">${familyTagsHtml}</span>
-            <input type="text" id="group-input-${item.id}" placeholder="Product No. likhen" onkeydown="handleGroupInputKeydown(event, ${item.id})" style="flex:1; border:none; background:transparent; outline:none; color:#e2e8f0; font-size:13px; min-width:100px;">
-        </div>
-        <button onclick="addProductToFamily(${item.id}, document.getElementById('group-input-${item.id}').value, document.getElementById('group-input-${item.id}'))" style="height:36px;padding:0 14px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:bold;cursor:pointer;flex-shrink:0;">+ Add</button>
-        <button onclick="viewFamily('${item.family_code}')" class="adminbtn" style="background:#8b5cf6; color:#fff; font-weight:bold; font-size:12px; padding:0 16px; border-radius:6px; height:36px; cursor:pointer; border:none; flex-shrink:0;">💜 VIEW GROUP</button>
+<div class="group-product-container" style="margin-bottom:12px; background:#0f2035; border:1px solid #1e3a5f; border-radius:8px; padding:12px 14px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <div style="font-size:11px; font-weight:700; color:#60a5fa; text-transform:uppercase; letter-spacing:0.5px;">💜 GROUP PRODUCT FAMILY</div>
+        ${item.family_code ? `<button type="button" onclick="viewFamily('${item.family_code}')" class="adminbtn" style="background:#8b5cf6; color:#fff; font-weight:bold; font-size:11px; padding:3px 12px; border-radius:5px; cursor:pointer; border:none;">💜 VIEW GROUP</button>` : ''}
     </div>
-    <div id="group-msg-${item.id}" style="font-size:11px;margin-top:4px;"></div>
+
+    <!-- Active group members tags -->
+    <div style="margin-bottom:10px;">
+        <div id="family-tags-${item.id}" style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
+            ${familyTagsHtml || '<span style="color:#64748b; font-size:11.5px; font-style:italic;">Abhi koi doosra product group me nahi hai. Neechay search se select kar k add karein:</span>'}
+        </div>
+    </div>
+
+    <!-- Search box with multi-select dropdown -->
+    <div style="display:flex; gap:8px; align-items:flex-start; flex-wrap:wrap;">
+        <div style="position:relative; flex:1; min-width:260px;">
+            <div id="group-search-box-${item.id}" style="display:flex; align-items:center; background:#060d1a; border:1px solid #1e3a5f; border-radius:6px; padding:0 10px; min-height:36px; transition:border-color .2s;">
+                <span style="color:#64748b; font-size:13px; margin-right:6px;">🔍</span>
+                <input type="text"
+                       id="group-input-${item.id}"
+                       placeholder="Product Name ya # search karein..."
+                       autocomplete="off"
+                       oninput="handleGroupSearchInput(${item.id})"
+                       onfocus="handleGroupSearchFocus(${item.id})"
+                       onkeydown="handleGroupInputKeydown(event, ${item.id})"
+                       style="flex:1; border:none; background:transparent; outline:none; color:#f8fafc; font-size:13px; padding:7px 0; min-width:140px;">
+                <span id="group-sel-badge-${item.id}" style="display:none; background:#2563eb; color:#fff; font-size:11px; font-weight:700; padding:2px 8px; border-radius:12px; margin-left:6px; white-space:nowrap;"></span>
+                <button type="button" id="group-clear-btn-${item.id}" onclick="clearGroupSearch(${item.id})" style="display:none; background:transparent; border:none; color:#94a3b8; cursor:pointer; font-size:14px; padding:0 4px; line-height:1;" title="Clear">✕</button>
+            </div>
+
+            <!-- Search Dropdown with Checkboxes -->
+            <div id="group-dropdown-${item.id}" class="group-search-dropdown" style="display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:99999; background:#0b192e; border:1.5px solid #2563eb; border-radius:8px; box-shadow:0 12px 35px rgba(0,0,0,0.85); overflow:hidden;">
+            </div>
+        </div>
+
+        <button id="group-add-btn-${item.id}" onclick="addSelectedProductsToFamily(${item.id})" style="height:36px; padding:0 16px; background:#2563eb; color:#fff; border:none; border-radius:6px; font-size:13px; font-weight:bold; cursor:pointer; flex-shrink:0; display:inline-flex; align-items:center; gap:6px; transition:all .15s;">
+            <span>➕</span> <span id="group-add-label-${item.id}">+ Add</span>
+        </button>
+    </div>
+
+    <div id="group-msg-${item.id}" style="font-size:11.5px; margin-top:6px;"></div>
 </div>`;
     } else {
         /* All non-admin workers: show view-only group panel with member tags */
@@ -2674,45 +2706,242 @@ function buildFamilyGroupingSection(item, isAdmin) {
     </div>
 </div>`;
     }
-    return '';
 }
 
-/* ── Family Grouping Handlers ────────────────── */
+/* ── Family Grouping Handlers & Search Multi-Select ─ */
+function handleGroupSearchInput(taskId){
+    var inp = document.getElementById('group-input-' + taskId);
+    if(!inp) return;
+    var query = inp.value.trim().toLowerCase();
+    var clearBtn = document.getElementById('group-clear-btn-' + taskId);
+    if(clearBtn) clearBtn.style.display = query ? 'inline-block' : 'none';
+    renderGroupSearchDropdown(taskId, query);
+}
+
+function handleGroupSearchFocus(taskId){
+    var inp = document.getElementById('group-input-' + taskId);
+    var query = inp ? inp.value.trim().toLowerCase() : '';
+    renderGroupSearchDropdown(taskId, query);
+}
+
+function renderGroupSearchDropdown(taskId, query){
+    var dropdown = document.getElementById('group-dropdown-' + taskId);
+    if(!dropdown) return;
+
+    if(!GROUP_SELECTED[taskId]){
+        GROUP_SELECTED[taskId] = new Set();
+    }
+
+    var currentTask = (typeof ALL_TASKS !== 'undefined' ? ALL_TASKS : []).find(function(t){ return t.id == taskId; });
+    var currentFam = currentTask ? currentTask.family_code : null;
+
+    // Filter ALL_TASKS: exclude current task and tasks already in current family
+    var pool = (typeof ALL_TASKS !== 'undefined' ? ALL_TASKS : []).filter(function(t){
+        if(t.id == taskId) return false;
+        if(currentFam && t.family_code && t.family_code === currentFam) return false;
+        return true;
+    });
+
+    var matches = [];
+    if(!query){
+        matches = pool.slice(0, 30);
+    } else {
+        matches = pool.filter(function(t){
+            var pNo = (t.product_no || '').toLowerCase();
+            var title = (t.title || '').toLowerCase();
+            return pNo.includes(query) || title.includes(query);
+        }).slice(0, 60);
+    }
+
+    if(matches.length === 0){
+        dropdown.innerHTML = `
+            <div style="padding:14px; text-align:center; color:#94a3b8; font-size:12px; display:flex; justify-content:space-between; align-items:center;">
+                <span>❌ Koi matching product nahi mila</span>
+                <button type="button" onclick="closeGroupDropdown(${taskId})" style="background:transparent;border:none;color:#94a3b8;font-size:14px;cursor:pointer;">✕</button>
+            </div>`;
+        dropdown.style.display = 'block';
+        return;
+    }
+
+    var selectedSet = GROUP_SELECTED[taskId];
+    var allChecked = matches.length > 0 && matches.every(function(m){ return selectedSet.has(m.product_no); });
+
+    var html = `
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:#0f2238; border-bottom:1px solid #1e3a5f; position:sticky; top:0; z-index:10;">
+        <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-size:11.5px; font-weight:700; color:#38bdf8;">
+            <input type="checkbox" id="group-select-all-${taskId}" ${allChecked ? 'checked' : ''} onchange="toggleGroupSelectAll(${taskId}, this.checked)" style="accent-color:#2563eb; width:15px; height:15px; cursor:pointer;">
+            <span>Select All (${matches.length})</span>
+        </label>
+        <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:11px; color:#94a3b8;">${matches.length} found</span>
+            <button type="button" onclick="closeGroupDropdown(${taskId})" style="background:transparent; border:none; color:#94a3b8; font-size:15px; cursor:pointer; padding:0 4px; line-height:1;" title="Close">✕</button>
+        </div>
+    </div>
+    <div style="max-height:220px; overflow-y:auto;">`;
+
+    matches.forEach(function(p){
+        var isChecked = selectedSet.has(p.product_no);
+        var cleanTitle = (p.title || 'Untitled').replace(/"/g, '&quot;');
+        var cleanNo = (p.product_no || '').replace(/"/g, '&quot;');
+        html += `
+        <label style="display:flex; align-items:center; gap:10px; padding:7px 12px; border-bottom:1px solid #13233a; cursor:pointer; transition:background .1s; user-select:none; ${isChecked ? 'background:#132a4a;' : ''}" onmouseover="if(!this.querySelector('input').checked) this.style.background='#0e1f36'" onmouseout="if(!this.querySelector('input').checked) this.style.background='transparent'">
+            <input type="checkbox"
+                   class="group-chk-${taskId}"
+                   value="${cleanNo}"
+                   ${isChecked ? 'checked' : ''}
+                   onchange="toggleGroupItemCheck(${taskId}, '${cleanNo}', this.checked)"
+                   style="accent-color:#2563eb; width:16px; height:16px; cursor:pointer; flex-shrink:0;">
+            <span style="background:#1d4ed8; color:#fff; font-weight:bold; font-size:11.5px; padding:2px 7px; border-radius:4px; font-family:'Agency FB', sans-serif; letter-spacing:0.5px; white-space:nowrap; flex-shrink:0;">#${cleanNo}</span>
+            <span style="color:#f1f5f9; font-size:12px; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${cleanTitle}">${cleanTitle}</span>
+            ${p.family_code ? `<span style="font-size:10px; color:#c084fc; background:#2e1065; padding:1px 6px; border-radius:4px; white-space:nowrap; flex-shrink:0;">💜 in group</span>` : ''}
+        </label>`;
+    });
+
+    html += `</div>`;
+
+    var selCount = selectedSet.size;
+    html += `
+    <div style="padding:8px 12px; background:#0f2238; border-top:1px solid #1e3a5f; display:flex; justify-content:space-between; align-items:center; position:sticky; bottom:0; z-index:10;">
+        <span style="font-size:11.5px; color:#cbd5e1;"><strong id="group-footer-count-${taskId}" style="color:#38bdf8;">${selCount}</strong> selected</span>
+        <button type="button" onclick="addSelectedProductsToFamily(${taskId})" style="padding:6px 14px; background:#2563eb; color:#fff; border:none; border-radius:5px; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:5px;">
+            <span>➕ Add to Group</span>
+        </button>
+    </div>`;
+
+    dropdown.innerHTML = html;
+    dropdown.style.display = 'block';
+}
+
+function toggleGroupItemCheck(taskId, productNo, isChecked){
+    if(!GROUP_SELECTED[taskId]) GROUP_SELECTED[taskId] = new Set();
+    if(isChecked){
+        GROUP_SELECTED[taskId].add(productNo);
+    } else {
+        GROUP_SELECTED[taskId].delete(productNo);
+    }
+    updateGroupUI(taskId);
+}
+
+function toggleGroupSelectAll(taskId, isChecked){
+    if(!GROUP_SELECTED[taskId]) GROUP_SELECTED[taskId] = new Set();
+    var chks = document.querySelectorAll('.group-chk-' + taskId);
+    chks.forEach(function(chk){
+        chk.checked = isChecked;
+        if(isChecked){
+            GROUP_SELECTED[taskId].add(chk.value);
+            var parentLabel = chk.closest('label');
+            if(parentLabel) parentLabel.style.background = '#132a4a';
+        } else {
+            GROUP_SELECTED[taskId].delete(chk.value);
+            var parentLabel = chk.closest('label');
+            if(parentLabel) parentLabel.style.background = 'transparent';
+        }
+    });
+    updateGroupUI(taskId);
+}
+
+function updateGroupUI(taskId){
+    var count = GROUP_SELECTED[taskId] ? GROUP_SELECTED[taskId].size : 0;
+    
+    var badge = document.getElementById('group-sel-badge-' + taskId);
+    if(badge){
+        if(count > 0){
+            badge.innerText = count + ' selected';
+            badge.style.display = 'inline-block';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+
+    var addBtnLabel = document.getElementById('group-add-label-' + taskId);
+    var addBtn = document.getElementById('group-add-btn-' + taskId);
+    if(addBtnLabel){
+        if(count > 0){
+            addBtnLabel.innerText = 'Add (' + count + ') to Group';
+            if(addBtn) addBtn.style.background = '#16a34a';
+        } else {
+            addBtnLabel.innerText = '+ Add';
+            if(addBtn) addBtn.style.background = '#2563eb';
+        }
+    }
+
+    var footerCount = document.getElementById('group-footer-count-' + taskId);
+    if(footerCount) footerCount.innerText = count;
+}
+
+function clearGroupSearch(taskId){
+    var inp = document.getElementById('group-input-' + taskId);
+    if(inp){ inp.value = ''; inp.focus(); }
+    var clearBtn = document.getElementById('group-clear-btn-' + taskId);
+    if(clearBtn) clearBtn.style.display = 'none';
+    renderGroupSearchDropdown(taskId, '');
+}
+
+function closeGroupDropdown(taskId){
+    var dropdown = document.getElementById('group-dropdown-' + taskId);
+    if(dropdown) dropdown.style.display = 'none';
+}
+
 function handleGroupInputKeydown(event, taskId) {
     if (event.key === 'Enter') {
         event.preventDefault();
-        var val = event.target.value.trim();
-        if (!val) return;
-        addProductToFamily(taskId, val, event.target);
+        addSelectedProductsToFamily(taskId);
     }
 }
 
-function addProductToFamily(taskId, productNo, inputEl) {
-    var cleanNo = (productNo || '').replace(/^#/, '').replace(/\+$/, '').trim();
+function addSelectedProductsToFamily(taskId) {
+    var list = [];
+    if(GROUP_SELECTED[taskId] && GROUP_SELECTED[taskId].size > 0){
+        list = Array.from(GROUP_SELECTED[taskId]);
+    } else {
+        var inp = document.getElementById('group-input-' + taskId);
+        var raw = inp ? inp.value.trim().replace(/^#/, '').replace(/\+$/, '') : '';
+        if(raw) list = [raw];
+    }
+
     var msgEl = document.getElementById('group-msg-' + taskId);
-    if(!cleanNo){
-        if(msgEl) msgEl.innerHTML = '<span style="color:#f87171;">Product number khali hai</span>';
+    if(!list.length){
+        if(msgEl) msgEl.innerHTML = '<span style="color:#f87171;">⚠️ Pehle search list me se products select karein ya product number likhen!</span>';
+        var inp = document.getElementById('group-input-' + taskId);
+        if(inp) inp.focus();
         return;
     }
-    if(msgEl) msgEl.innerHTML = '<span style="color:#94a3b8;">Adding...</span>';
+
+    if(msgEl) msgEl.innerHTML = `<span style="color:#38bdf8;">⏳ Adding ${list.length} product${list.length > 1 ? 's' : ''} to group...</span>`;
+
     var fd = new FormData();
     fd.append('action', 'add_to_family');
     fd.append('task_id', taskId);
-    fd.append('product_no', cleanNo);
+    fd.append('product_nos', JSON.stringify(list));
+    if(typeof CSRF_TOKEN !== 'undefined') fd.append('_csrf', CSRF_TOKEN);
+
     fetch('index.php', { method: 'POST', body: fd })
         .then(function(r){ return r.json(); })
         .then(function(r){
             if (r.success) {
-                if (inputEl) inputEl.value = '';
-                if(msgEl) msgEl.innerHTML = '';
+                if(GROUP_SELECTED[taskId]) GROUP_SELECTED[taskId].clear();
+                var inp = document.getElementById('group-input-' + taskId);
+                if(inp) inp.value = '';
+                closeGroupDropdown(taskId);
+                updateGroupUI(taskId);
+                var addedCount = r.data && r.data.added ? r.data.added : list.length;
+                if(msgEl) msgEl.innerHTML = `<span style="color:#4ade80;">✅ ${addedCount} product${addedCount > 1 ? 's' : ''} successfully group me add ho gaye!</span>`;
                 loadTasks();
             } else {
-                if(msgEl) msgEl.innerHTML = '<span style="color:#f87171;">❌ ' + (r.message || 'Product nahi mila') + '</span>';
+                if(msgEl) msgEl.innerHTML = '<span style="color:#f87171;">❌ ' + (r.message || 'Add fail ho gaya') + '</span>';
             }
         })
         .catch(function(err){
             if(msgEl) msgEl.innerHTML = '<span style="color:#f87171;">❌ Error: ' + err.message + '</span>';
         });
+}
+
+function addProductToFamily(taskId, productNo, inputEl) {
+    if(productNo && (!GROUP_SELECTED[taskId] || GROUP_SELECTED[taskId].size === 0)){
+        if(!GROUP_SELECTED[taskId]) GROUP_SELECTED[taskId] = new Set();
+        GROUP_SELECTED[taskId].add(productNo);
+    }
+    addSelectedProductsToFamily(taskId);
 }
 
 function removeProductFromFamily(event, memberTaskId, cardTaskId) {
@@ -2722,6 +2951,7 @@ function removeProductFromFamily(event, memberTaskId, cardTaskId) {
     var fd = new FormData();
     fd.append('action', 'remove_from_family');
     fd.append('task_id', memberTaskId);
+    if(typeof CSRF_TOKEN !== 'undefined') fd.append('_csrf', CSRF_TOKEN);
     fetch('index.php', { method: 'POST', body: fd })
         .then(function(r){ return r.json(); })
         .then(function(r){
@@ -2736,6 +2966,19 @@ function removeProductFromFamily(event, memberTaskId, cardTaskId) {
             if(msgEl) msgEl.innerHTML = '<span style="color:#f87171;">❌ Error: ' + err.message + '</span>';
         });
 }
+
+document.addEventListener('click', function(e){
+    document.querySelectorAll('.group-search-dropdown').forEach(function(dd){
+        if(dd.style.display !== 'none'){
+            var taskId = dd.id.replace('group-dropdown-', '');
+            var box = document.getElementById('group-search-box-' + taskId);
+            var addBtn = document.getElementById('group-add-btn-' + taskId);
+            if(box && !box.contains(e.target) && !dd.contains(e.target) && (!addBtn || !addBtn.contains(e.target))){
+                dd.style.display = 'none';
+            }
+        }
+    });
+});
 
 function viewFamily(familyCode) {
     if (!familyCode) return;

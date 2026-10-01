@@ -405,8 +405,38 @@ class TaskController {
 
         $taskId = intval($_POST['task_id'] ?? 0);
         $productNo = trim($_POST['product_no'] ?? '');
+        $productNos = $_POST['product_nos'] ?? null;
 
-        if(!$taskId || !$productNo) json_error('Missing task ID or product number');
+        if(!$taskId) json_error('Missing task ID');
+
+        if(!empty($productNos)){
+            if(is_string($productNos)){
+                $decoded = json_decode($productNos, true);
+                if(is_array($decoded)){
+                    $productNos = $decoded;
+                } else {
+                    $productNos = explode(',', $productNos);
+                }
+            }
+            if(!is_array($productNos)) $productNos = [$productNos];
+            $added = 0;
+            $errors = [];
+            foreach($productNos as $pNo){
+                $pNo = trim($pNo);
+                if(!$pNo) continue;
+                $res = Task::addToFamily($taskId, $pNo);
+                if($res['ok']) $added++;
+                else $errors[] = "$pNo: " . ($res['message'] ?? 'Error');
+            }
+            if($added > 0){
+                json_success(['added' => $added, 'errors' => $errors]);
+            } else {
+                json_error(!empty($errors) ? implode('; ', $errors) : 'Koi product add nahi ho saka');
+            }
+            return;
+        }
+
+        if(!$productNo) json_error('Missing product number');
 
         $result = Task::addToFamily($taskId, $productNo);
         if($result['ok']){
