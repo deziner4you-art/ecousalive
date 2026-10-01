@@ -2627,6 +2627,8 @@ if (ROLE === 'administrator') {
 }
 
 var GROUP_SELECTED = {};
+var GROUP_SEARCH_TIMERS = {};
+var GROUP_SEARCH_REQ_ID = {};
 
 function buildFamilyGroupingSection(item, isAdmin) {
     if (!item.family_code && !isAdmin) return '';
@@ -2659,13 +2661,12 @@ function buildFamilyGroupingSection(item, isAdmin) {
     <div style="display:flex; gap:8px; align-items:flex-start; flex-wrap:wrap;">
         <div style="position:relative; flex:1; min-width:260px;">
             <div id="group-search-box-${item.id}" style="display:flex; align-items:center; background:#060d1a; border:1px solid #1e3a5f; border-radius:6px; padding:0 10px; min-height:36px; transition:border-color .2s;">
-                <span style="color:#64748b; font-size:13px; margin-right:6px;">🔍</span>
+                <span onclick="triggerGroupSearch(${item.id})" style="color:#64748b; font-size:13px; margin-right:6px; cursor:pointer;" title="Click to search in database">🔍</span>
                 <input type="text"
                        id="group-input-${item.id}"
-                       placeholder="Product Name ya # search karein..."
+                       placeholder="Product Name ya # type karein (Enter dabayein)..."
                        autocomplete="off"
                        oninput="handleGroupSearchInput(${item.id})"
-                       onfocus="handleGroupSearchFocus(${item.id})"
                        onkeydown="handleGroupInputKeydown(event, ${item.id})"
                        style="flex:1; border:none; background:transparent; outline:none; color:#f8fafc; font-size:13px; padding:7px 0; min-width:140px;">
                 <span id="group-sel-badge-${item.id}" style="display:none; background:#2563eb; color:#fff; font-size:11px; font-weight:700; padding:2px 8px; border-radius:12px; margin-left:6px; white-space:nowrap;"></span>
@@ -2712,19 +2713,118 @@ function buildFamilyGroupingSection(item, isAdmin) {
 function handleGroupSearchInput(taskId){
     var inp = document.getElementById('group-input-' + taskId);
     if(!inp) return;
-    var query = inp.value.trim().toLowerCase();
+    var query = inp.value.trim();
     var clearBtn = document.getElementById('group-clear-btn-' + taskId);
     if(clearBtn) clearBtn.style.display = query ? 'inline-block' : 'none';
-    renderGroupSearchDropdown(taskId, query);
+
+    // Clear any previous debounce timer
+    if(GROUP_SEARCH_TIMERS[taskId]){
+        clearTimeout(GROUP_SEARCH_TIMERS[taskId]);
+    }
+
+    if(!query){
+        closeGroupDropdown(taskId);
+        return;
+    }
+
+    // Wait until typing stops (500ms debounce) before querying Backend
+    GROUP_SEARCH_TIMERS[taskId] = setTimeout(function(){
+        fetchGroupSearchResults(taskId, query);
+    }, 500);
 }
 
-function handleGroupSearchFocus(taskId){
+function handleGroupInputKeydown(event, taskId) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        var inp = document.getElementById('group-input-' + taskId);
+        var query = inp ? inp.value.trim() : '';
+
+        // Immediately cancel any pending debounce timer
+        if(GROUP_SEARCH_TIMERS[taskId]){
+            clearTimeout(GROUP_SEARCH_TIMERS[taskId]);
+        }
+
+        var dropdown = document.getElementById('group-dropdown-' + taskId);
+        var hasSelected = GROUP_SELECTED[taskId] && GROUP_SELECTED[taskId].size > 0;
+        var dropdownOpen = dropdown && dropdown.style.display !== 'none';
+
+        // If items already selected and dropdown is open, pressing Enter adds them
+        if (hasSelected && dropdownOpen && (!query || query === (inp.dataset.lastSearched || ''))) {
+            addSelectedProductsToFamily(taskId);
+        } else if (query) {
+            // Immediate BE query on Enter key press!
+            if(inp) inp.dataset.lastSearched = query;
+            fetchGroupSearchResults(taskId, query);
+        } else if (hasSelected) {
+            addSelectedProductsToFamily(taskId);
+        }
+    }
+}
+
+function triggerGroupSearch(taskId){
     var inp = document.getElementById('group-input-' + taskId);
-    var query = inp ? inp.value.trim().toLowerCase() : '';
-    renderGroupSearchDropdown(taskId, query);
+    var query = inp ? inp.value.trim() : '';
+    if(GROUP_SEARCH_TIMERS[taskId]){
+        clearTimeout(GROUP_SEARCH_TIMERS[taskId]);
+    }
+    if(query){
+        inp.dataset.lastSearched = query;
+        fetchGroupSearchResults(taskId, query);
+    }
 }
 
-function renderGroupSearchDropdown(taskId, query){
+function fetchGroupSearchResults(taskId, query){
+    var dropdown = document.getElementById('group-dropdown-' + taskId);
+    if(!dropdown) return;
+
+    query = (query || '').trim();
+    if(!query){
+        dropdown.style.display = 'none';
+        return;
+    }
+
+    var inp = document.getElementById('group-input-' + taskId);
+    if(inp) inp.dataset.lastSearched = query;
+
+    // Show loading state while querying BE
+    dropdown.innerHTML = `
+        <div style="padding:14px 16px; text-align:center; color:#38bdf8; font-size:12px; display:flex; justify-content:space-between; align-items:center;">
+            <span><span style="display:inline-block; margin-right:6px;">⏳</span> Searching <strong>"${escapeHtmlContent(query)}"</strong> in database...</span>
+            <button type="button" onclick="closeGroupDropdown(${taskId})" style="background:transparent;border:none;color:#94a3b8;font-size:14px;cursor:pointer;">✕</button>
+        </div>`;
+    dropdown.style.display = 'block';
+
+    var reqId = Date.now();
+    GROUP_SEARCH_REQ_ID[taskId] = reqId;
+
+    fetch('index.php?action=search_products_for_group&task_id=' + encodeURIComponent(taskId) + '&q=' + encodeURIComponent(query))
+        .then(function(r){ return r.json(); })
+        .then(function(r){
+            if(GROUP_SEARCH_REQ_ID[taskId] !== reqId) return;
+
+            if(r.success && Array.isArray(r.data)){
+                renderGroupSearchResultsDropdown(taskId, r.data, query);
+            } else {
+                dropdown.innerHTML = `
+                    <div style="padding:14px; text-align:center; color:#f87171; font-size:12px; display:flex; justify-content:space-between; align-items:center;">
+                        <span>❌ ${escapeHtmlContent(r.message || 'Product nahi mila')}</span>
+                        <button type="button" onclick="closeGroupDropdown(${taskId})" style="background:transparent;border:none;color:#94a3b8;font-size:14px;cursor:pointer;">✕</button>
+                    </div>`;
+                dropdown.style.display = 'block';
+            }
+        })
+        .catch(function(err){
+            if(GROUP_SEARCH_REQ_ID[taskId] !== reqId) return;
+            dropdown.innerHTML = `
+                <div style="padding:14px; text-align:center; color:#f87171; font-size:12px; display:flex; justify-content:space-between; align-items:center;">
+                    <span>❌ Server error: Search request fail ho gaya</span>
+                    <button type="button" onclick="closeGroupDropdown(${taskId})" style="background:transparent;border:none;color:#94a3b8;font-size:14px;cursor:pointer;">✕</button>
+                </div>`;
+            dropdown.style.display = 'block';
+        });
+}
+
+function renderGroupSearchResultsDropdown(taskId, matches, query){
     var dropdown = document.getElementById('group-dropdown-' + taskId);
     if(!dropdown) return;
 
@@ -2732,31 +2832,10 @@ function renderGroupSearchDropdown(taskId, query){
         GROUP_SELECTED[taskId] = new Set();
     }
 
-    var currentTask = (typeof ALL_TASKS !== 'undefined' ? ALL_TASKS : []).find(function(t){ return t.id == taskId; });
-    var currentFam = currentTask ? currentTask.family_code : null;
-
-    // Filter ALL_TASKS: exclude current task and tasks already in current family
-    var pool = (typeof ALL_TASKS !== 'undefined' ? ALL_TASKS : []).filter(function(t){
-        if(t.id == taskId) return false;
-        if(currentFam && t.family_code && t.family_code === currentFam) return false;
-        return true;
-    });
-
-    var matches = [];
-    if(!query){
-        matches = pool.slice(0, 30);
-    } else {
-        matches = pool.filter(function(t){
-            var pNo = (t.product_no || '').toLowerCase();
-            var title = (t.title || '').toLowerCase();
-            return pNo.includes(query) || title.includes(query);
-        }).slice(0, 60);
-    }
-
-    if(matches.length === 0){
+    if(!matches || matches.length === 0){
         dropdown.innerHTML = `
             <div style="padding:14px; text-align:center; color:#94a3b8; font-size:12px; display:flex; justify-content:space-between; align-items:center;">
-                <span>❌ Koi matching product nahi mila</span>
+                <span>❌ Database me "<strong>${escapeHtmlContent(query)}</strong>" se koi matching product nahi mila</span>
                 <button type="button" onclick="closeGroupDropdown(${taskId})" style="background:transparent;border:none;color:#94a3b8;font-size:14px;cursor:pointer;">✕</button>
             </div>`;
         dropdown.style.display = 'block';
@@ -2871,22 +2950,22 @@ function updateGroupUI(taskId){
 
 function clearGroupSearch(taskId){
     var inp = document.getElementById('group-input-' + taskId);
-    if(inp){ inp.value = ''; inp.focus(); }
+    if(inp){ 
+        inp.value = ''; 
+        inp.dataset.lastSearched = '';
+        inp.focus(); 
+    }
+    if (GROUP_SEARCH_TIMERS[taskId]) {
+        clearTimeout(GROUP_SEARCH_TIMERS[taskId]);
+    }
     var clearBtn = document.getElementById('group-clear-btn-' + taskId);
     if(clearBtn) clearBtn.style.display = 'none';
-    renderGroupSearchDropdown(taskId, '');
+    closeGroupDropdown(taskId);
 }
 
 function closeGroupDropdown(taskId){
     var dropdown = document.getElementById('group-dropdown-' + taskId);
     if(dropdown) dropdown.style.display = 'none';
-}
-
-function handleGroupInputKeydown(event, taskId) {
-    if (event.key === 'Enter') {
-        event.preventDefault();
-        addSelectedProductsToFamily(taskId);
-    }
 }
 
 function addSelectedProductsToFamily(taskId) {

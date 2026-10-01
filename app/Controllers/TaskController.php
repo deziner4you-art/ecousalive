@@ -458,6 +458,56 @@ class TaskController {
         json_success();
     }
 
+    public function searchProductsForGroup(): void {
+        AuthMiddleware::requireAuth();
+        RoleMiddleware::requireAdmin();
+
+        $taskId = intval($_GET['task_id'] ?? $_POST['task_id'] ?? 0);
+        $query  = trim($_GET['q'] ?? $_POST['q'] ?? '');
+
+        if(!$taskId){
+            json_error('Missing task ID');
+        }
+
+        $stmt = db()->prepare("SELECT id, product_no, family_code FROM wp_eco_aplus_tasks WHERE id = ?");
+        $stmt->execute([$taskId]);
+        $currentTask = $stmt->fetch();
+        if(!$currentTask){
+            json_error('Task not found');
+        }
+
+        $currentFam = $currentTask['family_code'] ?? null;
+
+        $sql = "SELECT id, product_no, title, family_code 
+                FROM wp_eco_aplus_tasks 
+                WHERE deleted_at IS NULL AND id != ?";
+        $params = [$taskId];
+
+        if(!empty($currentFam)){
+            $sql .= " AND (family_code IS NULL OR family_code != ?)";
+            $params[] = $currentFam;
+        }
+
+        if($query !== ''){
+            $words = array_filter(preg_split('/\s+/', $query));
+            foreach($words as $word){
+                $cleanW = trim(preg_replace('/^#/', '', $word));
+                $cleanW = trim(preg_replace('/\+$/', '', $cleanW));
+                if($cleanW === '') continue;
+                $sql .= " AND (product_no LIKE ? OR title LIKE ?)";
+                $params[] = '%' . $cleanW . '%';
+                $params[] = '%' . $cleanW . '%';
+            }
+        }
+
+        $sql .= " ORDER BY id DESC LIMIT 50";
+        $stmt = db()->prepare($sql);
+        $stmt->execute($params);
+        $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        json_success($products);
+    }
+
     public function setProductType(): void {
         AuthMiddleware::requireAuth();
         RoleMiddleware::requireAdmin();

@@ -44,6 +44,7 @@ return [
     'empty_recycle_bin'  => ['TaskController', 'emptyRecycleBin'],
     'add_to_family'      => ['TaskController', 'addToFamily'],
     'remove_from_family' => ['TaskController', 'removeFromFamily'],
+    'search_products_for_group' => ['TaskController', 'searchProductsForGroup'],
     'set_product_type'   => ['TaskController', 'setProductType'],
     'publish_product'    => ['TaskController', 'publishProduct'],
     'unpublish_product'  => ['TaskController', 'unpublishProduct'],
