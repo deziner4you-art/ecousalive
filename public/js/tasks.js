@@ -2615,7 +2615,7 @@ function applyBulkAction() {
 }
 
 /* ── Page init ───────────────────────────────── */
-setInterval(loadTasks, 5000);
+setInterval(loadTasks, 300000); // 5 minutes
 loadTasks();
 switchTab('products');
 
