@@ -212,8 +212,8 @@ function renderSmart(data){
 
             var lock   = item.status === 'Approved' || item.status === 'Updated';
             var isClientUser = (ROLE === 'eco_client' || (typeof USERNAME !== 'undefined' && USERNAME === 'ilyaeco'));
-            var canEdit = ((ROLE === 'd4u_writer' || ROLE === 'seo_manager' || ROLE === 'ai_work') && item.status === 'Pending')
-                       || (isClientUser && item.status === 'Generated')
+            var canEdit = ((ROLE === 'd4u_writer' || ROLE === 'seo_manager' || ROLE === 'ai_work') && (item.status === 'Pending' || item.status === 'All Generated'))
+                       || (isClientUser && (item.status === 'Generated' || item.status === 'All Generated'))
                        || (ROLE === 'administrator');
             var isWorker  = ROLE === 'worker';
             var isQa      = ROLE === 'qa';
@@ -288,6 +288,7 @@ function renderSmart(data){
 function getDisplayStatus(item){
     if(item.status === 'Hold')                                 return {cls:'Hold',          label:'Hold'};
     if(item.status === 'AI Work')                              return {cls:'AIWork',        label:'AI Work'};
+    if(item.status === 'All Generated')                        return {cls:'AllGenerated',  label:'All Generated'};
     if(item.status === 'Generate info Content' || item.status === 'Generate Info Content') return {cls:'Pending', label:'Generate Info Content'};
     if(item.status === 'AI DONE' && (!item.assigned_worker_id || item.assigned_worker_id == 0) && (!item.work_status || item.work_status === 'Pending')) return {cls:'AIDone', label:'AI DONE'};
     if(item.work_status === 'Changes')                         return {cls:'Changes',       label:'Changes in Design'};
@@ -333,7 +334,7 @@ function changePage(page){
 /* ── Update buttons ──────────────────────────── */
 function updateButtons(cardEl, item){
     var wBtn = cardEl.querySelector('.btn-writer-save');
-    if(wBtn) wBtn.disabled = item.status !== 'Pending';
+    if(wBtn) wBtn.disabled = item.status !== 'Pending' && item.status !== 'All Generated';
 
     if(ROLE === 'eco_client' || ROLE === 'administrator'){
         if(item.work_status === 'Work Done') return;
@@ -343,7 +344,7 @@ function updateButtons(cardEl, item){
         var lock = item.status === 'Approved' || item.status === 'Updated';
         if(lock){
             uBtn.disabled = true; aBtn.disabled = true;
-        } else if(item.status === 'Generated'){
+        } else if(item.status === 'Generated' || item.status === 'All Generated'){
             var editor = cardEl.querySelector('.editor');
             if(editor && IS_EDITING[item.id]){
                 /* keep current state */
@@ -692,10 +693,12 @@ function buildProductContentSection(item, canEdit, lock, isWorker, isQa, origina
                 }
             }
         }
-        if(item.aplus_worker_name || hasAplusContent || (item.work_status === 'Info Done' && item.status === 'Pending') || (item.product_type === 'Info + A Plus' && item.work_completed_worker_name)){
+        if(item.aplus_worker_name || hasAplusContent || (item.work_status === 'Info Done' && item.status === 'Pending') || (item.product_type === 'Info + A Plus' && item.work_completed_worker_name) || item.status === 'All Generated'){
             aplusStarted = true;
         }
     }
+
+    var isAllGenPhase = item.status === 'All Generated';
 
     var parsedOrig = null;
     if(item.original_content && item.original_content !== item.content){
@@ -710,12 +713,12 @@ function buildProductContentSection(item, canEdit, lock, isWorker, isQa, origina
         var autoFillLabel = 'Auto-Fill All Boxes from Single Text';
         var autoFillTarget = 'auto';
         if(isBothProd){
-            if(aplusStarted){
+            if(aplusStarted && !isAllGenPhase && item.work_status === 'Info Done'){
                 autoFillLabel = 'Auto-Fill A+ Banners';
                 autoFillTarget = 'aplus';
             } else {
-                autoFillLabel = 'Auto-Fill Infographics';
-                autoFillTarget = 'info';
+                autoFillLabel = 'Auto-Fill Infographics / Both';
+                autoFillTarget = 'auto';
             }
         } else if(isAplusProd){
             autoFillLabel = 'Auto-Fill A+ Banners';
@@ -725,8 +728,13 @@ function buildProductContentSection(item, canEdit, lock, isWorker, isQa, origina
             autoFillTarget = 'info';
         }
 
-        html += `<div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
-            <button type="button" class="btn-quick-paste" onclick="openQuickPasteModal(${item.id}, '${autoFillTarget}')" style="background:#0f2035;border:1px solid #0284c7;color:#38bdf8;font-size:11.5px;font-weight:700;padding:5px 12px;border-radius:5px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s;">
+        html += `<div style="display:flex;justify-content:flex-end;margin-bottom:8px;gap:8px;flex-wrap:wrap;">`;
+        if(isBothProd && !aplusStarted && !isAllGenPhase){
+            html += `<button type="button" class="btn-enable-aplus" onclick="enableAplusSection(${item.id})" style="background:#581c87;border:1px solid #a855f7;color:#f3e8ff;font-size:11.5px;font-weight:700;padding:5px 12px;border-radius:5px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s;">
+                <span>➕</span> Add A+ Banners Content (All Generated)
+            </button>`;
+        }
+        html += `<button type="button" class="btn-quick-paste" onclick="openQuickPasteModal(${item.id}, '${autoFillTarget}')" style="background:#0f2035;border:1px solid #0284c7;color:#38bdf8;font-size:11.5px;font-weight:700;padding:5px 12px;border-radius:5px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s;">
                 <span>📋</span> ${autoFillLabel}
             </button>
         </div>`;
@@ -734,10 +742,10 @@ function buildProductContentSection(item, canEdit, lock, isWorker, isQa, origina
 
     // 1. Infographics 6-Image Grid
     if(isInfoProd || isBothProd){
-        var infoIsLocked = isBothProd ? (aplusStarted || lock || isWorker || isQa) : (lock || isWorker || isQa);
-        var infoCanEdit  = isBothProd ? (!aplusStarted && canEdit && !lock) : (canEdit && !lock);
+        var infoIsLocked = isBothProd ? ((aplusStarted && !isAllGenPhase && item.work_status === 'Info Done') || lock || isWorker || isQa) : (lock || isWorker || isQa);
+        var infoCanEdit  = isBothProd ? ((!aplusStarted || isAllGenPhase || item.status === 'Pending' || item.status === 'Generated' || item.status === 'Generate info Content' || item.status === 'Generate Info Content') && canEdit && !lock) : (canEdit && !lock);
 
-        if(isBothProd && aplusStarted){
+        if(isBothProd && aplusStarted && !isAllGenPhase && item.work_status === 'Info Done'){
             html += `<div class="content-grid-header locked-header">
                 <span>🔒 Infographics Content (Phase 1 — Locked Reference)</span>
                 <span style="font-size:11px;font-weight:normal;color:#94a3b8;">Completed & Approved</span>
@@ -807,14 +815,19 @@ function buildProductContentSection(item, canEdit, lock, isWorker, isQa, origina
     }
 
     // 2. A+ Banners 4-Banner Grid
-    if(isAplusProd || (isBothProd && aplusStarted)){
+    var showAplusSection = isAplusProd || (isBothProd && (aplusStarted || isAdminUser || isAllGenPhase));
+    if(showAplusSection){
+        var isPrePhase2 = isBothProd && !aplusStarted && !isAllGenPhase;
+        var aplusSectionStyle = isPrePhase2 ? 'display:none;' : '';
         var aplusIsLocked = lock || isWorker || isQa;
         var aplusCanEdit  = canEdit && !lock;
+
+        html += `<div class="aplus-section-wrapper" id="aplus-section-${item.id}" style="${aplusSectionStyle}">`;
 
         if(isBothProd){
             html += `<div class="content-grid-header aplus-header" style="margin-top:14px;display:flex;justify-content:space-between;align-items:center;">
                 <div style="display:flex;align-items:center;gap:8px;">
-                    <span>🎨 A+ Banners Content (Phase 2)</span>
+                    <span>🎨 A+ Banners Content ${isAllGenPhase ? '(All Generated)' : (isPrePhase2 ? '(Simultaneous Draft)' : '(Phase 2)')}</span>
                     <span style="font-size:11px;font-weight:normal;color:#e9d5ff;">4 Banners Template</span>
                 </div>
                 ${(isAdminUser && !aplusIsLocked) ? `
@@ -882,17 +895,45 @@ function buildProductContentSection(item, canEdit, lock, isWorker, isQa, origina
                      onblur="unmarkEditing(${item.id})">${escapeHtmlContent(aplusExtraText)}</div>
             </div>`;
         }
+
+        html += `</div>`; // Close aplus-section-wrapper
     }
 
     // Informational note for Info + A Plus in Phase 1
-    if(isBothProd && !aplusStarted){
-        html += `<div style="margin-top:10px;padding:8px 14px;background:#0c1a2e;border:1px dashed #1e3a5f;border-radius:6px;font-size:11.5px;color:#7dd3fc;display:flex;align-items:center;gap:8px;">
+    if(isBothProd && !aplusStarted && !isAllGenPhase){
+        html += `<div id="phase1-note-${item.id}" style="margin-top:10px;padding:8px 14px;background:#0c1a2e;border:1px dashed #1e3a5f;border-radius:6px;font-size:11.5px;color:#7dd3fc;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
             <span>ℹ️ <strong>Phase 1 (Infographics):</strong> Active now. <strong>Phase 2 (A+ Banners 4-Box Template):</strong> Infographics complete/approve hone ke baad start hoga.</span>
+            ${isAdminUser ? `
+            <button type="button" class="btn-enable-aplus" onclick="enableAplusSection(${item.id})" style="background:#581c87;border:1px solid #a855f7;color:#f3e8ff;font-size:11px;font-weight:700;padding:4px 10px;border-radius:5px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;transition:all .15s;">
+                <span>➕</span> Add A+ Banners Content Now (All Generated)
+            </button>` : ''}
+        </div>`;
+    }
+    if(isBothProd && isAllGenPhase){
+        html += `<div style="margin-top:10px;padding:8px 14px;background:#2e1065;border:1px dashed #a855f7;border-radius:6px;font-size:11.5px;color:#e9d5ff;display:flex;align-items:center;gap:8px;">
+            <span>✨ <strong>All Generated Mode:</strong> Infographics aur A+ Banners dono ka content generate ho chuka hai. Client aik hi dafa dono approve kar sakta hai!</span>
         </div>`;
     }
 
     html += `</div>`;
     return html;
+}
+
+function enableAplusSection(taskId){
+    var sec = document.getElementById('aplus-section-' + taskId);
+    if(sec){
+        sec.style.display = 'block';
+        sec.scrollIntoView({ behavior:'smooth', block:'center' });
+    }
+    var note = document.getElementById('phase1-note-' + taskId);
+    if(note){
+        note.innerHTML = `<span>✨ <strong>All Generated Mode Active:</strong> Infographics aur A+ Banners dono ka content sath save hoga. Neechay <strong>Save All Generated</strong> button se draft save karein.</span>`;
+        note.style.borderColor = '#a855f7';
+        note.style.color = '#e9d5ff';
+        note.style.background = '#2e1065';
+    }
+    var btnSaveAll = document.getElementById('btn-save-allgen-' + taskId);
+    if(btnSaveAll) btnSaveAll.style.display = 'inline-block';
 }
 
 function openQuickPasteModal(taskId, preferredTarget){
@@ -940,6 +981,11 @@ function openQuickPasteModal(taskId, preferredTarget){
                     <input type="radio" name="quick-paste-target" value="auto" ${defaultTarget === 'auto' ? 'checked' : ''}> 
                     <span>⚡ Auto-Detect (Smart)</span>
                 </label>
+                ${isBothProd ? `
+                <label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;">
+                    <input type="radio" name="quick-paste-target" value="both" ${defaultTarget === 'both' ? 'checked' : ''}> 
+                    <span style="color:#e9d5ff;font-weight:700;">✨ Both (Info + A+ Banners)</span>
+                </label>` : ''}
                 ${(isBothProd || isAplusProd) ? `
                 <label style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;">
                     <input type="radio" name="quick-paste-target" value="aplus" ${defaultTarget === 'aplus' ? 'checked' : ''}> 
@@ -993,10 +1039,15 @@ function applyQuickPaste(taskId){
     var updateInfo = false;
     var updateAplus = false;
 
-    if(targetMode === 'info'){
+    if(targetMode === 'both'){
+        updateInfo = true;
+        updateAplus = true;
+        enableAplusSection(taskId);
+    } else if(targetMode === 'info'){
         updateInfo = true;
     } else if(targetMode === 'aplus'){
         updateAplus = true;
+        enableAplusSection(taskId);
     } else {
         // 'auto' mode:
         if(parsed._hasInfo){
@@ -1004,6 +1055,7 @@ function applyQuickPaste(taskId){
         }
         if(parsed._hasAplus){
             updateAplus = true;
+            if(isBothProd) enableAplusSection(taskId);
         }
         // If neither explicit header was matched:
         if(!parsed._hasInfo && !parsed._hasAplus){
@@ -1020,6 +1072,20 @@ function applyQuickPaste(taskId){
                     updateInfo = true;
                 }
             }
+        }
+    }
+
+    if(targetMode === 'both' && !parsed._hasInfo && !parsed._hasAplus){
+        var paras = rawText.split(/\n\s*\n/).map(function(s){ return s.trim(); }).filter(Boolean);
+        if(paras.length >= 7){
+            for(var p=0; p<Math.min(6, paras.length); p++){
+                parsed.info['img' + (p+1)] = paras[p];
+            }
+            for(var bp=0; bp<Math.min(4, paras.length - 6); bp++){
+                parsed.aplus['b' + (bp+1)] = paras[6 + bp];
+            }
+            parsed._hasInfo = true;
+            parsed._hasAplus = true;
         }
     }
 
@@ -1121,10 +1187,10 @@ function buildCard(item){
     var isListing    = ROLE === 'eco_listing';
     var isClient     = ROLE === 'eco_client' || (typeof USERNAME !== 'undefined' && USERNAME === 'ilyaeco');
     var showWorkerBadges = !isListing && !isClient && (typeof USERNAME === 'undefined' || (USERNAME.toLowerCase() !== 'ecolisting' && USERNAME.toLowerCase() !== 'ilyaeco'));
-    var canEdit      = ((ROLE === 'd4u_writer' || ROLE === 'seo_manager' || ROLE === 'ai_work') && item.status === 'Pending')
-                    || (isClient && item.status === 'Generated')
+    var canEdit      = ((ROLE === 'd4u_writer' || ROLE === 'seo_manager' || ROLE === 'ai_work') && (item.status === 'Pending' || item.status === 'All Generated'))
+                    || (isClient && (item.status === 'Generated' || item.status === 'All Generated'))
                     || isAdmin;
-    var approvedDisabled  = lock || item.status !== 'Generated';
+    var approvedDisabled  = lock || (item.status !== 'Generated' && item.status !== 'All Generated');
     var originalForDiff   = item.original_content || item.content || '';
     var workerCanSee = (isWorker || isQa) && (item.status === 'Approved' || item.status === 'Updated')
                     || (isWorker && (item.work_status === 'Changes' || item.work_status === 'Changing'));
@@ -1252,6 +1318,7 @@ function buildCard(item){
       <option value="">⚡ Task Perform...</option>
       <option value="edit_services">✏️ Edit Services & Workers</option>
       ${item.status==='Pending'?'<option value="save">💾 Save Draft</option>':''}
+      ${(item.status==='Pending'||item.status==='All Generated')&&item.product_type==='Info + A Plus'?'<option value="save_all_generated">✨ Save All Generated</option>':''}
       <option value="hold|${item.status==='Hold'?0:1}">${item.status==='Hold'?'▶ Unhold':'⏸ Hold'}</option>
       <option value="urgent|${isUrgent?0:1}">${isUrgent?'✅ Unmark Urgent':'🔴 Mark Urgent'}</option>
       <option value="settype|${item.product_type==='Info + A Plus'?'':'Info + A Plus'}">${item.product_type==='Info + A Plus'?'🏷 Remove Info+A Plus':'🏷 Set Info + A Plus'}</option>
@@ -1276,6 +1343,7 @@ function buildCard(item){
       <option value="Pending">Pending</option>
       <option value="Generate info Content">Generate info Content</option>
       <option value="Generated">Generated</option>
+      <option value="All Generated">All Generated</option>
       <option value="Updated">Updated</option>
       <option value="Approved">Approved</option>
       <option value="Working">Working</option>
@@ -1433,7 +1501,7 @@ ${item.published_link ? `<a href="${item.published_link}" target="_blank" rel="n
     /* Action buttons */
     var actionBtns = buildActionButtons(item, isAdmin, isWorker, isQa, isListing, isUrgent, lock, approvedDisabled);
 
-    var hideEditor = isInfoStage && item.work_status !== 'Content Pending' && item.status !== 'Generated' && item.status !== 'Approved' && item.status !== 'Updated' && !item.content_approved_at && !item.content_updated_at;
+    var hideEditor = isInfoStage && item.work_status !== 'Content Pending' && item.status !== 'Generated' && item.status !== 'All Generated' && item.status !== 'Approved' && item.status !== 'Updated' && !item.content_approved_at && !item.content_updated_at;
 
     return `
 <div class="head" onclick="headClick(event,${item.id})" ontouchend="headTouch(event,${item.id})" style="cursor:pointer; display:flex; align-items:center;">
@@ -1516,8 +1584,8 @@ ${linksBox}
 /* ── QA submit boxes ─────────────────────────── */
 function buildQABoxes(item, isAdmin, isQa){
     var html = '';
-    var isInfoStage = (item.product_type === 'Infographics' && item.work_status !== 'Content Pending' && item.status !== 'Generated' && item.status !== 'Approved' && item.status !== 'Updated' && !item.content_approved_at && !item.content_updated_at)
-                   || (item.product_type === 'Info + A Plus' && !item.work_completed_worker_name && (item.status === 'Pending' || item.status === 'AI DONE' || item.status === 'Infographics') && item.work_status !== 'Content Pending' && item.status !== 'Generated' && !item.content_approved_at && !item.content_updated_at);
+    var isInfoStage = (item.product_type === 'Infographics' && item.work_status !== 'Content Pending' && item.status !== 'Generated' && item.status !== 'All Generated' && item.status !== 'Approved' && item.status !== 'Updated' && !item.content_approved_at && !item.content_updated_at)
+                   || (item.product_type === 'Info + A Plus' && !item.work_completed_worker_name && (item.status === 'Pending' || item.status === 'AI DONE' || item.status === 'Infographics') && item.work_status !== 'Content Pending' && item.status !== 'Generated' && item.status !== 'All Generated' && !item.content_approved_at && !item.content_updated_at);
     var isInfoOnly = isInfoStage || item.product_type === 'Infographics';
     
     var qaLabelHtml = '';
@@ -1673,31 +1741,31 @@ function buildActionButtons(item, isAdmin, isWorker, isQa, isListing, isUrgent, 
     }
     var isClientAct = (ROLE === 'eco_client' || (typeof USERNAME !== 'undefined' && USERNAME === 'ilyaeco'));
     if(isClientAct){
-        if(item.status === 'Generated' || item.status === 'Hold'){
+        if(item.status === 'Generated' || item.status === 'All Generated' || item.status === 'Hold'){
             btns += `<button class="actionbtn" style="background:#0f766e;color:#fff;" onclick="holdProduct(${item.id},${item.status==='Hold'?0:1})">${item.status==='Hold'?'▶ Unhold':'⏸ Hold'}</button>`;
         }
-        if(item.status === 'Generated' && item.work_status !== 'Work Done'){
+        if((item.status === 'Generated' || item.status === 'All Generated') && item.work_status !== 'Work Done'){
             btns += `<button class="actionbtn" style="background:${isUrgent?'#475569':'#ef4444'};color:#fff;" onclick="setUrgent(${item.id},${isUrgent?0:1})">${isUrgent?'✅ Unmark Urgent':'🔴 Mark Urgent'}</button>`;
         }
     }
-    if((ROLE === 'd4u_writer' || ROLE === 'seo_manager') && item.status === 'Pending') btns += `<button class="btn-writer-save actionbtn" onclick="writerSave(${item.id})">💾 Save Draft</button>`;
+    if((ROLE === 'd4u_writer' || ROLE === 'seo_manager') && (item.status === 'Pending' || item.status === 'All Generated')) btns += `<button class="btn-writer-save actionbtn" onclick="writerSave(${item.id})">💾 Save Draft</button>`;
     if(ROLE === 'ai_work' && item.status === 'AI Work') btns += `<button class="btn2 actionbtn" style="background:#16a34a;color:#fff;" onclick="updateWorkStatus(${item.id},'AI DONE')">🤖 AI Done</button>`;
     if(isListing && item.work_status === 'Work Done' && !item.published_at) {
         btns += `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;width:100%;margin-top:4px;"><input type="url" id="pub-link-${item.id}" placeholder="Amazon published link (optional)" style="flex:1;min-width:160px;padding:9px 12px;border:1px solid #334155;border-radius:5px;background:#0a1628;color:#e2e8f0;font-size:13px;outline:none;"><button class="btn2 actionbtn" style="flex-shrink:0;" onclick="publishProduct(${item.id})">📦 Publish</button></div>`;
         btns += `<div style="display:flex;gap:8px;margin-top:6px;width:100%;"><button class="actionbtn" style="background:#d97706;color:#fff;flex:1;" onclick="openRevisionBox(${item.id},'design')">🎨 Revise Design</button><button class="actionbtn" style="background:#db2777;color:#fff;flex:1;" onclick="openRevisionBox(${item.id},'content')">✍ Revise Content</button></div>`;
     }
     if(isListing && item.work_status === 'Republish') btns += `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;width:100%;margin-top:4px;"><input type="url" id="pub-link-${item.id}" placeholder="Amazon Re-Publish link (required)" style="flex:1;min-width:160px;padding:9px 12px;border:2px solid #dc2626;border-radius:5px;background:#1a0505;color:#fca5a5;font-size:13px;outline:none;"><button class="btn2 actionbtn" style="flex-shrink:0;background:#dc2626;" onclick="publishProduct(${item.id})">📦 Re-Publish</button></div>`;
-    if(((isClientAct && item.status === 'Generated') || isAdmin) && item.work_status !== 'Work Done'){
+    if(((isClientAct && (item.status === 'Generated' || item.status === 'All Generated')) || isAdmin) && item.work_status !== 'Work Done'){
         btns = `<button class="btn1 actionbtn" id="u-${item.id}" disabled onclick="save(${item.id},'Updated')">UPDATED</button><button class="btn2 actionbtn" id="a-${item.id}" ${approvedDisabled?'disabled':''} onclick="save(${item.id},'Approved')">APPROVED</button>` + btns;
     }
     return btns;
 }
 
 function buildAdminButtons(item, isUrgent, lock){
-    var approvedDisabled = lock || item.status !== 'Generated';
+    var approvedDisabled = lock || (item.status !== 'Generated' && item.status !== 'All Generated');
     var isInfoStage = (item.status === 'Generate info Content' || item.status === 'Generate Info Content')
                    || ((item.product_type === 'Infographics' || !item.product_type) && !item.content_approved_at && !item.content_updated_at && item.status !== 'Approved' && item.status !== 'Updated')
-                   || (item.product_type === 'Info + A Plus' && !item.work_completed_worker_name && (item.status === 'Pending' || item.status === 'AI DONE' || item.status === 'Infographics' || item.status === 'Generate info Content' || item.status === 'Generate Info Content') && !item.content_approved_at && !item.content_updated_at);
+                   || (item.product_type === 'Info + A Plus' && item.status !== 'All Generated' && !item.work_completed_worker_name && (item.status === 'Pending' || item.status === 'AI DONE' || item.status === 'Infographics' || item.status === 'Generate info Content' || item.status === 'Generate Info Content') && !item.content_approved_at && !item.content_updated_at);
     var btns = '';
     if(item.status === 'AI Work'){
         btns += `<button class="btn2 actionbtn" style="background:#16a34a;color:#fff;" onclick="updateWorkStatus(${item.id},'AI DONE')">🤖 AI Done</button>`;
@@ -1715,8 +1783,16 @@ function buildAdminButtons(item, isUrgent, lock){
             // Admin can also save draft if it's pending
             if(item.status === 'Pending' || item.status === 'Generate info Content' || item.status === 'Generate Info Content') {
                 btns += `<button class="btn-writer-save actionbtn" onclick="writerSave(${item.id})">💾 Save Draft</button>`;
+                if(item.product_type === 'Info + A Plus'){
+                    var hasAplusInContent = item.content && (item.content.indexOf('aplus') !== -1 || item.content.indexOf('banner') !== -1 || item.content.indexOf('Banner') !== -1);
+                    btns += `<button id="btn-save-allgen-${item.id}" class="actionbtn" style="background:#7c3aed;color:#fff;display:${hasAplusInContent ? 'inline-block' : 'none'};" onclick="writerSave(${item.id}, 'All Generated')">💾 Save All Generated</button>`;
+                }
             }
         }
+    }
+
+    if(item.status === 'All Generated'){
+        btns += `<button class="btn-writer-save actionbtn" style="background:#7c3aed;color:#fff;" onclick="writerSave(${item.id}, 'All Generated')">💾 Save All Generated</button>`;
     }
 
     if(item.work_status !== 'Work Done' && item.work_status !== 'Info Done' && !isInfoStage){
@@ -1744,6 +1820,7 @@ function applyPerform(taskId){
     if(!act){ alert('Pehle koi action select karein'); return; }
     if(act === 'edit_services')                openEditServices(taskId);
     else if(act === 'save')                    writerSave(taskId);
+    else if(act === 'save_all_generated')      writerSave(taskId, 'All Generated');
     else if(act.startsWith('hold|'))           holdProduct(taskId, parseInt(act.split('|')[1]));
     else if(act.startsWith('urgent|'))         setUrgent(taskId, parseInt(act.split('|')[1]));
     else if(act.startsWith('settype|'))        setProductType(taskId, act.split('|')[1] || '');
@@ -2050,13 +2127,34 @@ function save(id, status){
 }
 
 /* ── Writer save ─────────────────────────────── */
-function writerSave(id){
+function writerSave(id, targetStatus){
     var content = getTaskContentToSave(id);
     var readable = contentToReadableText(content);
     if(readable.trim() === ''){ alert('Content khali hai!'); return; }
+
+    var task = (typeof ALL_TASKS !== 'undefined') ? ALL_TASKS.find(function(t){ return t.id == id; }) : null;
+    var statusToSave = targetStatus;
+    if(!statusToSave){
+        if(task && task.status === 'All Generated'){
+            statusToSave = 'All Generated';
+        } else {
+            statusToSave = 'Generated';
+        }
+    }
+
+    if(statusToSave === 'All Generated'){
+        var parsed = parseTaskContent(content, 'Info + A Plus');
+        var hasAplusContent = parsed._hasAplus || (parsed.aplus && (parsed.aplus.b1 || parsed.aplus.b2 || parsed.aplus.b3 || parsed.aplus.b4));
+        if(!hasAplusContent){
+            if(!confirm('A+ Banners ka content abhi khali lag raha hai. Kya aap All Generated status ke sath save karna chahtay hein?')){
+                return;
+            }
+        }
+    }
+
     var fd = new FormData();
     fd.append('action', 'save_task'); fd.append('id', id);
-    fd.append('content', content);   fd.append('status', 'Generated');
+    fd.append('content', content);   fd.append('status', statusToSave);
     if(typeof CSRF_TOKEN !== 'undefined') fd.append('_csrf', CSRF_TOKEN);
     fetch('index.php', {method:'POST', body:fd})
         .then(r => r.json())

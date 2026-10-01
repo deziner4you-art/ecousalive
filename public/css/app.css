@@ -204,6 +204,10 @@ background:#0369a1;
 background:#b91c1c;
 }
 
+.AllGenerated{
+background:#7c3aed;
+}
+
 .Approved,
 .Updated{
 background:#15803d;
@@ -1877,6 +1881,11 @@ padding:8px;
         background: rgba(255, 180, 171, 0.15) !important;
         border-color: #ffb4ab !important;
         color: #ffb4ab !important;
+    }
+    .AllGenerated {
+        background: rgba(192, 132, 252, 0.18) !important;
+        border-color: #c084fc !important;
+        color: #f3e8ff !important;
     }
     .Approved, .Updated {
         background: rgba(78, 222, 163, 0.15) !important;
