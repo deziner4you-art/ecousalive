@@ -310,6 +310,19 @@ function getDisplayStatus(item){
     if(item.product_type === 'Info + A Plus' && item.status === 'Pending' && (item.work_status === 'Pending' || !item.work_status)){
         return {cls: 'Pending', label: 'Infographics'};
     }
+    if(item.product_type === 'Info + A Plus' && item.status === 'Generated'){
+        var parsed = parseTaskContent(item.content, item.product_type);
+        var hasInfo = parsed && parsed.info && Object.values(parsed.info).some(function(v){ return v && String(v).trim() !== ''; });
+        var hasAplus = parsed && parsed.aplus && (
+            (parsed.aplus.b1 && parsed.aplus.b1.trim() !== '') ||
+            (parsed.aplus.b2 && parsed.aplus.b2.trim() !== '') ||
+            (parsed.aplus.b3 && parsed.aplus.b3.trim() !== '') ||
+            (parsed.aplus.b4 && parsed.aplus.b4.trim() !== '')
+        );
+        if(hasInfo && hasAplus){
+            return {cls:'AllGenerated', label:'All Generated'};
+        }
+    }
     return {cls: item.status, label: item.status};
 }
 
@@ -682,23 +695,30 @@ function buildProductContentSection(item, canEdit, lock, isWorker, isQa, origina
 
     var parsed = parseTaskContent(item.content, item.product_type);
 
-    // Is A+ workflow active for this product?
     var aplusStarted = false;
-    if(isBothProd){
-        var hasAplusContent = false;
-        if(parsed && parsed.aplus){
-            for(var b=1; b<=4; b++){
-                if(parsed.aplus['b' + b] && parsed.aplus['b' + b].trim() !== ''){
-                    hasAplusContent = true; break;
-                }
+    var hasAplusContent = false;
+    var hasInfoContent = false;
+    if(parsed && parsed.info){
+        for(var i=1; i<=6; i++){
+            if(parsed.info['img' + i] && parsed.info['img' + i].trim() !== ''){
+                hasInfoContent = true; break;
             }
         }
+    }
+    if(parsed && parsed.aplus){
+        for(var b=1; b<=4; b++){
+            if(parsed.aplus['b' + b] && parsed.aplus['b' + b].trim() !== ''){
+                hasAplusContent = true; break;
+            }
+        }
+    }
+    if(isBothProd){
         if(item.aplus_worker_name || hasAplusContent || (item.work_status === 'Info Done' && item.status === 'Pending') || (item.product_type === 'Info + A Plus' && item.work_completed_worker_name) || item.status === 'All Generated'){
             aplusStarted = true;
         }
     }
 
-    var isAllGenPhase = item.status === 'All Generated';
+    var isAllGenPhase = item.status === 'All Generated' || (isBothProd && hasInfoContent && hasAplusContent && item.status === 'Generated');
 
     var parsedOrig = null;
     if(item.original_content && item.original_content !== item.content){
@@ -1318,7 +1338,9 @@ function buildCard(item){
       <option value="">⚡ Task Perform...</option>
       <option value="edit_services">✏️ Edit Services & Workers</option>
       ${item.status==='Pending'?'<option value="save">💾 Save Draft</option>':''}
-      ${(item.status==='Pending'||item.status==='All Generated')&&item.product_type==='Info + A Plus'?'<option value="save_all_generated">✨ Save All Generated</option>':''}
+      ${item.product_type==='Info + A Plus'?'<option value="save_all_generated">✨ Save All Generated</option>':''}
+      ${item.product_type==='Info + A Plus'&&item.status!=='All Generated'?'<option value="set_all_generated">🏷 Tag as All Generated</option>':''}
+      ${item.product_type==='Info + A Plus'&&item.status==='All Generated'?'<option value="set_generated">🏷 Tag as Generated</option>':''}
       <option value="hold|${item.status==='Hold'?0:1}">${item.status==='Hold'?'▶ Unhold':'⏸ Hold'}</option>
       <option value="urgent|${isUrgent?0:1}">${isUrgent?'✅ Unmark Urgent':'🔴 Mark Urgent'}</option>
       <option value="settype|${item.product_type==='Info + A Plus'?'':'Info + A Plus'}">${item.product_type==='Info + A Plus'?'🏷 Remove Info+A Plus':'🏷 Set Info + A Plus'}</option>
@@ -1795,6 +1817,14 @@ function buildAdminButtons(item, isUrgent, lock){
         btns += `<button class="btn-writer-save actionbtn" style="background:#7c3aed;color:#fff;" onclick="writerSave(${item.id}, 'All Generated')">💾 Save All Generated</button>`;
     }
 
+    if(item.product_type === 'Info + A Plus'){
+        if(item.status === 'Generated'){
+            btns += `<button class="actionbtn" style="background:#7c3aed;color:#fff;" onclick="forceStage(${item.id},'All Generated')">✨ Tag All Generated</button>`;
+        } else if(item.status === 'All Generated'){
+            btns += `<button class="actionbtn" style="background:#b91c1c;color:#fff;" onclick="forceStage(${item.id},'Generated')">🏷 Tag Generated</button>`;
+        }
+    }
+
     if(item.work_status !== 'Work Done' && item.work_status !== 'Info Done' && !isInfoStage){
         btns += `<button class="btn1 actionbtn" id="u-${item.id}" disabled onclick="save(${item.id},'Updated')">UPDATED</button>`;
         btns += `<button class="btn2 actionbtn" id="a-${item.id}" ${approvedDisabled?'disabled':''} onclick="save(${item.id},'Approved')">APPROVED</button>`;
@@ -1821,6 +1851,8 @@ function applyPerform(taskId){
     if(act === 'edit_services')                openEditServices(taskId);
     else if(act === 'save')                    writerSave(taskId);
     else if(act === 'save_all_generated')      writerSave(taskId, 'All Generated');
+    else if(act === 'set_all_generated')       forceStage(taskId, 'All Generated');
+    else if(act === 'set_generated')           forceStage(taskId, 'Generated');
     else if(act.startsWith('hold|'))           holdProduct(taskId, parseInt(act.split('|')[1]));
     else if(act.startsWith('urgent|'))         setUrgent(taskId, parseInt(act.split('|')[1]));
     else if(act.startsWith('settype|'))        setProductType(taskId, act.split('|')[1] || '');
@@ -2133,9 +2165,21 @@ function writerSave(id, targetStatus){
     if(readable.trim() === ''){ alert('Content khali hai!'); return; }
 
     var task = (typeof ALL_TASKS !== 'undefined') ? ALL_TASKS.find(function(t){ return t.id == id; }) : null;
+    var pType = task ? task.product_type : '';
+    var parsed = parseTaskContent(content, pType);
+    var hasInfo = parsed && parsed.info && Object.values(parsed.info).some(function(v){ return v && String(v).trim() !== ''; });
+    var hasAplus = parsed && parsed.aplus && (
+        (parsed.aplus.b1 && parsed.aplus.b1.trim() !== '') ||
+        (parsed.aplus.b2 && parsed.aplus.b2.trim() !== '') ||
+        (parsed.aplus.b3 && parsed.aplus.b3.trim() !== '') ||
+        (parsed.aplus.b4 && parsed.aplus.b4.trim() !== '')
+    );
+
     var statusToSave = targetStatus;
     if(!statusToSave){
-        if(task && task.status === 'All Generated'){
+        if(pType === 'Info + A Plus' && hasInfo && hasAplus){
+            statusToSave = 'All Generated';
+        } else if(task && task.status === 'All Generated'){
             statusToSave = 'All Generated';
         } else {
             statusToSave = 'Generated';

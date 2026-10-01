@@ -807,6 +807,22 @@ class Task {
         $role = $user['role'];
 
         if(($role === 'd4u_writer' || $role === 'seo_manager' || $role === 'administrator') && in_array($status, ['Generated', 'All Generated'])){
+            if(($task['product_type'] ?? '') === 'Info + A Plus'){
+                $decoded = json_decode($content, true);
+                if(is_array($decoded) && !empty($decoded['info']) && !empty($decoded['aplus'])){
+                    $hasInfo = false;
+                    foreach(['img1','img2','img3','img4','img5','img6'] as $k){
+                        if(!empty(trim($decoded['info'][$k] ?? ''))){ $hasInfo = true; break; }
+                    }
+                    $hasAplus = false;
+                    foreach(['b1','b2','b3','b4'] as $bk){
+                        if(!empty(trim($decoded['aplus'][$bk] ?? ''))){ $hasAplus = true; break; }
+                    }
+                    if($hasInfo && $hasAplus){
+                        $status = 'All Generated';
+                    }
+                }
+            }
             $writerId = ($role === 'd4u_writer' || $role === 'seo_manager') ? $user['id'] : null;
             if($writerId){
                 db()->prepare("UPDATE wp_eco_aplus_tasks SET content=?, original_content=?, status=?, work_status='Pending', written_by_user_id=?, last_activity_at=NOW() WHERE id=?")
