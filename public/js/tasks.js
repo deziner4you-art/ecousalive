@@ -1540,18 +1540,19 @@ ${publishedRow ? `<div style="flex:100%;margin-top:6px;">${publishedRow}</div>` 
             var pendingText = '';
             if(diffMs > 0){
                 var _days  = Math.floor(diffMs / 86400000);
-                if(_days > 0) pendingText = _days + ' day' + (_days > 1 ? 's' : '') + ' before';
+                if(_days > 0) pendingText = _days + ' day' + (_days > 1 ? 's' : '');
                 else {
                     var _hrs = Math.floor(diffMs / 3600000);
-                    if(_hrs > 0) pendingText = _hrs + ' hour' + (_hrs > 1 ? 's' : '') + ' before';
-                    else pendingText = 'Just now';
+                    if(_hrs > 0) pendingText = _hrs + ' hour' + (_hrs > 1 ? 's' : '');
+                    else {
+                        var _mins = Math.floor(diffMs / 60000);
+                        pendingText = (_mins > 0 ? _mins + ' min' + (_mins > 1 ? 's' : '') : 'Just now');
+                    }
                 }
             }
-            statusTimeBlock = `<div style="display:flex; flex-direction:column; text-align:right; font-size:10px; color:#64748b; line-height:1.2; margin-right:8px; justify-content:center; width:155px; min-width:155px; max-width:155px; box-sizing:border-box; flex-shrink:0;">
-                <div style="color:#f87171; font-weight:700; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${pendingText}</div>
-                <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">🇵🇰 ${dTime.pak.replace(' PKT', '')} PKT</div>
-                <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">🇺🇸 ${dTime.us.replace(' ET', '')} ET</div>
-            </div>`;
+            if(pendingText){
+                statusTimeBlock = `<span class="time-elapsed-badge" style="font-size:12px; font-weight:700; color:#f87171; background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.35); padding:4px 9px; border-radius:6px; margin-right:6px; white-space:nowrap; flex-shrink:0; display:inline-flex; align-items:center; gap:4px;" title="Dual Activity Time: 🇵🇰 ${dTime.pak} | 🇺🇸 ${dTime.us}">⏱ ${pendingText}</span>`;
+            }
         }
     }
 
@@ -1582,14 +1583,14 @@ ${item.published_link ? `<a href="${item.published_link}" target="_blank" rel="n
 
     return `
 <div class="head" onclick="headClick(event,${item.id})" ontouchend="headTouch(event,${item.id})" style="cursor:pointer; display:flex; align-items:center; width:100%; box-sizing:border-box;">
-<div class="pid${isUrgent?' urgent-pid':''}" style="position:relative; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; padding-top:10px; width:125px; min-width:125px; font-family:'Agency FB', 'Arial Narrow', sans-serif; box-sizing:border-box; flex-shrink:0;">
-    <div style="line-height:1.1; font-family:'Agency FB', 'Arial Narrow', sans-serif; font-size:15px; font-weight:700; letter-spacing:0.3px; text-align:center; width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0 4px; box-sizing:border-box;">#${item.product_no}</div>
+<div class="pid${isUrgent?' urgent-pid':''}" style="position:relative; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; padding-top:8px; width:125px; min-width:125px; font-family:'Calibri', 'Segoe UI', Arial, sans-serif; box-sizing:border-box; flex-shrink:0;">
+    <div style="line-height:1.1; font-family:'Calibri', 'Segoe UI', Arial, sans-serif; font-size:17px; font-weight:700; letter-spacing:0.4px; text-align:center; width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0 4px; box-sizing:border-box;">#${item.product_no}</div>
     <div style="position:absolute; bottom:3px; z-index:10; display:flex; justify-content:center; width:100%;">
         ${typeBadge}
     </div>
 </div>
 <div class="title" style="flex:1 1 auto; max-width:none; min-width:180px; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 12px; box-sizing:border-box; overflow:hidden;">
-    <span class="title-text" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;" title="${item.title ? item.title.replace(/"/g, '&quot;') : ''}">${item.title}</span>
+    <span class="title-text" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; font-size:14px; font-weight:600;" title="${item.title ? item.title.replace(/"/g, '&quot;') : ''}">${item.title}</span>
     <span class="research-link-slot" style="flex-shrink:0; display:inline-flex; align-items:center; justify-content:flex-end; width:155px; min-width:155px;">
         ${linkIcon || ''}
     </span>
@@ -1597,14 +1598,14 @@ ${item.published_link ? `<a href="${item.published_link}" target="_blank" rel="n
 <div class="card-meta${isAdmin?' admin-meta':''}" style="display:flex; align-items:center; gap:6px; flex-shrink:0; margin-left:auto;">
     ${revBadge}
     ${invBadge}
-    ${item.family_code ? `<span onclick="event.stopPropagation(); viewFamily('${item.family_code}')" class="badge-group-slot" style="background:#581c87; border:1px solid #a855f7; color:#f3e8ff;" title="Click to view all products in this family group">💜 Group</span>` : ''}
+    ${item.family_code ? `<span onclick="event.stopPropagation(); viewFamily('${item.family_code}')" class="badge-group-slot" style="background:#581c87; border:1px solid #a855f7; color:#f3e8ff; font-size:11.5px;" title="Click to view all products in this family group">💜 Group</span>` : ''}
     ${(typeof HAS_BULK_ACTION !== 'undefined' && HAS_BULK_ACTION) ? `<input type="checkbox" class="bulk-chk" data-id="${item.id}" ${(typeof SELECTED_BULK_PRODUCTS !== 'undefined' && SELECTED_BULK_PRODUCTS.indexOf(item.id) !== -1) ? 'checked' : ''} onclick="event.stopPropagation(); toggleBulkSelection();" style="width:16px; height:16px; margin:0 6px; cursor:pointer; accent-color:#8b5cf6; vertical-align:middle; flex-shrink:0;">` : ''}
-    ${statusTimeBlock || `<div style="width:155px; min-width:155px; flex-shrink:0; margin-right:8px;"></div>`}
-    <div class="status ${ds.cls}">${ds.label}</div>
+    ${statusTimeBlock}
+    <div class="status ${ds.cls}" style="font-size:12px; letter-spacing:0.5px;">${ds.label}</div>
     ${adminAssign}
     ${qaSendSEO}
 </div>
-<button class="toggle" type="button" style="flex-shrink:0;"><span class="toggle-icon" style="display:inline-block; transition:transform 0.3s; transform:${OPEN[item.id] ? 'rotate(180deg)' : 'rotate(0deg)'};">▼</span></button>
+<button class="toggle${isUrgent?' urgent-toggle':''}" type="button" style="flex-shrink:0;"><span class="toggle-icon" style="display:inline-block; transition:transform 0.3s; transform:${OPEN[item.id] ? 'rotate(180deg)' : 'rotate(0deg)'};">▼</span></button>
 </div>
 <div class="body${OPEN[item.id]?' open':''}" id="body-${item.id}">
 <div class="card-close-bar" onclick="toggle(${item.id})" ontouchend="headTouch(event,${item.id})">▲ &nbsp;Close</div>

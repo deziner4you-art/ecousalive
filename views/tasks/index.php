@@ -136,6 +136,8 @@ if(!in_array('Info Done', $allowed)){
     <button id="addProductBtn" onclick="toggleAddProductCard()" class="adminbtn" style="background:#c2410c;flex-shrink:0;">+ Add Product</button>
     <?php endif; ?>
 
+    <!-- Theme Toggle button -->
+    <button type="button" id="filter-theme-btn" onclick="toggleTheme()" class="nav-theme-toggle" style="background:#0f172a;border:1px solid #334155;color:#60a5fa;padding:7px 14px;border-radius:4px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;flex-shrink:0;transition:all 0.2s;" title="Switch Dark / Light Theme"></button>
 </div>
 
 <?php if($canAddProduct): ?>

@@ -153,10 +153,10 @@ align-items:center;
 justify-content:center;
 background:#1d4ed8;
 color:#fff;
-font-weight:bold;
-font-size:15px;
-font-family:'Agency FB', 'Arial Narrow', sans-serif;
-letter-spacing:.2px;
+font-weight:700;
+font-size:16px;
+font-family:'Calibri', 'Segoe UI', Arial, sans-serif !important;
+letter-spacing:.4px;
 padding:0 6px;
 box-sizing:border-box;
 flex-shrink:0;
@@ -168,8 +168,8 @@ max-width:none;
 min-width:160px;
 padding:8px 12px;
 color:#e2e8f0;
-font-size:12.5px;
-font-weight:500;
+font-size:14px;
+font-weight:600;
 line-height:1.45;
 word-break:break-word;
 box-sizing:border-box;
@@ -291,18 +291,29 @@ URGENT
 =====================================================
 */
 
-@keyframes urgentBlink{
-0%,100%{ border-color:#ef4444; box-shadow:0 0 0 3px rgba(239,68,68,.35); }
-50%{     border-color:transparent; box-shadow:0 0 0 3px rgba(239,68,68,0); }
-}
-
 .card.urgent-card{
-border:2px solid #ef4444;
-animation:urgentBlink 1.2s ease-in-out infinite;
+border:1px solid #1e3a5f;
 }
 
 .pid.urgent-pid{
 background:#ef4444 !important;
+}
+
+.card.urgent-card .toggle,
+.toggle.urgent-toggle{
+background:#ef4444 !important;
+color:#fff !important;
+border-left:1px solid #dc2626 !important;
+}
+
+.card.urgent-card .toggle:hover,
+.toggle.urgent-toggle:hover{
+background:#dc2626 !important;
+}
+
+.card.urgent-card.open .toggle{
+background:#b91c1c !important;
+border-left-color:#991b1b !important;
 }
 
 .urgent-badge{

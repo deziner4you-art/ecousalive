@@ -120,7 +120,7 @@ tailwind.config = {
 </script>
 
 <!-- App CSS (cards, status badges, task styles from monolith) -->
-<link rel="stylesheet" href="<?= $publicUrl ?>/css/app.css?v=2.8.4">
+<link rel="stylesheet" href="<?= $publicUrl ?>/css/app.css?v=2.8.5">
 
 <style>
 /* ── Topbar ────────────────────────────────────── */
@@ -557,6 +557,31 @@ body { background: #081223; margin: 0; padding: 0; color: #e2e8f0; }
 .card .head .toggle {
     flex-shrink: 0 !important;
 }
+.pid, .pid div {
+    font-family: 'Calibri', 'Segoe UI', Arial, sans-serif !important;
+}
+.card.urgent-card {
+    border: 1px solid #1e3a5f !important;
+    animation: none !important;
+    box-shadow: none !important;
+}
+.card.urgent-card .head {
+    background: #162033;
+}
+.card.urgent-card .toggle,
+.toggle.urgent-toggle {
+    background: #ef4444 !important;
+    color: #ffffff !important;
+    border-left: 1px solid #dc2626 !important;
+}
+.card.urgent-card .toggle:hover,
+.toggle.urgent-toggle:hover {
+    background: #dc2626 !important;
+}
+.card.urgent-card.open .toggle {
+    background: #b91c1c !important;
+    border-left-color: #991b1b !important;
+}
 .card.open {
     overflow: visible !important;
 }
@@ -573,7 +598,6 @@ body { background: #081223; margin: 0; padding: 0; color: #e2e8f0; }
     border-left-color: #4A7DFF !important;
     color: #fff !important;
 }
-.card.urgent-card .head { background: #1a0a00; }
 
 /* ── Card: close bar — mobile only ───────────── */
 .card-close-bar {
@@ -1307,6 +1331,73 @@ html.light-theme select {
     -moz-appearance: none !important;
     appearance: none !important;
 }
+
+html.light-theme .card {
+    background: #ffffff !important;
+    border-color: #cbd5e1 !important;
+    border-bottom: 6px solid #2563eb !important;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06) !important;
+}
+html.light-theme .card .head {
+    background: #ffffff !important;
+}
+html.light-theme .card.open .head {
+    background: #2563eb !important;
+    color: #ffffff !important;
+}
+html.light-theme .card.open .head .title-text {
+    color: #ffffff !important;
+}
+html.light-theme .card.open .head .toggle {
+    background: #1d4ed8 !important;
+    color: #ffffff !important;
+    border-left-color: #3b82f6 !important;
+}
+html.light-theme .card .head .title {
+    color: #0f172a !important;
+}
+html.light-theme .card .head .title-text {
+    color: #0f172a !important;
+}
+html.light-theme .card .head .toggle {
+    background: #f1f5f9 !important;
+    border-left-color: #cbd5e1 !important;
+    color: #475569 !important;
+}
+html.light-theme .card.urgent-card .toggle,
+html.light-theme .toggle.urgent-toggle {
+    background: #ef4444 !important;
+    color: #ffffff !important;
+    border-left-color: #dc2626 !important;
+}
+html.light-theme .filter-bar {
+    background: #ffffff !important;
+    border-bottom-color: #cbd5e1 !important;
+}
+html.light-theme .filter-input,
+html.light-theme .filter-select {
+    background: #f8fafc !important;
+    border-color: #cbd5e1 !important;
+    color: #0f172a !important;
+}
+html.light-theme .filter-select option {
+    background: #ffffff !important;
+    color: #0f172a !important;
+}
+html.light-theme .body {
+    background: #f8fafc !important;
+    color: #1e293b !important;
+}
+html.light-theme .time-elapsed-badge {
+    background: rgba(239, 68, 68, 0.12) !important;
+    border-color: #f87171 !important;
+    color: #dc2626 !important;
+}
+html.light-theme .nav-theme-toggle {
+    background: #f1f5f9 !important;
+    color: #2563eb !important;
+    border-color: #cbd5e1 !important;
+}
 </style>
 </head>
 <body>
@@ -1590,7 +1681,7 @@ try {
 <!-- ── JS Modules ── -->
 <?php $v = '2.8.2'; ?>
 <script src="<?= $publicUrl ?>/js/core.js?v=<?= $v ?>"></script>
-<script src="<?= $publicUrl ?>/js/tasks.js?v=3.2.8"></script>
+<script src="<?= $publicUrl ?>/js/tasks.js?v=3.2.9"></script>
 <script src="<?= $publicUrl ?>/js/admin.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/invoices.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/payroll.js?v=2.7.13"></script>
@@ -1599,26 +1690,33 @@ try {
 
 <script>
 (function() {
-    // Theme toggle logic
-    var btn = document.getElementById('theme-toggle-btn');
-    if (btn) {
-        var updateBtn = function() {
-            var isLight = document.documentElement.classList.contains('light-theme');
-            btn.innerHTML = isLight ? '🌙 Dark Theme' : '☀️ Light Theme';
-        };
-        updateBtn();
-        btn.addEventListener('click', function() {
-            var isLight = document.documentElement.classList.contains('light-theme');
-            if (isLight) {
-                document.documentElement.classList.remove('light-theme');
-                localStorage.setItem('theme', 'dark');
-            } else {
-                document.documentElement.classList.add('light-theme');
-                localStorage.setItem('theme', 'light');
-            }
-            updateBtn();
-        });
+    // Theme toggle logic (syncs both topbar and filter bar buttons)
+    window.updateAllThemeButtons = function() {
+        var isLight = document.documentElement.classList.contains('light-theme');
+        var text = isLight ? '🌙 Dark Theme' : '☀️ Light Theme';
+        var topBtn = document.getElementById('theme-toggle-btn');
+        if (topBtn) topBtn.innerHTML = text;
+        var fltBtn = document.getElementById('filter-theme-btn');
+        if (fltBtn) fltBtn.innerHTML = text;
+    };
+
+    window.toggleTheme = function() {
+        var isLight = document.documentElement.classList.contains('light-theme');
+        if (isLight) {
+            document.documentElement.classList.remove('light-theme');
+            localStorage.setItem('theme', 'dark');
+        } else {
+            document.documentElement.classList.add('light-theme');
+            localStorage.setItem('theme', 'light');
+        }
+        window.updateAllThemeButtons();
+    };
+
+    var topBtn = document.getElementById('theme-toggle-btn');
+    if (topBtn) {
+        topBtn.addEventListener('click', window.toggleTheme);
     }
+    window.updateAllThemeButtons();
 
     // Silent heartbeat ping every 30 seconds
     setInterval(function() {
