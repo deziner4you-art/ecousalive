@@ -53,6 +53,7 @@ return [
     'update_product_services' => ['TaskController', 'updateProductServices'],
     'enable_aplus_service' => ['TaskController', 'enableAplusService'],
     'start_aplus_workflow' => ['TaskController', 'startAplusWorkflow'],
+    'rename_product'     => ['TaskController', 'renameProduct'],
 
     /* ── Invoices ───────────────────────────────── */
     'get_invoices'          => ['InvoiceController', 'getAll'],

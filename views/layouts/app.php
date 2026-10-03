@@ -1762,9 +1762,9 @@ try {
 </div>
 
 <!-- ── JS Modules ── -->
-<?php $v = '2.8.4'; ?>
+<?php $v = '2.8.5'; ?>
 <script src="<?= $publicUrl ?>/js/core.js?v=<?= $v ?>"></script>
-<script src="<?= $publicUrl ?>/js/tasks.js?v=3.3.2"></script>
+<script src="<?= $publicUrl ?>/js/tasks.js?v=3.3.3"></script>
 <script src="<?= $publicUrl ?>/js/admin.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/invoices.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/payroll.js?v=2.7.13"></script>

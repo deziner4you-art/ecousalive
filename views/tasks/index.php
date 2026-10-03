@@ -277,4 +277,59 @@ if(!in_array('Info Done', $allowed)){
         </div>
     </div>
 </div>
+
+<!-- ── Rename Product Number / Name Modal (Admin Only) ── -->
+<div id="renameProductModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.78);z-index:99999;align-items:center;justify-content:center;backdrop-filter:blur(3px);">
+    <div style="background:#0f172a;border:1px solid #1e3a5f;border-radius:12px;width:95%;max-width:520px;padding:24px;box-shadow:0 25px 35px -5px rgba(0,0,0,0.6);color:#f1f5f9;position:relative;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid #1e3a5f;padding-bottom:12px;">
+            <div style="font-size:16px;font-weight:700;color:#38bdf8;display:flex;align-items:center;gap:6px;">
+                <span>✏️ Rename Product Number & Title</span>
+            </div>
+            <button onclick="closeRenameProductModal()" style="background:transparent;border:none;color:#94a3b8;font-size:24px;cursor:pointer;line-height:1;" title="Close">&times;</button>
+        </div>
+
+        <input type="hidden" id="rename-task-id">
+
+        <!-- Safety Assurance Badge -->
+        <div style="background:#081b33;border:1px solid #1d4ed8;border-radius:8px;padding:10px 14px;margin-bottom:16px;display:flex;align-items:flex-start;gap:10px;">
+            <span style="font-size:18px;line-height:1;">🛡️</span>
+            <div style="font-size:12px;color:#93c5fd;line-height:1.5;">
+                <strong>Backend ID (<span id="rename-display-id">#0</span>) & History Preserved:</strong><br>
+                Product ka number ya name change karne se <strong>Status, Stage, Timers, History, Invoices, Payslips</strong> aur <strong>Group Product Family</strong> 100% maintain rahegi.
+            </div>
+        </div>
+
+        <!-- Product Number Input -->
+        <div style="margin-bottom:14px;">
+            <label style="display:block;font-size:11.5px;font-weight:700;color:#94a3b8;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Product Number *</label>
+            <div style="display:flex;align-items:center;background:#09111e;border:1.5px solid #334155;border-radius:6px;overflow:hidden;">
+                <span style="background:#1e293b;color:#94a3b8;padding:9px 14px;font-weight:bold;font-size:14px;border-right:1px solid #334155;">#</span>
+                <input type="text" id="rename-product-no" placeholder="e.g. JH-00019" style="flex:1;background:transparent;border:none;color:#f8fafc;padding:9px 12px;font-size:15px;font-weight:700;outline:none;" onkeydown="if(event.key==='Enter') saveRenameProduct()">
+            </div>
+        </div>
+
+        <!-- Product Title Input -->
+        <div style="margin-bottom:16px;">
+            <label style="display:block;font-size:11.5px;font-weight:700;color:#94a3b8;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Product Name / Title</label>
+            <input type="text" id="rename-product-title" placeholder="Product Title" style="width:100%;box-sizing:border-box;background:#09111e;border:1.5px solid #334155;border-radius:6px;color:#f8fafc;padding:9px 12px;font-size:13px;outline:none;" onkeydown="if(event.key==='Enter') saveRenameProduct()">
+        </div>
+
+        <!-- Warning / Duplicate Alert Message -->
+        <div id="rename-msg-box" style="display:none;margin-bottom:16px;background:#451a03;border:1px solid #b45309;border-radius:8px;padding:10px 12px;font-size:12px;color:#fde68a;">
+            <div id="rename-msg-text" style="margin-bottom:6px;line-height:1.4;"></div>
+            <label id="rename-force-label" style="display:none;align-items:center;gap:6px;font-weight:bold;cursor:pointer;color:#fbbf24;margin-top:4px;">
+                <input type="checkbox" id="rename-force-chk" style="accent-color:#f59e0b;width:15px;height:15px;">
+                Confirm Rename Anyway (Duplicate allow karein)
+            </label>
+        </div>
+
+        <!-- Action Buttons -->
+        <div style="display:flex;justify-content:flex-end;gap:10px;align-items:center;">
+            <button type="button" onclick="closeRenameProductModal()" style="background:#334155;color:#cbd5e1;border:none;padding:9px 18px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;">Cancel</button>
+            <button type="button" onclick="saveRenameProduct()" id="rename-btn-save" style="background:#2563eb;color:#fff;border:none;padding:9px 22px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:bold;display:inline-flex;align-items:center;gap:6px;transition:all 0.15s;">
+                <span>💾 Save Changes</span>
+            </button>
+        </div>
+    </div>
+</div>
 <?php endif; ?>

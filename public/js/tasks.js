@@ -1402,6 +1402,7 @@ function buildCard(item){
   <div style="display:flex;gap:6px;align-items:center;">
     <select id="performSel_${item.id}" style="flex:1;padding:6px 8px;background:#0d1e36;color:#e2e8f0;border:1px solid #1e3a5f;border-radius:4px;font-size:12px;outline:none;height:32px;">
       <option value="">⚡ Task Perform...</option>
+      <option value="rename_product">✏️ Rename Product # / Title</option>
       <option value="edit_services">✏️ Edit Services & Workers</option>
       ${item.status==='Pending'?'<option value="save">💾 Save Draft</option>':''}
       ${item.product_type==='Info + A Plus'?'<option value="save_all_generated">✨ Save All Generated</option>':''}
@@ -1638,13 +1639,16 @@ ${item.published_link ? `<a href="${item.published_link}" target="_blank" rel="n
     return `
 <div class="head" onclick="headClick(event,${item.id})" ontouchend="headTouch(event,${item.id})" style="cursor:pointer; display:flex; align-items:center; width:100%; box-sizing:border-box;">
 <div class="pid${isUrgent?' urgent-pid':''}" style="position:relative; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; padding-top:8px; width:125px; min-width:125px; font-family:'Calibri', 'Segoe UI', Arial, sans-serif; box-sizing:border-box; flex-shrink:0;">
-    <div style="line-height:1.1; font-family:'Calibri', 'Segoe UI', Arial, sans-serif; font-size:17px; font-weight:700; letter-spacing:0.4px; text-align:center; width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0 4px; box-sizing:border-box;">#${item.product_no}</div>
+    <div style="line-height:1.1; font-family:'Calibri', 'Segoe UI', Arial, sans-serif; font-size:17px; font-weight:700; letter-spacing:0.4px; text-align:center; width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0 4px; box-sizing:border-box;">
+        #${item.product_no}${isAdmin ? `<span onclick="event.stopPropagation(); openRenameProductModal(${item.id})" title="Rename Product Number / Title (Admin Only)" style="cursor:pointer; display:inline-block; font-size:12px; margin-left:3px; opacity:0.85; vertical-align:middle; transition:transform 0.15s;" onmouseover="this.style.opacity='1';this.style.transform='scale(1.25)'" onmouseout="this.style.opacity='0.85';this.style.transform='scale(1)'">✏️</span>` : ''}
+    </div>
     <div style="position:absolute; bottom:3px; z-index:10; display:flex; justify-content:center; width:100%;">
         ${typeBadge}
     </div>
 </div>
 <div class="title" style="flex:1 1 auto; max-width:none; min-width:180px; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 12px; box-sizing:border-box; overflow:hidden;">
     <span class="title-text" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; font-size:14px; font-weight:600;" title="${item.title ? item.title.replace(/"/g, '&quot;') : ''}">${item.title}</span>
+    ${isAdmin ? `<button type="button" onclick="event.stopPropagation(); openRenameProductModal(${item.id})" class="adminbtn" style="background:#1e293b; border:1px solid #3b82f6; color:#93c5fd; font-size:11px; font-weight:600; padding:2px 8px; border-radius:4px; cursor:pointer; flex-shrink:0; display:inline-flex; align-items:center; gap:4px; transition:all 0.15s;" title="Rename Product Number or Title">✏️ Rename</button>` : ''}
     <span class="research-link-slot" style="flex-shrink:0; display:inline-flex; align-items:center; justify-content:flex-end; width:155px; min-width:155px;">
         ${linkIcon || ''}
     </span>
@@ -1962,7 +1966,8 @@ function applyPerform(taskId){
     var sel = document.getElementById('performSel_' + taskId);
     var act = sel ? sel.value : '';
     if(!act){ alert('Pehle koi action select karein'); return; }
-    if(act === 'edit_services')                openEditServices(taskId);
+    if(act === 'rename_product')               openRenameProductModal(taskId);
+    else if(act === 'edit_services')           openEditServices(taskId);
     else if(act === 'save')                    writerSave(taskId);
     else if(act === 'save_all_generated')      writerSave(taskId, 'All Generated');
     else if(act === 'set_all_generated')       forceStage(taskId, 'All Generated');
@@ -1981,6 +1986,125 @@ function applyPerform(taskId){
     else if(act === 'qaready')                 updateWorkStatus(taskId, 'In QA');
     else if(act === 'remove_invoiced')         clearInvoiceStatus(taskId);
     else if(act === 'enable_aplus' || act === 'start_aplus') startAplusWorkflow(taskId);
+}
+
+/* ── Rename Product (Admin Only) ──────────────── */
+function openRenameProductModal(taskId){
+    var task = (typeof ALL_TASKS !== 'undefined' ? ALL_TASKS : []).find(function(t){ return parseInt(t.id) === parseInt(taskId); });
+    if(!task){ alert('Product not found'); return; }
+
+    var modal = document.getElementById('renameProductModal');
+    if(!modal) return;
+
+    document.getElementById('rename-task-id').value = task.id;
+    var dispId = document.getElementById('rename-display-id');
+    if(dispId) dispId.textContent = '#' + task.id;
+
+    var pnoInput = document.getElementById('rename-product-no');
+    if(pnoInput) pnoInput.value = task.product_no || '';
+
+    var titleInput = document.getElementById('rename-product-title');
+    if(titleInput) titleInput.value = task.title || '';
+
+    var msgBox = document.getElementById('rename-msg-box');
+    if(msgBox) msgBox.style.display = 'none';
+
+    var forceLabel = document.getElementById('rename-force-label');
+    if(forceLabel) forceLabel.style.display = 'none';
+
+    var forceChk = document.getElementById('rename-force-chk');
+    if(forceChk) forceChk.checked = false;
+
+    var saveBtn = document.getElementById('rename-btn-save');
+    if(saveBtn){
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<span>💾 Save Changes</span>';
+    }
+
+    modal.style.display = 'flex';
+    setTimeout(function(){
+        if(pnoInput){ pnoInput.focus(); pnoInput.select(); }
+    }, 100);
+}
+
+function closeRenameProductModal(){
+    var modal = document.getElementById('renameProductModal');
+    if(modal) modal.style.display = 'none';
+}
+
+function saveRenameProduct(){
+    var taskId = document.getElementById('rename-task-id').value;
+    var pnoInput = document.getElementById('rename-product-no');
+    var titleInput = document.getElementById('rename-product-title');
+    var forceChk = document.getElementById('rename-force-chk');
+
+    var newNo = (pnoInput ? pnoInput.value : '').trim().replace(/^#/, '');
+    var newTitle = (titleInput ? titleInput.value : '').trim();
+    var force = forceChk && forceChk.checked;
+
+    if(!newNo){
+        alert('Product number cannot be empty!');
+        if(pnoInput) pnoInput.focus();
+        return;
+    }
+
+    var saveBtn = document.getElementById('rename-btn-save');
+    if(saveBtn){
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<span>⏳ Saving...</span>';
+    }
+
+    var fd = new FormData();
+    fd.append('action', 'rename_product');
+    fd.append('task_id', taskId);
+    fd.append('product_no', newNo);
+    fd.append('title', newTitle);
+    if(force) fd.append('force', '1');
+
+    fetch('index.php', { method: 'POST', body: fd })
+        .then(function(r){ return r.json(); })
+        .then(function(res){
+            if(saveBtn){
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<span>💾 Save Changes</span>';
+            }
+
+            if(res.success){
+                // Update in ALL_TASKS
+                if(typeof ALL_TASKS !== 'undefined' && Array.isArray(ALL_TASKS)){
+                    var t = ALL_TASKS.find(function(x){ return parseInt(x.id) === parseInt(taskId); });
+                    if(t){
+                        t.product_no = res.new_product_no || newNo;
+                        if(res.title) t.title = res.title;
+                    }
+                    renderSmart(ALL_TASKS);
+                }
+                closeRenameProductModal();
+                alert('✅ Product successfully renamed to #' + (res.new_product_no || newNo) + '!\n\nAll records, stage, timers, and group product family are fully preserved.');
+                if(typeof loadTasks === 'function') loadTasks();
+            } else {
+                var msgBox = document.getElementById('rename-msg-box');
+                var msgText = document.getElementById('rename-msg-text');
+                var forceLabel = document.getElementById('rename-force-label');
+
+                if(msgBox && msgText){
+                    msgText.textContent = res.message || 'Error renaming product';
+                    msgBox.style.display = 'block';
+                    if(res.is_duplicate && forceLabel){
+                        forceLabel.style.display = 'inline-flex';
+                    }
+                } else {
+                    alert(res.message || 'Error renaming product');
+                }
+            }
+        })
+        .catch(function(err){
+            if(saveBtn){
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<span>💾 Save Changes</span>';
+            }
+            alert('Request failed: ' + err.message);
+        });
 }
 
 /* ── Edit Services & Workers (Admin) ──────────── */

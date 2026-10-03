@@ -1135,4 +1135,64 @@ class Task {
             ->execute($taskIds);
     }
 
+    public static function renameProduct(int $taskId, string $newProductNo, string $newTitle = '', bool $force = false): array {
+        $stmt = db()->prepare("SELECT id, product_no, title, family_code, status, work_status FROM wp_eco_aplus_tasks WHERE id = ?");
+        $stmt->execute([$taskId]);
+        $task = $stmt->fetch();
+        if (!$task) {
+            return ['ok' => false, 'message' => 'Product not found'];
+        }
+
+        $cleanProductNo = ltrim(trim($newProductNo), '#');
+        $cleanProductNo = trim($cleanProductNo);
+        $cleanTitle = trim($newTitle);
+
+        if ($cleanProductNo === '') {
+            return ['ok' => false, 'message' => 'Product number cannot be empty'];
+        }
+
+        // Check if another active product already has this product_no (duplicate warning)
+        if (!$force && strtolower(trim($task['product_no'])) !== strtolower($cleanProductNo)) {
+            $dupStmt = db()->prepare("
+                SELECT id, product_no, title 
+                FROM wp_eco_aplus_tasks 
+                WHERE LOWER(TRIM(product_no)) = LOWER(?) AND id != ? AND deleted_at IS NULL
+                LIMIT 1
+            ");
+            $dupStmt->execute([$cleanProductNo, $taskId]);
+            $dup = $dupStmt->fetch();
+            if ($dup) {
+                return [
+                    'ok' => false,
+                    'is_duplicate' => true,
+                    'duplicate_product_no' => $dup['product_no'],
+                    'duplicate_title' => $dup['title'],
+                    'duplicate_id' => $dup['id'],
+                    'message' => "Product #{$dup['product_no']} already exists for '{$dup['title']}' (ID: #{$dup['id']}). Agar aap phir bhi yehi number rakhna chahte hain to 'Confirm Rename Anyway' check karein."
+                ];
+            }
+        }
+
+        $titleToSave = ($cleanTitle !== '') ? $cleanTitle : $task['title'];
+
+        // Perform rename: updating ONLY product_no and title
+        // Backend id, family_code, work_status, status, workers, history remain 100% UNCHANGED
+        $updateStmt = db()->prepare("
+            UPDATE wp_eco_aplus_tasks 
+            SET product_no = ?, title = ?, last_activity_at = NOW() 
+            WHERE id = ?
+        ");
+        $updateStmt->execute([$cleanProductNo, $titleToSave, $taskId]);
+
+        return [
+            'ok' => true,
+            'message' => 'Product renamed successfully!',
+            'task_id' => $taskId,
+            'old_product_no' => $task['product_no'],
+            'new_product_no' => $cleanProductNo,
+            'title' => $titleToSave,
+            'family_code' => $task['family_code']
+        ];
+    }
+
 }

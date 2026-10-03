@@ -636,4 +636,32 @@ class TaskController {
         }
     }
 
+    public function renameProduct(): void {
+        AuthMiddleware::requireAuth();
+        RoleMiddleware::requireAdmin();
+        verify_csrf();
+
+        $taskId    = intval($_POST['task_id'] ?? 0);
+        $productNo = trim($_POST['product_no'] ?? '');
+        $title     = trim($_POST['title'] ?? '');
+        $force     = !empty($_POST['force']);
+
+        if (!$taskId) {
+            json_error('Task ID is required');
+        }
+        if ($productNo === '') {
+            json_error('Product number cannot be empty');
+        }
+
+        $res = Task::renameProduct($taskId, $productNo, $title, $force);
+        if ($res['ok']) {
+            json_success($res);
+        } else {
+            header('Content-Type: application/json');
+            http_response_code(400);
+            echo json_encode(array_merge(['success' => false], $res));
+            exit;
+        }
+    }
+
 }
