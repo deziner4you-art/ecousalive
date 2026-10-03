@@ -18,6 +18,7 @@ $isListing = $user['role'] === 'eco_listing';
 $userPerms = ModulePermission::getForUser($user);
 $canAddProduct = $isAdmin || !empty($userPerms['products']['add']);
 $canRenameProduct = $isAdmin || !empty($userPerms['products']['rename']);
+$canGroupProduct = $isAdmin || !empty($userPerms['products']['group']);
 
 /* Build the full filter option list */
 $allFilters = [

@@ -258,10 +258,12 @@ function runMigrations(): void {
         can_edit   TINYINT(1) NOT NULL DEFAULT 0,
         can_delete TINYINT(1) NOT NULL DEFAULT 0,
         can_rename TINYINT(1) NOT NULL DEFAULT 0,
+        can_group  TINYINT(1) NOT NULL DEFAULT 0,
         PRIMARY KEY (role, module)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     "); }catch(Exception $e){}
     try{ db()->exec("ALTER TABLE eco_module_permissions ADD COLUMN can_rename TINYINT(1) NOT NULL DEFAULT 0"); }catch(Exception $e){}
+    try{ db()->exec("ALTER TABLE eco_module_permissions ADD COLUMN can_group TINYINT(1) NOT NULL DEFAULT 0"); }catch(Exception $e){}
 
     try{ db()->exec("
     CREATE TABLE IF NOT EXISTS eco_user_permissions (
@@ -279,10 +281,12 @@ function runMigrations(): void {
         can_edit   TINYINT(1) NOT NULL DEFAULT 0,
         can_delete TINYINT(1) NOT NULL DEFAULT 0,
         can_rename TINYINT(1) NOT NULL DEFAULT 0,
+        can_group  TINYINT(1) NOT NULL DEFAULT 0,
         PRIMARY KEY (user_id, module)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     "); }catch(Exception $e){}
     try{ db()->exec("ALTER TABLE eco_user_module_permissions ADD COLUMN can_rename TINYINT(1) NOT NULL DEFAULT 0"); }catch(Exception $e){}
+    try{ db()->exec("ALTER TABLE eco_user_module_permissions ADD COLUMN can_group TINYINT(1) NOT NULL DEFAULT 0"); }catch(Exception $e){}
 
     db()->exec("
     CREATE TABLE IF NOT EXISTS eco_seo_content (

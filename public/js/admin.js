@@ -351,7 +351,7 @@ function renderModulePermissions(){
     if(!box) return;
 
     var moduleKeys = Object.keys(_MP_MODULES);
-    var actionLabels = {view:'View', add:'Add', edit:'Edit', delete:'Delete', rename:'Rename'};
+    var actionLabels = {view:'View', add:'Add', edit:'Edit', delete:'Delete', rename:'Rename', group:'Group'};
 
     /* ─── Table header ─── */
     var html = '<div style="overflow-x:auto;">';
@@ -711,8 +711,8 @@ function buildUserPermissionsHtml(user){
     var userModules = (res.user_modules && res.user_modules[uid]) || null;
     var moduleKeys = Object.keys(res.modules || {});
     var labels = res.labels || {};
-    var actionLabels = {view:'View', add:'Add', edit:'Edit', delete:'Delete', rename:'Rename'};
-    var allActions = ['view','add','edit','delete','rename'];
+    var actionLabels = {view:'View', add:'Add', edit:'Edit', delete:'Delete', rename:'Rename', group:'Group'};
+    var allActions = ['view','add','edit','delete','rename','group'];
     var filters = effective.filters || [];
     var customized = userFilters || userModules;
 

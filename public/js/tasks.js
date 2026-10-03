@@ -2883,11 +2883,12 @@ var GROUP_SEARCH_TIMERS = {};
 var GROUP_SEARCH_REQ_ID = {};
 
 function buildFamilyGroupingSection(item, isAdmin) {
-    if (!item.family_code && !isAdmin) return '';
+    var canGroup = isAdmin || (typeof CAN_GROUP_PRODUCT !== 'undefined' && CAN_GROUP_PRODUCT) || (typeof MODULE_PERMS !== 'undefined' && MODULE_PERMS.products && MODULE_PERMS.products.group);
+    if (!item.family_code && !canGroup) return '';
 
     var members = item.family_code ? ALL_TASKS.filter(function(t) { return t.family_code === item.family_code; }) : [];
 
-    if (isAdmin) {
+    if (canGroup) {
         var familyTagsHtml = '';
         members.forEach(function(m) {
             var isCurrent = m.id === item.id;

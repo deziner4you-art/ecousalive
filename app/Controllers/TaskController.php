@@ -400,7 +400,15 @@ class TaskController {
 
     public function addToFamily(): void {
         AuthMiddleware::requireAuth();
-        RoleMiddleware::requireAdmin();
+
+        $user = current_user();
+        if(!$user) json_error('Authentication required', 401);
+        $isAdmin = ($user['role'] ?? '') === 'administrator';
+        $canGroup = $isAdmin || ModulePermission::can($user, 'products', 'group');
+        if(!$canGroup){
+            json_error('Permission denied: You do not have permission to group products.', 403);
+        }
+
         verify_csrf();
 
         $taskId = intval($_POST['task_id'] ?? 0);
@@ -477,7 +485,15 @@ class TaskController {
 
     public function removeFromFamily(): void {
         AuthMiddleware::requireAuth();
-        RoleMiddleware::requireAdmin();
+
+        $user = current_user();
+        if(!$user) json_error('Authentication required', 401);
+        $isAdmin = ($user['role'] ?? '') === 'administrator';
+        $canGroup = $isAdmin || ModulePermission::can($user, 'products', 'group');
+        if(!$canGroup){
+            json_error('Permission denied: You do not have permission to group products.', 403);
+        }
+
         verify_csrf();
 
         $taskId = intval($_POST['task_id'] ?? 0);
@@ -489,7 +505,14 @@ class TaskController {
 
     public function searchProductsForGroup(): void {
         AuthMiddleware::requireAuth();
-        RoleMiddleware::requireAdmin();
+
+        $user = current_user();
+        if(!$user) json_error('Authentication required', 401);
+        $isAdmin = ($user['role'] ?? '') === 'administrator';
+        $canGroup = $isAdmin || ModulePermission::can($user, 'products', 'group');
+        if(!$canGroup){
+            json_error('Permission denied: You do not have permission to group products.', 403);
+        }
 
         $taskId = intval($_GET['task_id'] ?? $_POST['task_id'] ?? 0);
         $query  = trim($_GET['q'] ?? $_POST['q'] ?? '');

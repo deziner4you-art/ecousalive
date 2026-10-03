@@ -1497,12 +1497,14 @@ var CSRF_TOKEN = <?= json_encode(csrf_token())      ?>;
 <?php
 $currentUserPerms = ($user['role'] === 'administrator')
     ? array_fill_keys(array_keys(ModulePermission::MODULES),
-          array_fill_keys(['view','add','edit','delete','rename'], true))
+          array_fill_keys(['view','add','edit','delete','rename','group'], true))
     : ModulePermission::getForUser($user);
 $canUserRenameProduct = ($user['role'] === 'administrator') || !empty($currentUserPerms['products']['rename']);
+$canUserGroupProduct = ($user['role'] === 'administrator') || !empty($currentUserPerms['products']['group']);
 ?>
 var MODULE_PERMS = <?= json_encode($currentUserPerms) ?>;
 var CAN_RENAME_PRODUCT = <?= $canUserRenameProduct ? 'true' : 'false' ?>;
+var CAN_GROUP_PRODUCT = <?= $canUserGroupProduct ? 'true' : 'false' ?>;
 <?php
 $role_bulk_action = false;
 if(current_user()){
@@ -1765,9 +1767,9 @@ try {
 </div>
 
 <!-- ── JS Modules ── -->
-<?php $v = '2.8.6'; ?>
+<?php $v = '2.8.7'; ?>
 <script src="<?= $publicUrl ?>/js/core.js?v=<?= $v ?>"></script>
-<script src="<?= $publicUrl ?>/js/tasks.js?v=3.3.4"></script>
+<script src="<?= $publicUrl ?>/js/tasks.js?v=3.3.5"></script>
 <script src="<?= $publicUrl ?>/js/admin.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/invoices.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/payroll.js?v=2.7.13"></script>
