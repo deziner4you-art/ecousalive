@@ -58,18 +58,10 @@ class Task {
                       OR t.info_worker_id = ?
                       OR t.aplus_worker_id = ?
                       OR t.work_completed_by_worker_id = ?
-                      OR (t.family_code IS NOT NULL AND t.family_code IN (
-                          SELECT DISTINCT t2.family_code
-                          FROM wp_eco_aplus_tasks t2
-                          LEFT JOIN eco_tool_assignments a2 ON a2.task_id = t2.id
-                          WHERE t2.family_code IS NOT NULL
-                            AND t2.deleted_at IS NULL
-                            AND (a2.worker_id = ? OR t2.info_worker_id = ? OR t2.aplus_worker_id = ? OR t2.work_completed_by_worker_id = ?)
-                      ))
                   )
                 ORDER BY t.id DESC
                 ");
-                $stmt->execute([$user['id'], $user['id'], $user['id'], $user['id'], $user['id'], $user['id'], $user['id'], $user['id']]);
+                $stmt->execute([$user['id'], $user['id'], $user['id'], $user['id']]);
                 break;
 
             case 'qa':
@@ -153,18 +145,10 @@ class Task {
                   AND (
                       a.worker_id = ?
                       OR t.ai_worked_by = ?
-                      OR (t.family_code IS NOT NULL AND t.family_code IN (
-                          SELECT DISTINCT t2.family_code
-                          FROM wp_eco_aplus_tasks t2
-                          LEFT JOIN eco_tool_assignments a2 ON a2.task_id = t2.id
-                          WHERE t2.family_code IS NOT NULL
-                            AND t2.deleted_at IS NULL
-                            AND (a2.worker_id = ? OR t2.ai_worked_by = ?)
-                      ))
                   )
                 ORDER BY t.id DESC
                 ");
-                $stmt->execute([$user['id'], $user['id'], $user['id'], $user['id']]);
+                $stmt->execute([$user['id'], $user['id']]);
                 break;
 
             case 'eco_listing':

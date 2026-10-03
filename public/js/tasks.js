@@ -1579,8 +1579,8 @@ ${publishedRow ? `<div style="flex:100%;margin-top:6px;">${publishedRow}</div>` 
     var isAssignedToMe = false;
     if (ROLE === 'qa' && (parseInt(item.qa_submitted_by) === USER_ID || parseInt(item.qa_user_id) === USER_ID)) isAssignedToMe = true;
     else if ((ROLE === 'd4u_writer' || ROLE === 'seo_manager') && (parseInt(item.written_by_user_id) === USER_ID || parseInt(item.seo_submitted_by) === USER_ID)) isAssignedToMe = true;
-    else if (ROLE === 'ai_work' && parseInt(item.ai_worked_by) === USER_ID) isAssignedToMe = true;
-    else if (parseInt(item.assigned_worker_id) === USER_ID || parseInt(item.work_completed_by_worker_id) === USER_ID) isAssignedToMe = true;
+    else if (ROLE === 'ai_work' && (parseInt(item.ai_worked_by) === USER_ID || parseInt(item.assigned_worker_id) === USER_ID)) isAssignedToMe = true;
+    else if (parseInt(item.assigned_worker_id) === USER_ID || parseInt(item.work_completed_by_worker_id) === USER_ID || parseInt(item.info_worker_id) === USER_ID || parseInt(item.aplus_worker_id) === USER_ID) isAssignedToMe = true;
     // We don't have eco_tool_assignments array in JS, but checking assigned_worker_id / completed_by is usually enough for the card display
     
     var canSeeStatusTime = isAdmin || isAssignedToMe;
@@ -1819,6 +1819,13 @@ function buildActionButtons(item, isAdmin, isWorker, isQa, isListing, isUrgent, 
     if(isAdmin) return buildAdminButtons(item, isUrgent, lock);
     var btns = '';
     if(isWorker){
+        var myWorkerId = typeof USER_ID !== 'undefined' ? parseInt(USER_ID) : 0;
+        var isAssignedToCurrentWorker = (parseInt(item.assigned_worker_id) === myWorkerId ||
+                                         parseInt(item.info_worker_id) === myWorkerId ||
+                                         parseInt(item.aplus_worker_id) === myWorkerId ||
+                                         parseInt(item.work_completed_by_worker_id) === myWorkerId);
+        if(!isAssignedToCurrentWorker) return '';
+
         var isDesignRev = item.active_revision_type === 'design';
         var isInfoStage = (item.status === 'Generate info Content' || item.status === 'Generate Info Content')
                        || (item.product_type === 'Infographics')

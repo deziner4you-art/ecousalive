@@ -177,6 +177,22 @@ function getSortedFiltered(data){
     var workerFilter= document.getElementById('workerFilter')? document.getElementById('workerFilter').value: '';
 
     var result = data.filter(function(item){
+        // Strict worker isolation: Each worker only sees their own assigned/completed products
+        if (typeof ROLE !== 'undefined') {
+            var myId = typeof USER_ID !== 'undefined' ? parseInt(USER_ID) : 0;
+            if (ROLE === 'worker') {
+                var isMyTask = (parseInt(item.assigned_worker_id) === myId ||
+                                parseInt(item.info_worker_id) === myId ||
+                                parseInt(item.aplus_worker_id) === myId ||
+                                parseInt(item.work_completed_by_worker_id) === myId);
+                if (!isMyTask) return false;
+            } else if (ROLE === 'ai_work') {
+                var isMyAiTask = (parseInt(item.assigned_worker_id) === myId ||
+                                  parseInt(item.ai_worked_by) === myId);
+                if (!isMyAiTask) return false;
+            }
+        }
+
         if (typeof ACTIVE_FAMILY_FILTER !== 'undefined' && ACTIVE_FAMILY_FILTER) {
             return item.family_code === ACTIVE_FAMILY_FILTER;
         }
