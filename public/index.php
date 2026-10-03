@@ -49,6 +49,7 @@ require_once ROOT.'/app/Models/Payslip.php';
 require_once ROOT.'/app/Models/SeoContent.php';
 require_once ROOT.'/app/Models/ModulePermission.php';
 require_once ROOT.'/app/Models/Expense.php';
+require_once ROOT.'/app/Models/Vendor.php';
 
 /* ── Load Controllers ────────────────────────────────── */
 
@@ -59,6 +60,7 @@ require_once ROOT.'/app/Controllers/PayrollController.php';
 require_once ROOT.'/app/Controllers/AdminController.php';
 require_once ROOT.'/app/Controllers/DashboardController.php';
 require_once ROOT.'/app/Controllers/SeoController.php';
+require_once ROOT.'/app/Controllers/VendorController.php';
 
 /* ── API Dispatch ────────────────────────────────────── */
 

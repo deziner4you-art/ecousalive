@@ -72,6 +72,12 @@ class TaskController {
         } elseif ($bulk_action === 'ungroup') {
             Task::bulkUngroupTasks($task_ids);
             json_success(['message' => 'Products removed from group']);
+        } elseif ($bulk_action === 'move_vendor') {
+            $vendorId = intval($_POST['vendor_id'] ?? 0);
+            if (!$vendorId) json_error('Target vendor is required');
+            $res = Vendor::moveToVendor($task_ids, $vendorId);
+            if (!$res['ok']) json_error($res['message'] ?? 'Move failed');
+            json_success($res);
         } else {
             json_error('Invalid action');
         }
@@ -304,11 +310,11 @@ class TaskController {
         $productNo    = trim($_POST['product_no']    ?? '');
         $title        = trim($_POST['title']         ?? '');
         $infoSubtasks = trim($_POST['info_subtasks'] ?? '');
-        $productLink  = trim($_POST['product_link']  ?? '');
+        $vendorId     = intval($_POST['vendor_id']   ?? 0);
 
         if(!$productNo || !$title) json_error('Product No aur Title required hain');
 
-        $id = Task::addProduct($productNo, $title, $infoSubtasks, $productLink);
+        $id = Task::addProduct($productNo, $title, $infoSubtasks, $productLink, $vendorId);
         json_success(['id' => $id]);
     }
 

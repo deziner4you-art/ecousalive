@@ -193,6 +193,12 @@ function getSortedFiltered(data){
             }
         }
 
+        // Vendor browser tab filter
+        if (typeof ACTIVE_VENDOR_ID !== 'undefined' && ACTIVE_VENDOR_ID !== null && ACTIVE_VENDOR_ID !== '' && ACTIVE_VENDOR_ID !== 'all') {
+            var itemVendorId = parseInt(item.vendor_id || 0);
+            if (itemVendorId !== parseInt(ACTIVE_VENDOR_ID)) return false;
+        }
+
         if (typeof ACTIVE_FAMILY_FILTER !== 'undefined' && ACTIVE_FAMILY_FILTER) {
             return item.family_code === ACTIVE_FAMILY_FILTER;
         }
@@ -601,6 +607,11 @@ function saveAddProduct(){
     fd.append('title', title);
     fd.append('product_link', link);
     fd.append('info_subtasks', subtasks.join(','));
+    var vendorEl = document.getElementById('ap-vendor');
+    var vendorId = vendorEl ? vendorEl.value : '';
+    if (vendorId) {
+        fd.append('vendor_id', vendorId);
+    }
     fetch('index.php', {method:'POST', body:fd})
         .then(r => r.json())
         .then(r => {

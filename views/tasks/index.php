@@ -150,6 +150,9 @@ if(!in_array('Info Done', $allowed)){
         <input id="ap-product-no" type="text"    placeholder="Product No *" style="flex:1;min-width:120px;padding:9px 12px;border:1px solid #334155;border-radius:6px;background:#0a1628;color:#e2e8f0;font-size:13px;outline:none;">
         <input id="ap-title"      type="text"    placeholder="Product Title *" style="flex:3;min-width:200px;padding:9px 12px;border:1px solid #334155;border-radius:6px;background:#0a1628;color:#e2e8f0;font-size:13px;outline:none;">
         <input id="ap-product-link" type="text"   placeholder="Product Link" style="flex:2;min-width:180px;padding:9px 12px;border:1px solid #334155;border-radius:6px;background:#0a1628;color:#e2e8f0;font-size:13px;outline:none;">
+        <select id="ap-vendor" style="flex:1.5;min-width:150px;padding:9px 12px;border:1px solid #334155;border-radius:6px;background:#0a1628;color:#e2e8f0;font-size:13px;outline:none;">
+            <option value="">🏢 Vendor (Default)</option>
+        </select>
     </div>
     <div style="display:flex;gap:20px;margin-bottom:14px;flex-wrap:wrap;">
         <label style="display:flex;align-items:center;gap:7px;font-size:13px;color:#94a3b8;cursor:pointer;">
@@ -187,9 +190,16 @@ if(!in_array('Info Done', $allowed)){
         <button onclick="clearBulkSelection()" style="background:transparent; border:1px solid #475569; color:#94a3b8; padding:6px 12px; border-radius:6px; font-size:12px; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.borderColor='#94a3b8'; this.style.color='#f1f5f9';" onmouseout="this.style.borderColor='#475569'; this.style.color='#94a3b8';">Clear Selection</button>
     </div>
     <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+        <div style="display:flex; align-items:center; gap:6px; background:#0f172a; padding:4px 8px; border-radius:8px; border:1px solid #1e3a5f;">
+            <select id="bulk-vendor-select" style="background:transparent; border:none; color:#38bdf8; padding:5px 6px; font-size:13px; font-weight:700; outline:none; cursor:pointer; min-width:145px;">
+                <option value="">🚚 Move to Vendor...</option>
+            </select>
+            <button type="button" onclick="bulkMoveSelectedToVendor()" style="background:#0284c7; color:#fff; border:none; padding:6px 12px; border-radius:5px; font-size:12px; font-weight:bold; cursor:pointer; transition:background-color 0.15s;" onmouseover="this.style.backgroundColor='#0369a1';" onmouseout="this.style.backgroundColor='#0284c7';" title="Move selected products to chosen vendor">Move</button>
+        </div>
         <button type="button" onclick="bulkGroupSelected()" style="background:#8b5cf6; color:#fff; border:none; padding:8px 16px; border-radius:6px; font-size:13px; font-weight:bold; cursor:pointer; display:inline-flex; align-items:center; gap:6px; transition:background-color 0.2s; box-shadow: 0 2px 4px rgba(139,92,246,0.3);" onmouseover="this.style.backgroundColor='#7c3aed';" onmouseout="this.style.backgroundColor='#8b5cf6';" title="Group all selected products together into one family">💜 Group Selected</button>
         <select id="bulk-action-select" style="background:#0f172a; border:1px solid #334155; border-radius:6px; color:#e2e8f0; padding:8px 12px; font-size:13px; outline:none; cursor:pointer; min-width:165px;">
             <option value="">⚡ Bulk Action...</option>
+            <option value="move_vendor">🚚 Move to Selected Vendor</option>
             <option value="group">💜 Group Selected Products</option>
             <option value="ungroup">❌ Remove from Group (Ungroup)</option>
             <option value="urgent">Mark as Urgent</option>
@@ -335,3 +345,28 @@ if(!in_array('Info Done', $allowed)){
     </div>
 </div>
 <?php endif; ?>
+
+<!-- ── Move Single Product to Vendor Modal ── -->
+<div id="moveVendorSingleModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.78);z-index:99999;align-items:center;justify-content:center;backdrop-filter:blur(3px);">
+    <div style="background:#0f172a;border:1px solid #1e3a5f;border-radius:12px;width:95%;max-width:440px;padding:22px;box-shadow:0 25px 35px -5px rgba(0,0,0,0.6);color:#f1f5f9;position:relative;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid #1e3a5f;padding-bottom:10px;">
+            <div style="font-size:15px;font-weight:700;color:#38bdf8;display:flex;align-items:center;gap:6px;">
+                <span>🚚 Move Product to Vendor</span>
+            </div>
+            <button onclick="closeMoveVendorModal()" style="background:transparent;border:none;color:#94a3b8;font-size:22px;cursor:pointer;line-height:1;" title="Close">&times;</button>
+        </div>
+        <input type="hidden" id="mv-single-task-id">
+        <div style="margin-bottom:14px;font-size:13px;color:#cbd5e1;">
+            Product: <strong id="mv-single-product-label" style="color:#f8fafc;">#</strong>
+        </div>
+        <div style="margin-bottom:16px;">
+            <label style="display:block;font-size:11.5px;font-weight:700;color:#94a3b8;margin-bottom:6px;text-transform:uppercase;">Select Destination Vendor</label>
+            <select id="mv-single-vendor-select" style="width:100%;box-sizing:border-box;background:#09111e;border:1.5px solid #334155;border-radius:6px;color:#f8fafc;padding:9px 12px;font-size:13px;outline:none;">
+            </select>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;">
+            <button type="button" onclick="closeMoveVendorModal()" style="background:#334155;color:#cbd5e1;border:none;padding:8px 16px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600;">Cancel</button>
+            <button type="button" onclick="confirmMoveSingleVendor()" style="background:#0284c7;color:#fff;border:none;padding:8px 18px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:bold;">🚚 Move</button>
+        </div>
+    </div>
+</div>

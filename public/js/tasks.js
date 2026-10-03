@@ -17,6 +17,9 @@ function loadTasks(){
         .then(r => {
             if(r.force_logout){ window.location.href = 'index.php'; return; }
             ALL_TASKS = r.data;
+            if(typeof renderVendorTabs === 'function'){
+                renderVendorTabs();
+            }
             renderSmart(r.data);
             if(typeof updateNotifications === 'function'){
                 updateNotifications(r.data);
@@ -1403,6 +1406,7 @@ function buildCard(item){
     <select id="performSel_${item.id}" style="flex:1;padding:6px 8px;background:#0d1e36;color:#e2e8f0;border:1px solid #1e3a5f;border-radius:4px;font-size:12px;outline:none;height:32px;">
       <option value="">⚡ Task Perform...</option>
       <option value="rename_product">✏️ Rename Product # / Title</option>
+      <option value="move_vendor">🚚 Move to Vendor...</option>
       <option value="edit_services">✏️ Edit Services & Workers</option>
       ${item.status==='Pending'?'<option value="save">💾 Save Draft</option>':''}
       ${item.product_type==='Info + A Plus'?'<option value="save_all_generated">✨ Save All Generated</option>':''}
@@ -1657,6 +1661,7 @@ ${item.published_link ? `<a href="${item.published_link}" target="_blank" rel="n
 <div class="card-meta${isAdmin?' admin-meta':''}" style="display:flex; align-items:center; gap:6px; flex-shrink:0; margin-left:auto;">
     ${revBadge}
     ${invBadge}
+    ${item.vendor_name ? `<span class="badge-vendor-slot" style="background:${item.vendor_color || '#0284c7'}22; border:1px solid ${item.vendor_color || '#0284c7'}88; color:${item.vendor_color || '#38bdf8'}; font-size:11px; font-weight:700; padding:2px 7px; border-radius:4px; white-space:nowrap; letter-spacing:0.3px; display:inline-flex; align-items:center; gap:3px;" title="Vendor: ${item.vendor_name}">🏷️ ${item.vendor_name}</span>` : ''}
     ${item.family_code ? `<span onclick="event.stopPropagation(); viewFamily('${item.family_code}')" class="badge-group-slot" style="background:#581c87; border:1px solid #a855f7; color:#f3e8ff; font-size:11.5px;" title="Click to view all products in this family group">💜 Group</span>` : `<span class="badge-group-slot badge-group-placeholder" aria-hidden="true"></span>`}
     ${(typeof HAS_BULK_ACTION !== 'undefined' && HAS_BULK_ACTION) ? `<input type="checkbox" class="bulk-chk" data-id="${item.id}" ${(typeof SELECTED_BULK_PRODUCTS !== 'undefined' && SELECTED_BULK_PRODUCTS.indexOf(item.id) !== -1) ? 'checked' : ''} onclick="event.stopPropagation(); toggleBulkSelection();" style="width:16px; height:16px; margin:0 6px; cursor:pointer; accent-color:#8b5cf6; vertical-align:middle; flex-shrink:0;">` : ''}
     ${statusTimeBlock}
@@ -1968,6 +1973,7 @@ function applyPerform(taskId){
     var act = sel ? sel.value : '';
     if(!act){ alert('Pehle koi action select karein'); return; }
     if(act === 'rename_product')               openRenameProductModal(taskId);
+    else if(act === 'move_vendor')             openMoveVendorModal(taskId);
     else if(act === 'edit_services')           openEditServices(taskId);
     else if(act === 'save')                    writerSave(taskId);
     else if(act === 'save_all_generated')      writerSave(taskId, 'All Generated');
@@ -2831,6 +2837,10 @@ function applyBulkAction() {
         return;
     }
 
+    if (action === 'move_vendor') {
+        bulkMoveSelectedToVendor();
+        return;
+    }
     if (action === 'group') {
         bulkGroupSelected();
         return;
@@ -3430,4 +3440,359 @@ function emptyRecycleBin() {
                 else { alert('Empty bin failed'); }
             });
     });
+}
+
+/* ══════════════════════════════════════════════════════
+   VENDOR SYSTEM & BROWSER TABS
+   ══════════════════════════════════════════════════════ */
+
+function renderVendorTabs() {
+    var bar = document.getElementById('vendor-browser-tabs-bar');
+    if (!bar) return;
+
+    var vendors = window.ALL_VENDORS || [];
+    var tasks = window.ALL_TASKS || [];
+    var activeId = String(window.ACTIVE_VENDOR_ID || 'all');
+
+    // Count tasks per vendor (respects any worker isolation already applied in ALL_TASKS)
+    var vendorCounts = {};
+    var totalTasks = tasks.length;
+    tasks.forEach(function(t) {
+        var vId = String(t.vendor_id || window.DEFAULT_VENDOR_ID || 0);
+        vendorCounts[vId] = (vendorCounts[vId] || 0) + 1;
+    });
+
+    var html = '';
+
+    // "All Vendors" browser tab
+    var isAllActive = (activeId === 'all');
+    html += '<button type="button" class="vendor-browser-tab' + (isAllActive ? ' active' : '') + '" onclick="switchVendorTab(\'all\')" title="Show products from all vendors">';
+    html += '<span>🌐 All</span>';
+    html += '<span class="vendor-tab-count">' + totalTasks + '</span>';
+    html += '</button>';
+
+    // Individual vendor browser tabs
+    vendors.forEach(function(v) {
+        var isThisActive = (String(v.id) === activeId);
+        var vCount = vendorCounts[String(v.id)] || 0;
+        var dotColor = v.color || '#0284c7';
+        var activeStyle = isThisActive ? ('border-top-color:' + dotColor + ';') : '';
+
+        html += '<button type="button" class="vendor-browser-tab' + (isThisActive ? ' active' : '') + '" style="' + activeStyle + '" onclick="switchVendorTab(' + v.id + ')" title="Vendor: ' + (v.name ? v.name.replace(/"/g, '&quot;') : '') + '">';
+        html += '<span class="vendor-tab-color-dot" style="background:' + dotColor + ';"></span>';
+        html += '<span style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (v.name || 'Vendor') + '</span>';
+        html += '<span class="vendor-tab-count">' + vCount + '</span>';
+        html += '</button>';
+    });
+
+    // Add Vendor Button (for Admin)
+    var isAdmin = (typeof ROLE !== 'undefined' && ROLE === 'administrator');
+    if (isAdmin) {
+        html += '<button type="button" class="vendor-browser-tab-add" onclick="openVendorModal()" title="Add or Manage Vendors">';
+        html += '<span style="font-weight:bold;font-size:14px;line-height:1;">+</span> <span style="font-size:11px;">Vendor</span>';
+        html += '</button>';
+    }
+
+    bar.innerHTML = html;
+
+    // Populate vendor dropdowns in addProductCard, bulk action bar, etc.
+    populateVendorDropdowns();
+}
+
+function switchVendorTab(vendorId) {
+    window.ACTIVE_VENDOR_ID = String(vendorId);
+    try {
+        localStorage.setItem('d4u_active_vendor_id', window.ACTIVE_VENDOR_ID);
+    } catch(e) {}
+
+    // If not on products tab, switch to products tab
+    var prodBtn = document.getElementById('tab-products');
+    if (prodBtn && !prodBtn.classList.contains('active') && typeof switchTab === 'function') {
+        switchTab('products');
+    }
+
+    renderVendorTabs();
+    if (typeof CURRENT_PAGE !== 'undefined') CURRENT_PAGE = 1;
+    if (typeof ALL_TASKS !== 'undefined') {
+        renderSmart(ALL_TASKS);
+    }
+}
+
+function populateVendorDropdowns() {
+    var vendors = window.ALL_VENDORS || [];
+    var defaultId = window.DEFAULT_VENDOR_ID;
+
+    // 1. Add Product modal vendor select: #ap-vendor
+    var apSel = document.getElementById('ap-vendor');
+    if (apSel) {
+        var curVal = apSel.value;
+        var apHtml = '<option value="">🏢 Select Vendor</option>';
+        vendors.forEach(function(v) {
+            var isDef = (parseInt(v.id) === parseInt(defaultId)) || v.is_default == 1;
+            apHtml += '<option value="' + v.id + '">' + v.name + (isDef ? ' (Default)' : '') + '</option>';
+        });
+        apSel.innerHTML = apHtml;
+        if (curVal) {
+            apSel.value = curVal;
+        } else if (window.ACTIVE_VENDOR_ID && window.ACTIVE_VENDOR_ID !== 'all') {
+            apSel.value = window.ACTIVE_VENDOR_ID;
+        } else if (defaultId) {
+            apSel.value = defaultId;
+        }
+    }
+
+    // 2. Bulk action bar vendor select: #bulk-vendor-select
+    var bulkSel = document.getElementById('bulk-vendor-select');
+    if (bulkSel) {
+        var bulkCur = bulkSel.value;
+        var bHtml = '<option value="">🚚 Move to Vendor...</option>';
+        vendors.forEach(function(v) {
+            bHtml += '<option value="' + v.id + '">' + v.name + '</option>';
+        });
+        bulkSel.innerHTML = bHtml;
+        if (bulkCur) bulkSel.value = bulkCur;
+    }
+
+    // 3. Single move modal vendor select: #mv-single-vendor-select
+    var mvSel = document.getElementById('mv-single-vendor-select');
+    if (mvSel) {
+        var mvCur = mvSel.value;
+        var mvHtml = '';
+        vendors.forEach(function(v) {
+            mvHtml += '<option value="' + v.id + '">' + v.name + '</option>';
+        });
+        mvSel.innerHTML = mvHtml;
+        if (mvCur) mvSel.value = mvCur;
+    }
+}
+
+function loadVendorsAndRenderTabs() {
+    fetch('index.php?action=get_vendors')
+        .then(function(r){ return r.json(); })
+        .then(function(r){
+            if (r.success && r.data) {
+                window.ALL_VENDORS = r.data;
+                renderVendorTabs();
+            }
+        })
+        .catch(function(err){ console.error('Error fetching vendors:', err); });
+}
+
+/* ── Bulk Move to Vendor ─────────────────────── */
+function bulkMoveSelectedToVendor() {
+    if (!SELECTED_BULK_PRODUCTS || SELECTED_BULK_PRODUCTS.length === 0) {
+        alert('Pehle products select karein jinhe move karna hai.');
+        return;
+    }
+    var sel = document.getElementById('bulk-vendor-select');
+    var targetVendorId = sel ? sel.value : '';
+    if (!targetVendorId) {
+        alert('Pehle vendor select karein jisme move karna hai.');
+        return;
+    }
+
+    var vendors = window.ALL_VENDORS || [];
+    var targetVendor = vendors.find(function(v){ return String(v.id) === String(targetVendorId); });
+    var vendorName = targetVendor ? targetVendor.name : 'selected vendor';
+    var count = SELECTED_BULK_PRODUCTS.length;
+
+    _confirm('Kya aap in ' + count + ' products ko vendor "' + vendorName + '" mein move karna chahte hain?\n(Note: Product status, history, timers, aur groups bilkul mehfooz rahenge)', function(){
+        var fd = new FormData();
+        fd.append('action', 'move_to_vendor');
+        fd.append('task_ids', SELECTED_BULK_PRODUCTS.join(','));
+        fd.append('target_vendor_id', targetVendorId);
+        fetch('index.php', { method: 'POST', body: fd })
+            .then(function(r){ return r.json(); })
+            .then(function(r){
+                if (r.success) {
+                    SELECTED_BULK_PRODUCTS = [];
+                    updateBulkActionBar();
+                    loadTasks();
+                    loadVendorsAndRenderTabs();
+                } else {
+                    alert('Move failed: ' + (r.message || 'Error'));
+                }
+            })
+            .catch(function(err){ alert('Request failed: ' + err.message); });
+    });
+}
+
+/* ── Single Product Move to Vendor Modal ──────── */
+function openMoveVendorModal(taskId) {
+    var task = (window.ALL_TASKS || []).find(function(t){ return parseInt(t.id) === parseInt(taskId); });
+    if (!task) { alert('Product not found'); return; }
+
+    var modal = document.getElementById('moveVendorSingleModal');
+    if (!modal) return;
+
+    document.getElementById('mv-single-task-id').value = task.id;
+    var lbl = document.getElementById('mv-single-product-label');
+    if (lbl) lbl.textContent = '#' + (task.product_no || task.id) + ' — ' + (task.title || '');
+
+    populateVendorDropdowns();
+    var sel = document.getElementById('mv-single-vendor-select');
+    if (sel && task.vendor_id) {
+        sel.value = task.vendor_id;
+    }
+
+    modal.style.display = 'flex';
+}
+
+function closeMoveVendorModal() {
+    var modal = document.getElementById('moveVendorSingleModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function confirmMoveSingleVendor() {
+    var taskId = document.getElementById('mv-single-task-id').value;
+    var sel = document.getElementById('mv-single-vendor-select');
+    var targetVendorId = sel ? sel.value : '';
+
+    if (!taskId || !targetVendorId) {
+        alert('Please select a destination vendor.');
+        return;
+    }
+
+    var fd = new FormData();
+    fd.append('action', 'move_to_vendor');
+    fd.append('task_ids', taskId);
+    fd.append('target_vendor_id', targetVendorId);
+    fetch('index.php', { method: 'POST', body: fd })
+        .then(function(r){ return r.json(); })
+        .then(function(r){
+            if (r.success) {
+                closeMoveVendorModal();
+                loadTasks();
+                loadVendorsAndRenderTabs();
+            } else {
+                alert('Move failed: ' + (r.message || 'Error'));
+            }
+        })
+        .catch(function(err){ alert('Request failed: ' + err.message); });
+}
+
+/* ── Vendor Management Modal (Admin) ─────────── */
+function openVendorModal() {
+    var modal = document.getElementById('vendorManagementModal');
+    if (!modal) return;
+
+    renderVendorManagementList();
+    modal.style.display = 'flex';
+}
+
+function closeVendorModal() {
+    var modal = document.getElementById('vendorManagementModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function renderVendorManagementList() {
+    var list = document.getElementById('vm-vendor-list');
+    if (!list) return;
+
+    var vendors = window.ALL_VENDORS || [];
+    var tasks = window.ALL_TASKS || [];
+    var vendorCounts = {};
+    tasks.forEach(function(t) {
+        var vId = String(t.vendor_id || window.DEFAULT_VENDOR_ID || 0);
+        vendorCounts[vId] = (vendorCounts[vId] || 0) + 1;
+    });
+
+    var html = '';
+    vendors.forEach(function(v) {
+        var count = vendorCounts[String(v.id)] || 0;
+        var dotColor = v.color || '#0284c7';
+        var isDef = (v.is_default == 1);
+
+        html += '<div style="background:#0a1628; border:1px solid #1e3a5f; border-radius:6px; padding:10px 14px; display:flex; align-items:center; justify-content:space-between; gap:10px;">';
+        html +=   '<div style="display:flex; align-items:center; gap:10px;">';
+        html +=     '<span style="width:14px; height:14px; border-radius:50%; background:' + dotColor + '; display:inline-block; flex-shrink:0;"></span>';
+        html +=     '<div>';
+        html +=       '<div style="font-weight:700; color:#f1f5f9; font-size:13px;">' + v.name + (v.code ? ' <span style="color:#94a3b8; font-weight:normal; font-size:11px;">(' + v.code + ')</span>' : '') + '</div>';
+        html +=       '<div style="font-size:11px; color:#64748b;">' + count + ' products assigned</div>';
+        html +=     '</div>';
+        html +=   '</div>';
+
+        html +=   '<div style="display:flex; align-items:center; gap:8px;">';
+        if (isDef) {
+            html +=   '<span style="background:#065f46; color:#a7f3d0; font-size:10px; font-weight:bold; padding:2px 8px; border-radius:12px; border:1px solid #059669;">DEFAULT</span>';
+        } else {
+            html +=   '<button type="button" onclick="deleteVendor(' + v.id + ', \'' + (v.name ? v.name.replace(/'/g, "\\'") : '') + '\')" style="background:#7f1d1d; color:#fca5a5; border:1px solid #991b1b; padding:4px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;" title="Delete Vendor and reassign products to default">🗑 Delete</button>';
+        }
+        html +=   '</div>';
+        html += '</div>';
+    });
+
+    list.innerHTML = html;
+}
+
+function saveNewVendor() {
+    var nameInput = document.getElementById('vm-new-name');
+    var codeInput = document.getElementById('vm-new-code');
+    var colorInput = document.getElementById('vm-new-color');
+
+    var name = nameInput ? nameInput.value.trim() : '';
+    var code = codeInput ? codeInput.value.trim() : '';
+    var color = colorInput ? colorInput.value.trim() : '#0284c7';
+
+    if (!name) {
+        alert('Vendor Name zaroori hai.');
+        if (nameInput) nameInput.focus();
+        return;
+    }
+
+    var fd = new FormData();
+    fd.append('action', 'save_vendor');
+    fd.append('name', name);
+    fd.append('code', code);
+    fd.append('color', color);
+
+    fetch('index.php', { method: 'POST', body: fd })
+        .then(function(r){ return r.json(); })
+        .then(function(r){
+            if (r.success) {
+                if (nameInput) nameInput.value = '';
+                if (codeInput) codeInput.value = '';
+                loadVendorsAndRenderTabs();
+                setTimeout(function(){
+                    renderVendorManagementList();
+                }, 300);
+            } else {
+                alert('Vendor create failed: ' + (r.message || 'Error'));
+            }
+        })
+        .catch(function(err){ alert('Request failed: ' + err.message); });
+}
+
+function deleteVendor(vendorId, vendorName) {
+    _confirm('Kya aap vendor "' + vendorName + '" ko delete karna chahte hain?\n(Note: Tamam products default vendor "EcoQuality" mein safely transfer ho jayenge)', function(){
+        var fd = new FormData();
+        fd.append('action', 'delete_vendor');
+        fd.append('id', vendorId);
+
+        fetch('index.php', { method: 'POST', body: fd })
+            .then(function(r){ return r.json(); })
+            .then(function(r){
+                if (r.success) {
+                    if (String(window.ACTIVE_VENDOR_ID) === String(vendorId)) {
+                        window.ACTIVE_VENDOR_ID = 'all';
+                        try { localStorage.setItem('d4u_active_vendor_id', 'all'); } catch(e){}
+                    }
+                    loadVendorsAndRenderTabs();
+                    loadTasks();
+                    setTimeout(function(){
+                        renderVendorManagementList();
+                    }, 400);
+                } else {
+                    alert('Delete failed: ' + (r.message || 'Error'));
+                }
+            })
+            .catch(function(err){ alert('Request failed: ' + err.message); });
+    });
+}
+
+// Initial render of vendor tabs on load
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function(){ renderVendorTabs(); });
+} else {
+    renderVendorTabs();
 }

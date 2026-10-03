@@ -187,6 +187,103 @@ tailwind.config = {
     border-bottom: 2px solid #3b82f6;
 }
 
+/* ── Vendor Browser Tabs Bar ── */
+.vendor-nav-divider {
+    width: 1px;
+    height: 22px;
+    background: #1e3a5f;
+    margin: 0 8px;
+    flex-shrink: 0;
+}
+.vendor-browser-tabs-container {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    overflow-x: auto;
+    max-width: 100%;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding: 2px 2px 0 2px;
+}
+.vendor-browser-tabs-container::-webkit-scrollbar {
+    display: none;
+}
+.vendor-browser-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #94a3b8;
+    background: #0f1d32;
+    border: 1px solid #1e3a5f;
+    border-top: 2.5px solid transparent;
+    border-radius: 6px 6px 3px 3px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+    user-select: none;
+    height: 31px;
+    box-sizing: border-box;
+}
+.vendor-browser-tab:hover {
+    background: #162742;
+    color: #e2e8f0;
+    border-color: #2b4c77;
+}
+.vendor-browser-tab.active {
+    background: #192a45;
+    color: #ffffff;
+    border-color: #3b82f6;
+    border-top: 2.5px solid #38bdf8;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+}
+.vendor-tab-color-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+.vendor-tab-count {
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 10px;
+    padding: 1px 6px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #93c5fd;
+    line-height: 1.2;
+}
+.vendor-browser-tab.active .vendor-tab-count {
+    background: rgba(56, 189, 248, 0.25);
+    color: #e0f2fe;
+}
+.vendor-browser-tab-add {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 0 9px;
+    height: 28px;
+    background: #0f1d32;
+    border: 1px dashed #334155;
+    border-radius: 5px;
+    color: #94a3b8;
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+    margin-left: 2px;
+}
+.vendor-browser-tab-add:hover {
+    background: #1e3a5f;
+    border-color: #38bdf8;
+    color: #38bdf8;
+    transform: translateY(-1px);
+}
+
 /* Nav right group */
 #topbar .nav-right {
     display: flex;
@@ -1520,6 +1617,13 @@ if(current_user()){
 }
 ?>
 var HAS_BULK_ACTION = <?= $role_bulk_action ? 'true' : 'false' ?>;
+<?php
+$allVendors = Vendor::getAll();
+$defaultVendor = Vendor::getDefault();
+?>
+var ALL_VENDORS = <?= json_encode($allVendors) ?>;
+var DEFAULT_VENDOR_ID = <?= json_encode($defaultVendor ? (int)$defaultVendor['id'] : null) ?>;
+var ACTIVE_VENDOR_ID = localStorage.getItem('d4u_active_vendor_id') || 'all';
 </script>
 
 <?php
@@ -1658,6 +1762,10 @@ try {
             <button class="tab-btn active" id="tab-products" onclick="switchTab('products')">📦 Products</button>
             <button class="tab-btn"        id="tab-analytics" onclick="switchTab('analytics')">📊 Dashboard</button>
         <?php endif; ?>
+
+        <!-- Vendor Browser Tabs Bar -->
+        <div class="vendor-nav-divider"></div>
+        <div id="vendor-browser-tabs-bar" class="vendor-browser-tabs-container"></div>
     </div>
 
     <!-- Right: Notifications + Username + Logout -->
@@ -1766,10 +1874,60 @@ try {
     </div>
 </div>
 
+<!-- ── Vendor Management Modal (Admin / authorized users) ── -->
+<div id="vendorManagementModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.78);z-index:99999;align-items:center;justify-content:center;backdrop-filter:blur(3px);">
+    <div style="background:#0f172a;border:1px solid #1e3a5f;border-radius:12px;width:95%;max-width:540px;padding:24px;box-shadow:0 25px 35px -5px rgba(0,0,0,0.6);color:#f1f5f9;position:relative;max-height:90vh;overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid #1e3a5f;padding-bottom:12px;">
+            <div style="font-size:16px;font-weight:700;color:#38bdf8;display:flex;align-items:center;gap:8px;">
+                <span>🏢 Vendor Management</span>
+            </div>
+            <button onclick="closeVendorModal()" style="background:transparent;border:none;color:#94a3b8;font-size:24px;cursor:pointer;line-height:1;" title="Close">&times;</button>
+        </div>
+
+        <!-- Add New Vendor Section -->
+        <div style="background:#09111e;border:1px solid #1e3a5f;border-radius:8px;padding:14px;margin-bottom:18px;">
+            <div style="font-size:12px;font-weight:700;color:#93c5fd;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">➕ Add New Vendor</div>
+            <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+                <input type="text" id="vm-new-name" placeholder="Vendor Name (e.g. Vendor B) *" style="flex:2;min-width:160px;background:#0a1628;border:1px solid #334155;border-radius:6px;color:#f8fafc;padding:8px 12px;font-size:13px;outline:none;">
+                <input type="text" id="vm-new-code" placeholder="Code (e.g. VB)" style="flex:1;min-width:90px;background:#0a1628;border:1px solid #334155;border-radius:6px;color:#f8fafc;padding:8px 12px;font-size:13px;outline:none;">
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+                <span style="font-size:12px;color:#94a3b8;font-weight:600;">Tab Badge Color:</span>
+                <input type="color" id="vm-new-color" value="#0284c7" style="background:transparent;border:none;width:32px;height:32px;cursor:pointer;border-radius:4px;">
+                <div style="display:flex;gap:6px;">
+                    <span onclick="document.getElementById('vm-new-color').value='#0284c7'" style="width:18px;height:18px;border-radius:50%;background:#0284c7;cursor:pointer;display:inline-block;" title="Blue"></span>
+                    <span onclick="document.getElementById('vm-new-color').value='#8b5cf6'" style="width:18px;height:18px;border-radius:50%;background:#8b5cf6;cursor:pointer;display:inline-block;" title="Purple"></span>
+                    <span onclick="document.getElementById('vm-new-color').value='#10b981'" style="width:18px;height:18px;border-radius:50%;background:#10b981;cursor:pointer;display:inline-block;" title="Green"></span>
+                    <span onclick="document.getElementById('vm-new-color').value='#f59e0b'" style="width:18px;height:18px;border-radius:50%;background:#f59e0b;cursor:pointer;display:inline-block;" title="Amber"></span>
+                    <span onclick="document.getElementById('vm-new-color').value='#ec4899'" style="width:18px;height:18px;border-radius:50%;background:#ec4899;cursor:pointer;display:inline-block;" title="Pink"></span>
+                    <span onclick="document.getElementById('vm-new-color').value='#06b6d4'" style="width:18px;height:18px;border-radius:50%;background:#06b6d4;cursor:pointer;display:inline-block;" title="Cyan"></span>
+                </div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;">
+                <button type="button" onclick="saveNewVendor()" style="background:#2563eb;color:#fff;border:none;padding:7px 16px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+                    <span>✅ Create Vendor</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Vendor List Section -->
+        <div>
+            <div style="font-size:12px;font-weight:700;color:#94a3b8;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">Existing Vendors</div>
+            <div id="vm-vendor-list" style="display:flex;flex-direction:column;gap:8px;">
+                <!-- Populated dynamically by JS -->
+            </div>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;margin-top:20px;border-top:1px solid #1e3a5f;padding-top:14px;">
+            <button type="button" onclick="closeVendorModal()" style="background:#334155;color:#cbd5e1;border:none;padding:8px 18px;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;">Close</button>
+        </div>
+    </div>
+</div>
+
 <!-- ── JS Modules ── -->
-<?php $v = '2.8.7'; ?>
+<?php $v = '2.8.8'; ?>
 <script src="<?= $publicUrl ?>/js/core.js?v=<?= $v ?>"></script>
-<script src="<?= $publicUrl ?>/js/tasks.js?v=3.3.5"></script>
+<script src="<?= $publicUrl ?>/js/tasks.js?v=3.3.6"></script>
 <script src="<?= $publicUrl ?>/js/admin.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/invoices.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/payroll.js?v=2.7.13"></script>

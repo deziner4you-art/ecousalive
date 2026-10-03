@@ -55,6 +55,12 @@ return [
     'start_aplus_workflow' => ['TaskController', 'startAplusWorkflow'],
     'rename_product'     => ['TaskController', 'renameProduct'],
 
+    /* ── Vendors ────────────────────────────────── */
+    'get_vendors'        => ['VendorController', 'getAll'],
+    'save_vendor'        => ['VendorController', 'save'],
+    'delete_vendor'      => ['VendorController', 'delete'],
+    'move_to_vendor'     => ['VendorController', 'moveProducts'],
+
     /* ── Invoices ───────────────────────────────── */
     'get_invoices'          => ['InvoiceController', 'getAll'],
     'get_invoice_detail'    => ['InvoiceController', 'getDetail'],

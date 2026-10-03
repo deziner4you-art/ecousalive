@@ -323,5 +323,9 @@ function runMigrations(): void {
         ");
     } catch(Exception $e){}
 
+    /* ── Vendor System ── */
+    try {
+        require_once ROOT . '/app/Models/Vendor.php';
+        Vendor::ensureTable();
+    } catch(Exception $e){}
 }
-

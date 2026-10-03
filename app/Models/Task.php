@@ -20,6 +20,8 @@ class Task {
 
         $cols = "
             t.*,
+            v.name AS vendor_name,
+            v.color AS vendor_color,
             a.worker_id AS assigned_worker_id,
             q.username AS qa_user_name,
             cw.username AS work_completed_worker_name,
@@ -45,6 +47,7 @@ class Task {
                 $stmt = db()->prepare("
                 SELECT $cols
                 FROM wp_eco_aplus_tasks t
+                LEFT JOIN eco_vendors v ON v.id = t.vendor_id
                 LEFT JOIN eco_tool_assignments a ON a.task_id = t.id
                 LEFT JOIN eco_tool_users q  ON q.id  = t.qa_submitted_by
                 LEFT JOIN eco_tool_users cw ON cw.id = t.work_completed_by_worker_id
@@ -68,6 +71,7 @@ class Task {
                 $stmt = db()->prepare("
                 SELECT $cols
                 FROM wp_eco_aplus_tasks t
+                LEFT JOIN eco_vendors v ON v.id = t.vendor_id
                 LEFT JOIN eco_tool_assignments a ON a.task_id = t.id
                 LEFT JOIN eco_tool_users q  ON q.id  = t.qa_submitted_by
                 LEFT JOIN eco_tool_users cw ON cw.id = t.work_completed_by_worker_id
@@ -99,6 +103,7 @@ class Task {
                 $stmt = db()->prepare("
                 SELECT $cols
                 FROM wp_eco_aplus_tasks t
+                LEFT JOIN eco_vendors v ON v.id = t.vendor_id
                 LEFT JOIN eco_tool_assignments a ON a.task_id = t.id
                 LEFT JOIN eco_tool_users q  ON q.id  = t.qa_submitted_by
                 LEFT JOIN eco_tool_users cw ON cw.id = t.work_completed_by_worker_id
@@ -134,6 +139,7 @@ class Task {
                 $stmt = db()->prepare("
                 SELECT $cols
                 FROM wp_eco_aplus_tasks t
+                LEFT JOIN eco_vendors v ON v.id = t.vendor_id
                 LEFT JOIN eco_tool_assignments a ON a.task_id = t.id
                 LEFT JOIN eco_tool_users q  ON q.id  = t.qa_submitted_by
                 LEFT JOIN eco_tool_users cw ON cw.id = t.work_completed_by_worker_id
@@ -155,6 +161,7 @@ class Task {
                 $stmt = db()->prepare("
                 SELECT $cols
                 FROM wp_eco_aplus_tasks t
+                LEFT JOIN eco_vendors v ON v.id = t.vendor_id
                 LEFT JOIN eco_tool_assignments a ON a.task_id = t.id
                 LEFT JOIN eco_tool_users q  ON q.id  = t.qa_submitted_by
                 LEFT JOIN eco_tool_users cw ON cw.id = t.work_completed_by_worker_id
@@ -172,6 +179,7 @@ class Task {
                 $stmt = db()->query("
                 SELECT $cols
                 FROM wp_eco_aplus_tasks t
+                LEFT JOIN eco_vendors v ON v.id = t.vendor_id
                 LEFT JOIN eco_tool_assignments a ON a.task_id = t.id
                 LEFT JOIN eco_tool_users q  ON q.id  = t.qa_submitted_by
                 LEFT JOIN eco_tool_users cw ON cw.id = t.work_completed_by_worker_id
@@ -702,7 +710,7 @@ class Task {
         return ['ok'=>true, 'message'=>'Product services & assignments updated successfully'];
     }
 
-    public static function addProduct(string $productNo, string $title, ?string $infoSubtasks, ?string $productLink = null): int {
+    public static function addProduct(string $productNo, string $title, ?string $infoSubtasks, ?string $productLink = null, ?int $vendorId = null): int {
         $type = null;
         if($infoSubtasks && trim($infoSubtasks)){
             $subtasks = array_map('trim', explode(',', $infoSubtasks));
@@ -719,8 +727,13 @@ class Task {
                 $type = 'Infographics';
             }
         }
-        db()->prepare("INSERT INTO wp_eco_aplus_tasks (product_no, title, status, work_status, product_type, info_subtasks, product_link) VALUES (?, ?, 'Pending', 'Pending', ?, ?, ?)")
-            ->execute([$productNo, $title, $type ?: null, $infoSubtasks ?: null, $productLink ?: null]);
+        if (!$vendorId || $vendorId <= 0) {
+            $defVendor = Vendor::getDefault();
+            $vendorId = $defVendor ? (int)$defVendor['id'] : null;
+        }
+
+        db()->prepare("INSERT INTO wp_eco_aplus_tasks (product_no, title, status, work_status, product_type, info_subtasks, product_link, vendor_id) VALUES (?, ?, 'Pending', 'Pending', ?, ?, ?, ?)")
+            ->execute([$productNo, $title, $type ?: null, $infoSubtasks ?: null, $productLink ?: null, $vendorId]);
         return (int) db()->lastInsertId();
     }
 
