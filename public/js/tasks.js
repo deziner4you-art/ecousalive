@@ -1635,12 +1635,13 @@ ${item.published_link ? `<a href="${item.published_link}" target="_blank" rel="n
     var actionBtns = buildActionButtons(item, isAdmin, isWorker, isQa, isListing, isUrgent, lock, approvedDisabled);
 
     var hideEditor = isInfoStage && item.work_status !== 'Content Pending' && item.status !== 'Generated' && item.status !== 'All Generated' && item.status !== 'Approved' && item.status !== 'Updated' && !item.content_approved_at && !item.content_updated_at;
+    var canRename = isAdmin || (typeof CAN_RENAME_PRODUCT !== 'undefined' && CAN_RENAME_PRODUCT) || (typeof MODULE_PERMS !== 'undefined' && MODULE_PERMS.products && MODULE_PERMS.products.rename);
 
     return `
 <div class="head" onclick="headClick(event,${item.id})" ontouchend="headTouch(event,${item.id})" style="cursor:pointer; display:flex; align-items:center; width:100%; box-sizing:border-box;">
 <div class="pid${isUrgent?' urgent-pid':''}" style="position:relative; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; padding-top:8px; width:125px; min-width:125px; font-family:'Calibri', 'Segoe UI', Arial, sans-serif; box-sizing:border-box; flex-shrink:0;">
     <div style="line-height:1.1; font-family:'Calibri', 'Segoe UI', Arial, sans-serif; font-size:17px; font-weight:700; letter-spacing:0.4px; text-align:center; width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0 4px; box-sizing:border-box;">
-        #${item.product_no}${isAdmin ? `<span onclick="event.stopPropagation(); openRenameProductModal(${item.id})" title="Rename Product Number / Title (Admin Only)" style="cursor:pointer; display:inline-block; font-size:12px; margin-left:3px; opacity:0.85; vertical-align:middle; transition:transform 0.15s;" onmouseover="this.style.opacity='1';this.style.transform='scale(1.25)'" onmouseout="this.style.opacity='0.85';this.style.transform='scale(1)'">✏️</span>` : ''}
+        #${item.product_no}${canRename ? `<span onclick="event.stopPropagation(); openRenameProductModal(${item.id})" title="Rename Product Number / Title" style="cursor:pointer; display:inline-block; font-size:12px; margin-left:3px; opacity:0.85; vertical-align:middle; transition:transform 0.15s;" onmouseover="this.style.opacity='1';this.style.transform='scale(1.25)'" onmouseout="this.style.opacity='0.85';this.style.transform='scale(1)'">✏️</span>` : ''}
     </div>
     <div style="position:absolute; bottom:3px; z-index:10; display:flex; justify-content:center; width:100%;">
         ${typeBadge}
@@ -1648,7 +1649,7 @@ ${item.published_link ? `<a href="${item.published_link}" target="_blank" rel="n
 </div>
 <div class="title" style="flex:1 1 auto; max-width:none; min-width:180px; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 12px; box-sizing:border-box; overflow:hidden;">
     <span class="title-text" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; font-size:14px; font-weight:600;" title="${item.title ? item.title.replace(/"/g, '&quot;') : ''}">${item.title}</span>
-    ${isAdmin ? `<button type="button" onclick="event.stopPropagation(); openRenameProductModal(${item.id})" class="adminbtn" style="background:#1e293b; border:1px solid #3b82f6; color:#93c5fd; font-size:11px; font-weight:600; padding:2px 8px; border-radius:4px; cursor:pointer; flex-shrink:0; display:inline-flex; align-items:center; gap:4px; transition:all 0.15s;" title="Rename Product Number or Title">✏️ Rename</button>` : ''}
+    ${canRename ? `<button type="button" onclick="event.stopPropagation(); openRenameProductModal(${item.id})" class="adminbtn" style="background:#1e293b; border:1px solid #3b82f6; color:#93c5fd; font-size:11px; font-weight:600; padding:2px 8px; border-radius:4px; cursor:pointer; flex-shrink:0; display:inline-flex; align-items:center; gap:4px; transition:all 0.15s;" title="Rename Product Number or Title">✏️ Rename</button>` : ''}
     <span class="research-link-slot" style="flex-shrink:0; display:inline-flex; align-items:center; justify-content:flex-end; width:155px; min-width:155px;">
         ${linkIcon || ''}
     </span>
@@ -2059,6 +2060,7 @@ function saveRenameProduct(){
     fd.append('task_id', taskId);
     fd.append('product_no', newNo);
     fd.append('title', newTitle);
+    if(typeof CSRF_TOKEN !== 'undefined') fd.append('_csrf', CSRF_TOKEN);
     if(force) fd.append('force', '1');
 
     fetch('index.php', { method: 'POST', body: fd })

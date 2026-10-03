@@ -638,7 +638,18 @@ class TaskController {
 
     public function renameProduct(): void {
         AuthMiddleware::requireAuth();
-        RoleMiddleware::requireAdmin();
+
+        $user = current_user();
+        if(!$user) {
+            json_error('Authentication required', 401);
+        }
+
+        $isAdmin = ($user['role'] ?? '') === 'administrator';
+        $canRename = $isAdmin || ModulePermission::can($user, 'products', 'rename');
+        if(!$canRename){
+            json_error('Permission denied: You do not have permission to rename products.', 403);
+        }
+
         verify_csrf();
 
         $taskId    = intval($_POST['task_id'] ?? 0);

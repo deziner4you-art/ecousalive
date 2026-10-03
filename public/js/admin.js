@@ -351,7 +351,7 @@ function renderModulePermissions(){
     if(!box) return;
 
     var moduleKeys = Object.keys(_MP_MODULES);
-    var actionLabels = {view:'View', add:'Add', edit:'Edit', delete:'Delete'};
+    var actionLabels = {view:'View', add:'Add', edit:'Edit', delete:'Delete', rename:'Rename'};
 
     /* ─── Table header ─── */
     var html = '<div style="overflow-x:auto;">';
@@ -369,7 +369,7 @@ function renderModulePermissions(){
     html += '<tr><th></th>';
     moduleKeys.forEach(function(mod){
         _MP_MODULES[mod].forEach(function(act){
-            html += '<th class="mp-th-action">' + actionLabels[act] + '</th>';
+            html += '<th class="mp-th-action">' + (actionLabels[act] || act) + '</th>';
         });
     });
     html += '</tr></thead><tbody>';
@@ -711,7 +711,8 @@ function buildUserPermissionsHtml(user){
     var userModules = (res.user_modules && res.user_modules[uid]) || null;
     var moduleKeys = Object.keys(res.modules || {});
     var labels = res.labels || {};
-    var actionLabels = {view:'View', add:'Add', edit:'Edit', delete:'Delete'};
+    var actionLabels = {view:'View', add:'Add', edit:'Edit', delete:'Delete', rename:'Rename'};
+    var allActions = ['view','add','edit','delete','rename'];
     var filters = effective.filters || [];
     var customized = userFilters || userModules;
 
@@ -725,14 +726,14 @@ function buildUserPermissionsHtml(user){
         + '<button class="adminbtn" onclick="saveUserPermissionSet(' + uid + ')" style="padding:7px 12px;">Save User Permissions</button></div></div>';
 
     html += '<div style="overflow-x:auto;"><table class="mp-table" style="min-width:760px;"><thead><tr><th class="mp-th-role">Module</th>';
-    ['view','add','edit','delete'].forEach(function(act){ html += '<th class="mp-th-action">' + actionLabels[act] + '</th>'; });
+    allActions.forEach(function(act){ html += '<th class="mp-th-action">' + (actionLabels[act] || act) + '</th>'; });
     html += '</tr></thead><tbody>';
 
     moduleKeys.forEach(function(mod){
         var allowedActs = (res.modules && res.modules[mod]) || [];
         var savedPerms = (effective.modules && effective.modules[mod]) || {};
         html += '<tr><td class="mp-td-role">' + (labels[mod] || mod) + '</td>';
-        ['view','add','edit','delete'].forEach(function(act){
+        allActions.forEach(function(act){
             if(allowedActs.indexOf(act) === -1){
                 html += '<td class="mp-td-cb" style="color:#334155;">-</td>';
             } else {
@@ -784,6 +785,7 @@ function saveUserPermissionSet(userId){
     fd.append('user_id', userId);
     fd.append('filters', JSON.stringify(filters));
     fd.append('modules', JSON.stringify(modules));
+    if(typeof CSRF_TOKEN !== 'undefined') fd.append('_csrf', CSRF_TOKEN);
 
     fetch('index.php', {method:'POST', body:fd}).then(r => r.json()).then(function(r){
         if(msg){
@@ -803,6 +805,7 @@ function resetUserPermissionSet(userId){
         var fd = new FormData();
         fd.append('action', 'reset_user_permissions');
         fd.append('user_id', userId);
+        if(typeof CSRF_TOKEN !== 'undefined') fd.append('_csrf', CSRF_TOKEN);
 
         fetch('index.php', {method:'POST', body:fd}).then(r => r.json()).then(function(r){
             if(msg){
