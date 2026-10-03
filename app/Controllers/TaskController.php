@@ -74,8 +74,9 @@ class TaskController {
             Task::bulkUngroupTasks($task_ids);
             json_success(['message' => 'Products removed from group']);
         } elseif ($bulk_action === 'move_vendor') {
-            $vendorId = intval($_POST['vendor_id'] ?? 0);
+            $vendorId = intval($_POST['vendor_id'] ?? $_POST['target_vendor_id'] ?? 0);
             if (!$vendorId) json_error('Target vendor is required');
+            require_once ROOT . '/app/Models/Vendor.php';
             $res = Vendor::moveToVendor($task_ids, $vendorId);
             if (!$res['ok']) json_error($res['message'] ?? 'Move failed');
             json_success($res);

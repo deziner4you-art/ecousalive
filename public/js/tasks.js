@@ -1643,8 +1643,8 @@ ${item.published_link ? `<a href="${item.published_link}" target="_blank" rel="n
 
     return `
 <div class="head" onclick="headClick(event,${item.id})" ontouchend="headTouch(event,${item.id})" style="cursor:pointer; display:flex; align-items:center; width:100%; box-sizing:border-box;">
-<div class="pid${isUrgent?' urgent-pid':''}" style="position:relative; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; padding-top:8px; width:125px; min-width:125px; font-family:'Calibri', 'Segoe UI', Arial, sans-serif; box-sizing:border-box; flex-shrink:0;">
-    <div style="line-height:1.1; font-family:'Calibri', 'Segoe UI', Arial, sans-serif; font-size:17px; font-weight:700; letter-spacing:0.4px; text-align:center; width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0 4px; box-sizing:border-box;">
+<div class="pid${isUrgent?' urgent-pid':''}" style="position:relative; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; padding-top:8px; width:190px; min-width:190px; font-family:'Calibri', 'Segoe UI', Arial, sans-serif; box-sizing:border-box; flex-shrink:0;">
+    <div style="line-height:1.1; font-family:'Calibri', 'Segoe UI', Arial, sans-serif; font-size:${(String(item.product_no||'').length > 14 ? '14px' : (String(item.product_no||'').length > 10 ? '15.5px' : '17px'))}; font-weight:700; letter-spacing:0.3px; text-align:center; width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0 4px; box-sizing:border-box;">
         #${item.product_no}${canRename ? `<span onclick="event.stopPropagation(); openRenameProductModal(${item.id})" title="Rename Product Number / Title" style="cursor:pointer; display:inline-block; font-size:12px; margin-left:3px; opacity:0.85; vertical-align:middle; transition:transform 0.15s;" onmouseover="this.style.opacity='1';this.style.transform='scale(1.25)'" onmouseout="this.style.opacity='0.85';this.style.transform='scale(1)'">✏️</span>` : ''}
     </div>
     <div style="position:absolute; bottom:3px; z-index:10; display:flex; justify-content:center; width:100%;">
@@ -3603,6 +3603,7 @@ function bulkMoveSelectedToVendor() {
         var fd = new FormData();
         fd.append('action', 'move_to_vendor');
         fd.append('task_ids', SELECTED_BULK_PRODUCTS.join(','));
+        fd.append('vendor_id', targetVendorId);
         fd.append('target_vendor_id', targetVendorId);
         if(typeof CSRF_TOKEN !== 'undefined') fd.append('csrf_token', CSRF_TOKEN);
         fetch('index.php', { method: 'POST', body: fd })
@@ -3660,6 +3661,7 @@ function confirmMoveSingleVendor() {
     var fd = new FormData();
     fd.append('action', 'move_to_vendor');
     fd.append('task_ids', taskId);
+    fd.append('vendor_id', targetVendorId);
     fd.append('target_vendor_id', targetVendorId);
     if(typeof CSRF_TOKEN !== 'undefined') fd.append('csrf_token', CSRF_TOKEN);
     fetch('index.php', { method: 'POST', body: fd })

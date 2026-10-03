@@ -120,7 +120,7 @@ tailwind.config = {
 </script>
 
 <!-- App CSS (cards, status badges, task styles from monolith) -->
-<link rel="stylesheet" href="<?= $publicUrl ?>/css/app.css?v=2.8.5">
+<link rel="stylesheet" href="<?= $publicUrl ?>/css/app.css?v=2.8.6">
 
 <style>
 /* ── Topbar ────────────────────────────────────── */
@@ -653,6 +653,10 @@ body { background: #081223; margin: 0; padding: 0; color: #e2e8f0; }
 }
 .card .head .toggle {
     flex-shrink: 0 !important;
+}
+.pid {
+    width: 190px !important;
+    min-width: 190px !important;
 }
 .pid, .pid div {
     font-family: 'Calibri', 'Segoe UI', Arial, sans-serif !important;
@@ -1937,7 +1941,7 @@ try {
 <!-- ── JS Modules ── -->
 <?php $v = '2.8.9'; ?>
 <script src="<?= $publicUrl ?>/js/core.js?v=<?= $v ?>"></script>
-<script src="<?= $publicUrl ?>/js/tasks.js?v=3.3.7"></script>
+<script src="<?= $publicUrl ?>/js/tasks.js?v=3.3.8"></script>
 <script src="<?= $publicUrl ?>/js/admin.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/invoices.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/payroll.js?v=2.7.13"></script>
