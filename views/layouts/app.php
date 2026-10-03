@@ -1606,12 +1606,22 @@ var CAN_GROUP_PRODUCT = <?= $canUserGroupProduct ? 'true' : 'false' ?>;
 $role_bulk_action = false;
 if(current_user()){
     $u = current_user();
-    if($u['role'] === 'administrator' || $u['username'] === 'ilyaeco'){
+    $uname = strtolower($u['username'] ?? '');
+    if($u['role'] === 'administrator' || $uname === 'ilyaeco' || $uname === 'irfan' || $u['role'] === 'ai_work' || !empty($canUserGroupProduct)){
         $role_bulk_action = true;
     } else {
-        $perm_row = db()->prepare("SELECT settings FROM eco_permissions WHERE role=?");
-        $perm_row->execute([$u['role']]);
-        $perm_settings = json_decode($perm_row->fetchColumn() ?: '{}', true);
+        $settings = null;
+        try {
+            $uperm_stmt = db()->prepare("SELECT settings FROM eco_user_permissions WHERE user_id=?");
+            $uperm_stmt->execute([(int)$u['id']]);
+            $settings = $uperm_stmt->fetchColumn();
+        } catch(Exception $e){}
+        if ($settings === false || $settings === null) {
+            $perm_row = db()->prepare("SELECT settings FROM eco_permissions WHERE role=?");
+            $perm_row->execute([$u['role']]);
+            $settings = $perm_row->fetchColumn();
+        }
+        $perm_settings = json_decode($settings ?: '{}', true);
         $role_bulk_action = !empty($perm_settings['bulk_action']);
     }
 }
@@ -1925,9 +1935,9 @@ try {
 </div>
 
 <!-- ── JS Modules ── -->
-<?php $v = '2.8.8'; ?>
+<?php $v = '2.8.9'; ?>
 <script src="<?= $publicUrl ?>/js/core.js?v=<?= $v ?>"></script>
-<script src="<?= $publicUrl ?>/js/tasks.js?v=3.3.6"></script>
+<script src="<?= $publicUrl ?>/js/tasks.js?v=3.3.7"></script>
 <script src="<?= $publicUrl ?>/js/admin.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/invoices.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/payroll.js?v=2.7.13"></script>

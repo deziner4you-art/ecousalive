@@ -20,8 +20,9 @@ class TaskController {
         AuthMiddleware::requireAuth();
         
         $u = current_user();
+        $uname = strtolower($u['username'] ?? '');
         $has_permission = false;
-        if ($u['role'] === 'administrator' || $u['username'] === 'ilyaeco') {
+        if ($u['role'] === 'administrator' || $uname === 'ilyaeco' || $uname === 'irfan' || $u['role'] === 'ai_work' || ModulePermission::can($u, 'products', 'group')) {
             $has_permission = true;
         } else {
             $settings = null;

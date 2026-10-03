@@ -69,16 +69,17 @@ class VendorController {
             json_error('Authentication required', 401);
         }
 
-        // Admin or users with edit/group permission can move products between vendors
+        // Admin or users with edit/group permission (including Irfan / AI work) can move products between vendors
+        $uname = strtolower($user['username'] ?? '');
         $isAdmin = ($user['role'] ?? '') === 'administrator';
-        $canMove = $isAdmin || ModulePermission::can($user, 'products', 'edit') || ModulePermission::can($user, 'products', 'group');
+        $canMove = $isAdmin || $uname === 'irfan' || ($user['role'] ?? '') === 'ai_work' || ModulePermission::can($user, 'products', 'edit') || ModulePermission::can($user, 'products', 'group');
         if (!$canMove) {
             json_error('Permission denied: You do not have permission to move products to another vendor.', 403);
         }
 
         verify_csrf();
 
-        $vendorId = intval($_POST['vendor_id'] ?? 0);
+        $vendorId = intval($_POST['vendor_id'] ?? $_POST['target_vendor_id'] ?? 0);
         $taskIdsRaw = $_POST['task_ids'] ?? [];
 
         if (!$vendorId) {

@@ -289,8 +289,9 @@ if(!in_array('Info Done', $allowed)){
         </div>
     </div>
 </div>
+<?php endif; ?>
 
-<!-- ── Rename Product Number / Name Modal (Admin Only) ── -->
+<!-- ── Rename Product Number / Name Modal (Admin & Permitted Users) ── -->
 <div id="renameProductModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.78);z-index:99999;align-items:center;justify-content:center;backdrop-filter:blur(3px);">
     <div style="background:#0f172a;border:1px solid #1e3a5f;border-radius:12px;width:95%;max-width:520px;padding:24px;box-shadow:0 25px 35px -5px rgba(0,0,0,0.6);color:#f1f5f9;position:relative;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid #1e3a5f;padding-bottom:12px;">
@@ -344,7 +345,6 @@ if(!in_array('Info Done', $allowed)){
         </div>
     </div>
 </div>
-<?php endif; ?>
 
 <!-- ── Move Single Product to Vendor Modal ── -->
 <div id="moveVendorSingleModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.78);z-index:99999;align-items:center;justify-content:center;backdrop-filter:blur(3px);">

@@ -2776,6 +2776,7 @@ function bulkGroupSelected() {
         fd.append('action', 'bulk_update_tasks');
         fd.append('task_ids', SELECTED_BULK_PRODUCTS.join(','));
         fd.append('bulk_action', 'group');
+        if(typeof CSRF_TOKEN !== 'undefined') fd.append('csrf_token', CSRF_TOKEN);
         fetch('index.php', { method: 'POST', body: fd })
             .then(function(r){ return r.json(); })
             .then(function(r){
@@ -2809,6 +2810,7 @@ function bulkUngroupSelected() {
         fd.append('action', 'bulk_update_tasks');
         fd.append('task_ids', SELECTED_BULK_PRODUCTS.join(','));
         fd.append('bulk_action', 'ungroup');
+        if(typeof CSRF_TOKEN !== 'undefined') fd.append('csrf_token', CSRF_TOKEN);
         fetch('index.php', { method: 'POST', body: fd })
             .then(function(r){ return r.json(); })
             .then(function(r){
@@ -2862,6 +2864,7 @@ function applyBulkAction() {
         fd.append('action', 'bulk_update_tasks');
         fd.append('task_ids', SELECTED_BULK_PRODUCTS.join(','));
         fd.append('bulk_action', action);
+        if(typeof CSRF_TOKEN !== 'undefined') fd.append('csrf_token', CSRF_TOKEN);
         fetch('index.php', { method: 'POST', body: fd })
             .then(function(r){ return r.json(); })
             .then(function(r){
@@ -3601,6 +3604,7 @@ function bulkMoveSelectedToVendor() {
         fd.append('action', 'move_to_vendor');
         fd.append('task_ids', SELECTED_BULK_PRODUCTS.join(','));
         fd.append('target_vendor_id', targetVendorId);
+        if(typeof CSRF_TOKEN !== 'undefined') fd.append('csrf_token', CSRF_TOKEN);
         fetch('index.php', { method: 'POST', body: fd })
             .then(function(r){ return r.json(); })
             .then(function(r){
@@ -3657,6 +3661,7 @@ function confirmMoveSingleVendor() {
     fd.append('action', 'move_to_vendor');
     fd.append('task_ids', taskId);
     fd.append('target_vendor_id', targetVendorId);
+    if(typeof CSRF_TOKEN !== 'undefined') fd.append('csrf_token', CSRF_TOKEN);
     fetch('index.php', { method: 'POST', body: fd })
         .then(function(r){ return r.json(); })
         .then(function(r){
@@ -3745,6 +3750,7 @@ function saveNewVendor() {
     fd.append('name', name);
     fd.append('code', code);
     fd.append('color', color);
+    if(typeof CSRF_TOKEN !== 'undefined') fd.append('csrf_token', CSRF_TOKEN);
 
     fetch('index.php', { method: 'POST', body: fd })
         .then(function(r){ return r.json(); })
@@ -3768,6 +3774,7 @@ function deleteVendor(vendorId, vendorName) {
         var fd = new FormData();
         fd.append('action', 'delete_vendor');
         fd.append('id', vendorId);
+        if(typeof CSRF_TOKEN !== 'undefined') fd.append('csrf_token', CSRF_TOKEN);
 
         fetch('index.php', { method: 'POST', body: fd })
             .then(function(r){ return r.json(); })
