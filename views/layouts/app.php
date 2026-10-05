@@ -657,32 +657,96 @@ body { background: #081223; margin: 0; padding: 0; color: #e2e8f0; }
 .pid {
     width: 190px !important;
     min-width: 190px !important;
+    background: #1d4ed8 !important; /* Normal Blue */
+    color: #ffffff !important;
 }
 .pid, .pid div {
     font-family: 'Calibri', 'Segoe UI', Arial, sans-serif !important;
 }
+.pid.urgent-pid {
+    background: #ef4444 !important; /* Urgent Red */
+    color: #ffffff !important;
+}
+
+/* Accordion toggle handle - Normal is BLUE, Urgent is RED */
+.card .head .toggle,
+.toggle {
+    background: #1d4ed8 !important; /* Normal Blue handle */
+    color: #ffffff !important;
+    border: none !important;
+    border-left: 1px solid #1e40af !important;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+.card .head .toggle:hover,
+.toggle:hover {
+    background: #2563eb !important;
+}
+
+/* Urgent card & toggle styling */
 .card.urgent-card {
-    border: 1px solid #1e3a5f !important;
+    border: 1px solid #ef4444 !important;
     animation: none !important;
-    box-shadow: none !important;
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.2) !important;
 }
 .card.urgent-card .head {
     background: #162033;
 }
+.card.urgent-card .head .toggle,
 .card.urgent-card .toggle,
 .toggle.urgent-toggle {
-    background: #ef4444 !important;
+    background: #ef4444 !important; /* Urgent Red handle */
     color: #ffffff !important;
     border-left: 1px solid #dc2626 !important;
 }
+.card.urgent-card .head .toggle:hover,
 .card.urgent-card .toggle:hover,
 .toggle.urgent-toggle:hover {
     background: #dc2626 !important;
 }
+.card.urgent-card.open .head .toggle,
 .card.urgent-card.open .toggle {
     background: #b91c1c !important;
     border-left-color: #991b1b !important;
 }
+
+/* Priority badges */
+.badge-priority {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 2px 7px;
+    border-radius: 4px;
+    white-space: nowrap;
+    letter-spacing: 0.3px;
+    line-height: 1.2;
+}
+.badge-priority.p1 {
+    background: #b91c1c;
+    border: 1px solid #ef4444;
+    color: #ffffff;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+}
+.badge-priority.p2 {
+    background: #c2410c;
+    border: 1px solid #f97316;
+    color: #ffffff;
+    box-shadow: 0 0 8px rgba(249, 115, 22, 0.4);
+}
+.badge-priority.p3 {
+    background: #b45309;
+    border: 1px solid #f59e0b;
+    color: #ffffff;
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+}
+.badge-priority.p0 {
+    background: #ef4444;
+    border: 1px solid #dc2626;
+    color: #ffffff;
+}
+
 .card.open {
     overflow: visible !important;
 }
@@ -1611,7 +1675,7 @@ $role_bulk_action = false;
 if(current_user()){
     $u = current_user();
     $uname = strtolower($u['username'] ?? '');
-    if($u['role'] === 'administrator' || $uname === 'ilyaeco' || $uname === 'irfan' || $u['role'] === 'ai_work' || !empty($canUserGroupProduct)){
+    if($u['role'] === 'administrator' || $uname === 'ilyaeco' || $uname === 'irfan' || $u['role'] === 'ai_work' || $u['role'] === 'eco_listing' || $uname === 'ecolisting' || !empty($canUserGroupProduct)){
         $role_bulk_action = true;
     } else {
         $settings = null;

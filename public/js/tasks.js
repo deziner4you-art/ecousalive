@@ -265,15 +265,17 @@ function renderSmart(data){
             }
 
             updateButtons(existing, item);
-            if(item.is_urgent == 1 && item.work_status !== 'Work Done') existing.classList.add('urgent-card');
+            var isCardUrgent = (item.is_urgent > 0) && item.work_status !== 'Work Done' && !item.published_at;
+            if(isCardUrgent) existing.classList.add('urgent-card');
             else existing.classList.remove('urgent-card');
             container.appendChild(existing);
             return;
         }
 
+        var isCardUrgent = (item.is_urgent > 0) && item.work_status !== 'Work Done' && !item.published_at;
         var div = document.createElement('div');
         div.className = 'card' 
-            + (item.is_urgent == 1 && item.work_status !== 'Work Done' ? ' urgent-card' : '')
+            + (isCardUrgent ? ' urgent-card' : '')
             + (OPEN[item.id] ? ' open' : '');
         div.setAttribute('data-id',          item.id);
         div.setAttribute('data-work-status', item.work_status || '');
@@ -1284,67 +1286,25 @@ function buildCard(item){
     var workerCanSee = (isWorker || isQa) && (item.status === 'Approved' || item.status === 'Updated')
                     || (isWorker && (item.work_status === 'Changes' || item.work_status === 'Changing'));
                     /* eco_listing does NOT see product content — only SEO form + Publish */
-    var isUrgent  = item.is_urgent == 1 && !item.published_at;
-
-    /* Invoice badge */
-    var invBadge = '';
-    if(!isListing){
-        var paidByPayroll = item.payslip_status === 'Paid';
-        var invoicePaid   = item.invoice_status === 'Paid' || item.info_invoice_status === 'Paid' || item.aplus_invoice_status === 'Paid';
-        var isWorkerView  = ['worker','qa','d4u_writer','seo_manager','ai_work'].includes(ROLE);
-
-        if(isWorkerView){
-            if(paidByPayroll){
-                invBadge = '<span class="inv-badge-paid" style="margin-right:12px;">✅ Paid</span>';
-            } else if(item.payslip_status === 'Generated'){
-                invBadge = '<span class="inv-badge-invoiced" style="margin-right:12px;">🧾 Payslip Generated</span>';
-            } else if(invoicePaid){
-                invBadge = '<span class="inv-badge-invoiced" style="margin-right:12px;">🧾 Invoiced</span>';
-            } else {
-                invBadge = '';
-            }
+    var isUrgent  = (item.is_urgent > 0) && item.work_status !== 'Work Done' && !item.published_at;
+    var pVal      = isUrgent ? parseInt(item.is_urgent) : 0;
+    var urgentBadge = '';
+    var priorityMetaBadge = '';
+    if (isUrgent) {
+        if (pVal === 1) {
+            urgentBadge = `<span class="urgent-badge" style="background:#b91c1c; border:1px solid #ef4444; box-shadow:0 0 10px rgba(239,68,68,0.5);">🚨 URGENT — PRIORITY 1 (TOP)</span>`;
+            priorityMetaBadge = `<span class="badge-priority p1" title="Urgent - Priority 1">🚨 Priority 1</span>`;
+        } else if (pVal === 2) {
+            urgentBadge = `<span class="urgent-badge" style="background:#c2410c; border:1px solid #f97316; box-shadow:0 0 10px rgba(249,115,22,0.4);">⚡ URGENT — PRIORITY 2 (MEDIUM)</span>`;
+            priorityMetaBadge = `<span class="badge-priority p2" title="Urgent - Priority 2">⚡ Priority 2</span>`;
+        } else if (pVal === 3) {
+            urgentBadge = `<span class="urgent-badge" style="background:#b45309; border:1px solid #f59e0b; box-shadow:0 0 10px rgba(245,158,11,0.4);">📌 URGENT — PRIORITY 3 (NORMAL)</span>`;
+            priorityMetaBadge = `<span class="badge-priority p3" title="Urgent - Priority 3">📌 Priority 3</span>`;
         } else {
-            if(item.product_type === 'Info + A Plus'){
-                var iBadge = (item.info_invoice_status === 'Paid')     ? '<span class="inv-badge-paid" style="margin-right:4px;">✅ Info Paid</span>'
-                           : (item.info_invoice_status === 'Invoiced') ? '<span class="inv-badge-invoiced" style="margin-right:4px;">🧾 Info Invoiced</span>' : '';
-                var aBadge = (item.aplus_invoice_status === 'Paid')    ? '<span class="inv-badge-paid" style="margin-right:12px;">✅ A+ Paid</span>'
-                           : (item.aplus_invoice_status === 'Invoiced')? '<span class="inv-badge-invoiced" style="margin-right:12px;">🧾 A+ Invoiced</span>' : '';
-                invBadge = iBadge + aBadge;
-            } else if(item.product_type === 'Infographics'){
-                invBadge = (item.info_invoice_status === 'Invoiced') ? '<span class="inv-badge-invoiced" style="margin-right:12px;">🧾 Invoiced</span>'
-                         : (item.info_invoice_status === 'Paid')     ? '<span class="inv-badge-paid" style="margin-right:12px;">✅ Paid</span>' : '';
-            } else if(item.product_type === 'A+'){
-                invBadge = (item.aplus_invoice_status === 'Invoiced') ? '<span class="inv-badge-invoiced" style="margin-right:12px;">🧾 Invoiced</span>'
-                         : (item.aplus_invoice_status === 'Paid')     ? '<span class="inv-badge-paid" style="margin-right:12px;">✅ Paid</span>' : '';
-            } else {
-                invBadge = (item.invoice_status === 'Invoiced') ? '<span class="inv-badge-invoiced" style="margin-right:12px;">🧾 Invoiced</span>'
-                         : (item.invoice_status === 'Paid')     ? '<span class="inv-badge-paid" style="margin-right:12px;">✅ Paid</span>' : '';
-            }
+            urgentBadge = `<span class="urgent-badge">🔴 URGENT</span>`;
+            priorityMetaBadge = `<span class="badge-priority p0" title="Urgent">🔴 Urgent</span>`;
         }
     }
-    var typeBadge = '';
-    var tbStyle = "display:inline-block; font-size:9.5px; padding:2px 6px; white-space:nowrap; border-radius:12px; box-shadow:0 2px 4px rgba(0,0,0,0.3); letter-spacing:0.5px; line-height:1;";
-    if(item.product_type === 'Info + A Plus'){
-        typeBadge = '<span style="' + tbStyle + ' background:#8b5cf6; color:#fff;">Info + A Plus</span>';
-    } else if(item.product_type === 'Infographics'){
-        typeBadge = '<span style="' + tbStyle + ' background:#f59e0b; color:#fff;">Infographics</span>';
-    } else {
-        typeBadge = '<span style="' + tbStyle + ' background:#0ea5e9; color:#fff;">A Plus</span>';
-    }
-
-    var linkIcon = '';
-    if(item.product_link && item.product_link.trim() !== ''){
-        var cleanLink = item.product_link.trim();
-        if(!/^https?:\/\//i.test(cleanLink)){
-            cleanLink = 'https://' + cleanLink;
-        }
-        linkIcon = ` <a href="${cleanLink}" target="_blank" rel="noopener" onclick="event.stopPropagation();" class="product-research-link" title="Research Link">🔗 Ref. link for Research</a>`;
-    }
-    var revCount = parseInt(item.revision_count) || 0;
-    if(!revCount){ try{ if(item.revision_log) revCount = JSON.parse(item.revision_log).length; }catch(e){} }
-    if(!revCount && item.revision_comment) revCount = 1;
-    var revBadge = revCount > 0 ? `<span style="display:inline-block;padding:1px 8px;border-radius:10px;background:#7c2d12;color:#fed7aa;font-size:10px;font-weight:bold;margin-left:4px;vertical-align:middle;border:1px solid #c2410c;">✏ Changes ${revCount}</span>` : '';
-    var urgentBadge    = isUrgent ? `<span class="urgent-badge">🔴 URGENT</span>` : '';
     var publishedBadge = (item.published_at && (isAdmin || ROLE === 'eco_client' || isListing))
         ? `<span style="display:inline-block;padding:1px 8px;border-radius:10px;background:#15803d;color:#d1fae5;font-size:10px;font-weight:bold;margin-left:5px;vertical-align:middle;">📦 Published</span>` : '';
 
@@ -1659,6 +1619,7 @@ ${item.published_link ? `<a href="${item.published_link}" target="_blank" rel="n
     </span>
 </div>
 <div class="card-meta${isAdmin?' admin-meta':''}" style="display:flex; align-items:center; gap:6px; flex-shrink:0; margin-left:auto;">
+    ${priorityMetaBadge}
     ${revBadge}
     ${invBadge}
     ${item.vendor_name ? `<span class="badge-vendor-slot" style="background:${item.vendor_color || '#0284c7'}22; border:1px solid ${item.vendor_color || '#0284c7'}88; color:${item.vendor_color || '#38bdf8'}; font-size:11px; font-weight:700; padding:2px 7px; border-radius:4px; white-space:nowrap; letter-spacing:0.3px; display:inline-flex; align-items:center; gap:3px;" title="Vendor: ${item.vendor_name}">🏷️ ${item.vendor_name}</span>` : ''}
@@ -1886,12 +1847,17 @@ function buildActionButtons(item, isAdmin, isWorker, isQa, isListing, isUrgent, 
         }
     }
     var isClientAct = (ROLE === 'eco_client' || (typeof USERNAME !== 'undefined' && USERNAME === 'ilyaeco'));
+    var canToggleUrgent = (isClientAct || isListing || (typeof USERNAME !== 'undefined' && USERNAME === 'ecolisting') || isAdmin);
     if(isClientAct){
         if(item.status === 'Generated' || item.status === 'All Generated' || item.status === 'Hold'){
             btns += `<button class="actionbtn" style="background:#0f766e;color:#fff;" onclick="holdProduct(${item.id},${item.status==='Hold'?0:1})">${item.status==='Hold'?'▶ Unhold':'⏸ Hold'}</button>`;
         }
-        if((item.status === 'Generated' || item.status === 'All Generated') && item.work_status !== 'Work Done'){
-            btns += `<button class="actionbtn" style="background:${isUrgent?'#475569':'#ef4444'};color:#fff;" onclick="setUrgent(${item.id},${isUrgent?0:1})">${isUrgent?'✅ Unmark Urgent':'🔴 Mark Urgent'}</button>`;
+    }
+    if(canToggleUrgent && item.work_status !== 'Work Done'){
+        if(isUrgent){
+            btns += `<button class="actionbtn" style="background:#475569;color:#fff;" onclick="setUrgent(${item.id},0)">⚪ Clear Urgent (Normal)</button>`;
+        } else {
+            btns += `<button class="actionbtn" style="background:#dc2626;color:#fff;" onclick="openPriorityPicker(${item.id})">🚨 Mark Urgent / Priority</button>`;
         }
     }
     if((ROLE === 'd4u_writer' || ROLE === 'seo_manager') && (item.status === 'Pending' || item.status === 'All Generated')) btns += `<button class="btn-writer-save actionbtn" onclick="writerSave(${item.id})">💾 Save Draft</button>`;
@@ -1980,6 +1946,10 @@ function applyPerform(taskId){
     else if(act === 'set_all_generated')       forceStage(taskId, 'All Generated');
     else if(act === 'set_generated')           forceStage(taskId, 'Generated');
     else if(act.startsWith('hold|'))           holdProduct(taskId, parseInt(act.split('|')[1]));
+    else if(act === 'urgent_1')                setUrgent(taskId, 1, 1);
+    else if(act === 'urgent_2')                setUrgent(taskId, 1, 2);
+    else if(act === 'urgent_3')                setUrgent(taskId, 1, 3);
+    else if(act === 'urgent_remove')           setUrgent(taskId, 0, 0);
     else if(act.startsWith('urgent|'))         setUrgent(taskId, parseInt(act.split('|')[1]));
     else if(act.startsWith('settype|'))        setProductType(taskId, act.split('|')[1] || '');
     else if(act === 'clear')                   clearTask(taskId);
@@ -2853,8 +2823,16 @@ function applyBulkAction() {
     }
     
     var msg = '';
-    if (action === 'urgent') {
-        msg = 'Kya aap select shuda products ko URGENT mark karna chahte hain?';
+    if (action === 'urgent_1') {
+        msg = 'Kya aap select shuda products aur un ke groups ko 🚨 Priority 1 (High) mark karna chahte hain?';
+    } else if (action === 'urgent_2') {
+        msg = 'Kya aap select shuda products aur un ke groups ko ⚡ Priority 2 (Medium) mark karna chahte hain?';
+    } else if (action === 'urgent_3') {
+        msg = 'Kya aap select shuda products aur un ke groups ko 📌 Priority 3 (Normal Urgent) mark karna chahte hain?';
+    } else if (action === 'urgent') {
+        msg = 'Kya aap select shuda products aur un ke groups ko 🔴 URGENT mark karna chahte hain?';
+    } else if (action === 'remove_urgent') {
+        msg = 'Kya aap select shuda products aur un ke groups se URGENT aur Priority tag hatana chahte hain (Normal blue karna chahte hain)?';
     } else if (action === 'hold') {
         msg = 'Kya aap select shuda products ko HOLD par daalna chahte hain?';
     }
@@ -2875,8 +2853,73 @@ function applyBulkAction() {
                 } else {
                     alert('Failed: ' + (r.message || ''));
                 }
-            });
+            })
+            .catch(function(err){ alert('Request failed: ' + err.message); });
     });
+}
+
+function bulkApplyUrgentPriority() {
+    if (SELECTED_BULK_PRODUCTS.length === 0) {
+        alert('Pehle products select karein');
+        return;
+    }
+    var sel = document.getElementById('bulk-priority-select');
+    var val = sel ? parseInt(sel.value) : 1;
+    var count = SELECTED_BULK_PRODUCTS.length;
+
+    var action = 'urgent';
+    var priority = val;
+    var msg = '';
+    if (val === 0) {
+        action = 'remove_urgent';
+        priority = 0;
+        msg = 'Kya aap select shuda ' + count + ' products aur un ke groups se URGENT aur Priority hatana chahte hain (Normal blue karna chahte hain)?';
+    } else if (val === 1) {
+        action = 'urgent_1';
+        msg = 'Kya aap select shuda ' + count + ' products aur un ke groups ko 🚨 Priority 1 (High) mark karna chahte hain?';
+    } else if (val === 2) {
+        action = 'urgent_2';
+        msg = 'Kya aap select shuda ' + count + ' products aur un ke groups ko ⚡ Priority 2 (Medium) mark karna chahte hain?';
+    } else if (val === 3) {
+        action = 'urgent_3';
+        msg = 'Kya aap select shuda ' + count + ' products aur un ke groups ko 📌 Priority 3 (Normal Urgent) mark karna chahte hain?';
+    }
+
+    _confirm(msg, function(){
+        var fd = new FormData();
+        fd.append('action', 'bulk_update_tasks');
+        fd.append('task_ids', SELECTED_BULK_PRODUCTS.join(','));
+        fd.append('bulk_action', action);
+        fd.append('priority', priority);
+        if(typeof CSRF_TOKEN !== 'undefined') fd.append('csrf_token', CSRF_TOKEN);
+        fetch('index.php', { method: 'POST', body: fd })
+            .then(function(r){ return r.json(); })
+            .then(function(r){
+                if (r.success) {
+                    SELECTED_BULK_PRODUCTS = [];
+                    updateBulkActionBar();
+                    loadTasks();
+                } else {
+                    alert('Failed: ' + (r.message || ''));
+                }
+            })
+            .catch(function(err){ alert('Request failed: ' + err.message); });
+    });
+}
+
+function openPriorityPicker(taskId) {
+    var p = prompt("Select Priority for this product (aur is ke pooray group ke liye):\n1 = 🚨 Priority 1 (High)\n2 = ⚡ Priority 2 (Medium)\n3 = 📌 Priority 3 (Normal Urgent)\n0 = ⚪ Clear Urgent / Normal Blue", "1");
+    if(p === null) return;
+    var pInt = parseInt(p);
+    if(isNaN(pInt) || pInt < 0 || pInt > 3) {
+        alert("Invalid priority. Please enter 1, 2, 3, or 0.");
+        return;
+    }
+    if(pInt === 0) {
+        setUrgent(taskId, 0, 0);
+    } else {
+        setUrgent(taskId, 1, pInt);
+    }
 }
 
 /* ── Page init ───────────────────────────────── */

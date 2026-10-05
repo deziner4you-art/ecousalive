@@ -62,7 +62,7 @@ class Task {
                       OR t.aplus_worker_id = ?
                       OR t.work_completed_by_worker_id = ?
                   )
-                ORDER BY t.id DESC
+                ORDER BY (CASE WHEN t.is_urgent > 0 AND t.work_status != 'Work Done' THEN t.is_urgent ELSE 999 END) ASC, t.id DESC
                 ");
                 $stmt->execute([$user['id'], $user['id'], $user['id'], $user['id']]);
                 break;
@@ -93,7 +93,7 @@ class Task {
                             AND (t2.work_status = 'In QA' OR t2.work_status = 'SEO Review' OR t2.work_status = 'Info Done' OR t2.qa_submitted_by = ?)
                       ))
                   )
-                ORDER BY t.id DESC
+                ORDER BY (CASE WHEN t.is_urgent > 0 AND t.work_status != 'Work Done' THEN t.is_urgent ELSE 999 END) ASC, t.id DESC
                 ");
                 $stmt->execute([$user['id'], $user['id']]);
                 break;
@@ -130,7 +130,7 @@ class Task {
                             )
                       ))
                   )
-                ORDER BY t.id DESC
+                ORDER BY (CASE WHEN t.is_urgent > 0 AND t.work_status != 'Work Done' THEN t.is_urgent ELSE 999 END) ASC, t.id DESC
                 ");
                 $stmt->execute([$user['id'], $user['id'], $user['id'], $user['id']]);
                 break;
@@ -152,7 +152,7 @@ class Task {
                       a.worker_id = ?
                       OR t.ai_worked_by = ?
                   )
-                ORDER BY t.id DESC
+                ORDER BY (CASE WHEN t.is_urgent > 0 AND t.work_status != 'Work Done' THEN t.is_urgent ELSE 999 END) ASC, t.id DESC
                 ");
                 $stmt->execute([$user['id'], $user['id']]);
                 break;
@@ -170,7 +170,7 @@ class Task {
                 LEFT JOIN eco_tool_users infow ON infow.id = t.info_worker_id
                 LEFT JOIN eco_tool_users aplusw ON aplusw.id = t.aplus_worker_id
                 WHERE t.deleted_at IS NULL
-                ORDER BY t.is_urgent DESC, t.id DESC
+                ORDER BY (CASE WHEN t.is_urgent > 0 AND t.published_at IS NULL THEN t.is_urgent ELSE 999 END) ASC, t.id DESC
                 ");
                 $stmt->execute([]);
                 break;
@@ -188,7 +188,7 @@ class Task {
                 LEFT JOIN eco_tool_users infow ON infow.id = t.info_worker_id
                 LEFT JOIN eco_tool_users aplusw ON aplusw.id = t.aplus_worker_id
                 WHERE t.deleted_at IS NULL
-                ORDER BY t.id DESC
+                ORDER BY (CASE WHEN t.is_urgent > 0 AND t.work_status != 'Work Done' THEN t.is_urgent ELSE 999 END) ASC, t.id DESC
                 ");
                 break;
         }
@@ -614,8 +614,28 @@ class Task {
         }
     }
 
-    public static function toggleUrgent(int $taskId, int $urgent): void {
-        db()->prepare("UPDATE wp_eco_aplus_tasks SET is_urgent=?, last_activity_at=NOW() WHERE id=?")->execute([$urgent, $taskId]);
+    public static function toggleUrgent(int $taskId, int $urgent, int $priority = 1): void {
+        $val = $urgent ? max(1, min(3, $priority)) : 0;
+        
+        // Check if product belongs to a group/family
+        $stmt = db()->prepare("SELECT family_code FROM wp_eco_aplus_tasks WHERE id=?");
+        $stmt->execute([$taskId]);
+        $familyCode = $stmt->fetchColumn();
+
+        if (!empty($familyCode)) {
+            // Group ki sabhi products ka urgent & priority same ho jaye ga
+            db()->prepare("
+                UPDATE wp_eco_aplus_tasks 
+                SET is_urgent = ?, last_activity_at = NOW() 
+                WHERE family_code = ? AND deleted_at IS NULL
+            ")->execute([$val, $familyCode]);
+        } else {
+            db()->prepare("
+                UPDATE wp_eco_aplus_tasks 
+                SET is_urgent = ?, last_activity_at = NOW() 
+                WHERE id = ?
+            ")->execute([$val, $taskId]);
+        }
     }
 
     public static function assignProduct(int $taskId, int $workerId): array {
@@ -1062,14 +1082,43 @@ class Task {
         return ['ok'=>true];
     }
 
-    public static function bulkMarkUrgent(array $taskIds): void {
+    public static function bulkMarkUrgent(array $taskIds, int $priority = 1): void {
         if (empty($taskIds)) return;
+        $val = max(0, min(3, $priority));
         $inQuery = implode(',', array_fill(0, count($taskIds), '?'));
+        
+        // Find all family_codes for these products
+        $stmt = db()->prepare("
+            SELECT DISTINCT family_code 
+            FROM wp_eco_aplus_tasks 
+            WHERE id IN ($inQuery) AND family_code IS NOT NULL AND family_code != ''
+        ");
+        $stmt->execute($taskIds);
+        $families = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+        // Update selected tasks directly
+        $updateParams = array_merge([$val], $taskIds);
         db()->prepare("
             UPDATE wp_eco_aplus_tasks
-            SET is_urgent = 1, last_activity_at = NOW()
+            SET is_urgent = ?, last_activity_at = NOW()
             WHERE id IN ($inQuery)
-        ")->execute($taskIds);
+        ")->execute($updateParams);
+
+        // Also update all sibling products in the same groups
+        if (!empty($families)) {
+            $famInQuery = implode(',', array_fill(0, count($families), '?'));
+            $famParams = array_merge([$val], $families);
+            db()->prepare("
+                UPDATE wp_eco_aplus_tasks
+                SET is_urgent = ?, last_activity_at = NOW()
+                WHERE family_code IN ($famInQuery) AND deleted_at IS NULL
+            ")->execute($famParams);
+        }
+    }
+
+    public static function bulkRemoveUrgent(array $taskIds): void {
+        if (empty($taskIds)) return;
+        self::bulkMarkUrgent($taskIds, 0);
     }
 
     public static function bulkMarkHold(array $taskIds): void {
