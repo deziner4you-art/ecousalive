@@ -351,7 +351,7 @@ function renderModulePermissions(){
     if(!box) return;
 
     var moduleKeys = Object.keys(_MP_MODULES);
-    var actionLabels = {view:'View', add:'Add', edit:'Edit', delete:'Delete', rename:'Rename', group:'Group', priority:'Priority'};
+    var actionLabels = {view:'View', add:'Add', edit:'Edit', delete:'Delete', rename:'Rename', group:'Group'};
 
     /* ─── Table header ─── */
     var html = '<div style="overflow-x:auto;">';
@@ -535,8 +535,7 @@ function renderUnifiedPermissions(){
     var box = document.getElementById('role-perms-container');
     if(!box) return;
     var moduleKeys = Object.keys(UNIFIED_MODULES);
-    var actionLabels = {view:'View', add:'Add', edit:'Edit', delete:'Delete', rename:'Rename', group:'Group', priority:'Priority'};
-    var allUnifiedActions = ['view','add','edit','delete','rename','group','priority'];
+    var actionLabels = {view:'View', add:'Add', edit:'Edit', delete:'Delete'};
     var html = '<div style="display:flex;justify-content:flex-end;margin-bottom:12px;">'
         + '<button class="adminbtn" onclick="saveAllUnifiedPermissions()">Save All Permissions</button>'
         + '</div>';
@@ -550,15 +549,15 @@ function renderUnifiedPermissions(){
             + '</div>';
 
         html += '<div style="overflow-x:auto;"><table class="mp-table" style="min-width:760px;"><thead><tr><th class="mp-th-role">Module</th>';
-        allUnifiedActions.forEach(function(act){
-            html += '<th class="mp-th-action">' + (actionLabels[act] || act) + '</th>';
+        ['view','add','edit','delete'].forEach(function(act){
+            html += '<th class="mp-th-action">' + actionLabels[act] + '</th>';
         });
         html += '</tr></thead><tbody>';
         moduleKeys.forEach(function(mod){
             var allowedActs = UNIFIED_MODULES[mod] || [];
             var savedPerms = (UNIFIED_MODULE_PERMS[role] && UNIFIED_MODULE_PERMS[role][mod]) || {};
             html += '<tr><td class="mp-td-role">' + (UNIFIED_LABELS[mod] || mod) + '</td>';
-            allUnifiedActions.forEach(function(act){
+            ['view','add','edit','delete'].forEach(function(act){
                 if(allowedActs.indexOf(act) === -1){
                     html += '<td class="mp-td-cb" style="color:#334155;">-</td>';
                 } else {
@@ -712,8 +711,8 @@ function buildUserPermissionsHtml(user){
     var userModules = (res.user_modules && res.user_modules[uid]) || null;
     var moduleKeys = Object.keys(res.modules || {});
     var labels = res.labels || {};
-    var actionLabels = {view:'View', add:'Add', edit:'Edit', delete:'Delete', rename:'Rename', group:'Group', priority:'Priority'};
-    var allActions = ['view','add','edit','delete','rename','group','priority'];
+    var actionLabels = {view:'View', add:'Add', edit:'Edit', delete:'Delete', rename:'Rename', group:'Group'};
+    var allActions = ['view','add','edit','delete','rename','group'];
     var filters = effective.filters || [];
     var customized = userFilters || userModules;
 

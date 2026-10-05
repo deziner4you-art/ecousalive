@@ -683,50 +683,6 @@ body { background: #081223; margin: 0; padding: 0; color: #e2e8f0; }
     background: #b91c1c !important;
     border-left-color: #991b1b !important;
 }
-.badge-priority {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 11px;
-    font-weight: 800;
-    padding: 2px 7px;
-    border-radius: 4px;
-    letter-spacing: 0.4px;
-    white-space: nowrap;
-    line-height: 1.2;
-}
-.badge-priority.p1 {
-    background: #dc2626;
-    color: #ffffff;
-    box-shadow: 0 0 10px rgba(220, 38, 38, 0.4);
-    border: 1px solid #ef4444;
-}
-.badge-priority.p2 {
-    background: #ea580c;
-    color: #ffffff;
-    box-shadow: 0 0 10px rgba(234, 88, 12, 0.4);
-    border: 1px solid #f97316;
-}
-.badge-priority.p3 {
-    background: #d97706;
-    color: #ffffff;
-    box-shadow: 0 0 10px rgba(217, 119, 6, 0.4);
-    border: 1px solid #f59e0b;
-}
-.badge-priority.p0 {
-    background: #ef4444;
-    color: #ffffff;
-    border: 1px solid #dc2626;
-}
-.card.urgent-p1 {
-    border-left: 4px solid #ef4444 !important;
-}
-.card.urgent-p2 {
-    border-left: 4px solid #f97316 !important;
-}
-.card.urgent-p3 {
-    border-left: 4px solid #f59e0b !important;
-}
 .card.open {
     overflow: visible !important;
 }
@@ -1598,8 +1554,7 @@ html.light-theme #bulk-action-bar span,
 html.light-theme #bulk-action-bar label {
     color: #1e293b !important;
 }
-html.light-theme #bulk-action-select,
-html.light-theme #bulk-priority-select {
+html.light-theme #bulk-action-select {
     background: #f8fafc !important;
     border-color: #cbd5e1 !important;
     color: #0f172a !important;
@@ -1643,22 +1598,20 @@ var CSRF_TOKEN = <?= json_encode(csrf_token())      ?>;
 <?php
 $currentUserPerms = ($user['role'] === 'administrator')
     ? array_fill_keys(array_keys(ModulePermission::MODULES),
-          array_fill_keys(['view','add','edit','delete','rename','group','priority'], true))
+          array_fill_keys(['view','add','edit','delete','rename','group'], true))
     : ModulePermission::getForUser($user);
 $canUserRenameProduct = ($user['role'] === 'administrator') || !empty($currentUserPerms['products']['rename']);
 $canUserGroupProduct = ($user['role'] === 'administrator') || !empty($currentUserPerms['products']['group']);
-$canUserSetPriority = ($user['role'] === 'administrator') || ($user['role'] === 'eco_listing') || (strtolower($user['username'] ?? '') === 'ecolisting') || !empty($currentUserPerms['products']['priority']);
 ?>
 var MODULE_PERMS = <?= json_encode($currentUserPerms) ?>;
 var CAN_RENAME_PRODUCT = <?= $canUserRenameProduct ? 'true' : 'false' ?>;
 var CAN_GROUP_PRODUCT = <?= $canUserGroupProduct ? 'true' : 'false' ?>;
-var CAN_SET_PRIORITY = <?= $canUserSetPriority ? 'true' : 'false' ?>;
 <?php
 $role_bulk_action = false;
 if(current_user()){
     $u = current_user();
     $uname = strtolower($u['username'] ?? '');
-    if($u['role'] === 'administrator' || $uname === 'ilyaeco' || $uname === 'irfan' || $u['role'] === 'ai_work' || $u['role'] === 'eco_listing' || $uname === 'ecolisting' || !empty($canUserGroupProduct) || !empty($canUserSetPriority)){
+    if($u['role'] === 'administrator' || $uname === 'ilyaeco' || $uname === 'irfan' || $u['role'] === 'ai_work' || !empty($canUserGroupProduct)){
         $role_bulk_action = true;
     } else {
         $settings = null;
@@ -1707,7 +1660,7 @@ try {
               AND t.work_status NOT IN ('Work Done', 'Info Done')
               AND (a.worker_id = ? OR t.info_worker_id = ? OR t.aplus_worker_id = ? OR t.ai_worked_by = ?)
             GROUP BY t.id
-            ORDER BY t.is_urgent DESC, (CASE WHEN t.priority > 0 THEN t.priority ELSE 999 END) ASC, t.id DESC
+            ORDER BY t.is_urgent DESC, t.id DESC
             LIMIT 50
         ");
         $n_stmt->execute([$uid, $uid, $uid, $uid]);
@@ -1721,7 +1674,7 @@ try {
             WHERE t.deleted_at IS NULL AND t.status != 'Hold'
               AND t.work_status IN ('Work Done', 'Info Done')
               AND t.published_at IS NULL
-            ORDER BY t.is_urgent DESC, (CASE WHEN t.priority > 0 THEN t.priority ELSE 999 END) ASC, t.id DESC
+            ORDER BY t.is_urgent DESC, t.id DESC
             LIMIT 50
         ");
         $notif_items = $n_stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -1733,7 +1686,7 @@ try {
             FROM wp_eco_aplus_tasks t
             WHERE t.deleted_at IS NULL AND t.status != 'Hold'
               AND t.work_status = 'In QA'
-            ORDER BY t.is_urgent DESC, (CASE WHEN t.priority > 0 THEN t.priority ELSE 999 END) ASC, t.id DESC
+            ORDER BY t.is_urgent DESC, t.id DESC
             LIMIT 50
         ");
         $notif_items = $n_stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -1745,7 +1698,7 @@ try {
             FROM wp_eco_aplus_tasks t
             WHERE t.deleted_at IS NULL AND t.status != 'Hold'
               AND (t.work_status = 'SEO Review' OR (t.status = 'Pending' AND t.product_type != 'Infographics'))
-            ORDER BY t.is_urgent DESC, (CASE WHEN t.priority > 0 THEN t.priority ELSE 999 END) ASC, t.id DESC
+            ORDER BY t.is_urgent DESC, t.id DESC
             LIMIT 50
         ");
         $notif_items = $n_stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -1757,7 +1710,7 @@ try {
             FROM wp_eco_aplus_tasks t
             WHERE t.deleted_at IS NULL AND t.status != 'Hold'
               AND (t.status = 'Generated' OR t.status = 'All Generated') AND t.work_status NOT IN ('Work Done', 'Info Done')
-            ORDER BY t.is_urgent DESC, (CASE WHEN t.priority > 0 THEN t.priority ELSE 999 END) ASC, t.id DESC
+            ORDER BY t.is_urgent DESC, t.id DESC
             LIMIT 50
         ");
         $notif_items = $n_stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -1769,7 +1722,7 @@ try {
             FROM wp_eco_aplus_tasks t
             WHERE t.deleted_at IS NULL AND t.status != 'Hold'
               AND (t.work_status = 'In QA' OR (t.work_status IN ('Work Done', 'Info Done') AND t.published_at IS NULL))
-            ORDER BY t.is_urgent DESC, (CASE WHEN t.priority > 0 THEN t.priority ELSE 999 END) ASC, t.id DESC
+            ORDER BY t.is_urgent DESC, t.id DESC
             LIMIT 50
         ");
         $notif_items = $n_stmt->fetchAll(PDO::FETCH_ASSOC);

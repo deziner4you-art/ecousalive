@@ -265,21 +265,15 @@ function renderSmart(data){
             }
 
             updateButtons(existing, item);
-            var pNum = (item.is_urgent == 1 && item.priority) ? parseInt(item.priority) : 0;
-            existing.classList.remove('urgent-card', 'urgent-p1', 'urgent-p2', 'urgent-p3');
-            if(item.is_urgent == 1 && item.work_status !== 'Work Done') {
-                existing.classList.add('urgent-card');
-                if(pNum >= 1 && pNum <= 3) existing.classList.add('urgent-p' + pNum);
-            }
+            if(item.is_urgent == 1 && item.work_status !== 'Work Done') existing.classList.add('urgent-card');
+            else existing.classList.remove('urgent-card');
             container.appendChild(existing);
             return;
         }
 
-        var pNum = (item.is_urgent == 1 && item.priority) ? parseInt(item.priority) : 0;
-        var pClass = (pNum >= 1 && pNum <= 3) ? (' urgent-p' + pNum) : '';
         var div = document.createElement('div');
         div.className = 'card' 
-            + (item.is_urgent == 1 && item.work_status !== 'Work Done' ? (' urgent-card' + pClass) : '')
+            + (item.is_urgent == 1 && item.work_status !== 'Work Done' ? ' urgent-card' : '')
             + (OPEN[item.id] ? ' open' : '');
         div.setAttribute('data-id',          item.id);
         div.setAttribute('data-work-status', item.work_status || '');
@@ -1349,14 +1343,8 @@ function buildCard(item){
     var revCount = parseInt(item.revision_count) || 0;
     if(!revCount){ try{ if(item.revision_log) revCount = JSON.parse(item.revision_log).length; }catch(e){} }
     if(!revCount && item.revision_comment) revCount = 1;
-    var pVal = (item.is_urgent == 1) ? (parseInt(item.priority) || 0) : 0;
-    var urgentBadge = '';
-    if (isUrgent) {
-        if (pVal === 1) urgentBadge = `<span class="urgent-badge" style="background:#b91c1c; border:1px solid #ef4444; box-shadow:0 0 10px rgba(239,68,68,0.5);">🚨 URGENT — PRIORITY 1 (HIGH)</span>`;
-        else if (pVal === 2) urgentBadge = `<span class="urgent-badge" style="background:#c2410c; border:1px solid #f97316; box-shadow:0 0 10px rgba(249,115,22,0.4);">⚡ URGENT — PRIORITY 2 (MEDIUM)</span>`;
-        else if (pVal === 3) urgentBadge = `<span class="urgent-badge" style="background:#b45309; border:1px solid #f59e0b; box-shadow:0 0 10px rgba(245,158,11,0.4);">📌 URGENT — PRIORITY 3 (NORMAL)</span>`;
-        else urgentBadge = `<span class="urgent-badge">🔴 URGENT</span>`;
-    }
+    var revBadge = revCount > 0 ? `<span style="display:inline-block;padding:1px 8px;border-radius:10px;background:#7c2d12;color:#fed7aa;font-size:10px;font-weight:bold;margin-left:4px;vertical-align:middle;border:1px solid #c2410c;">✏ Changes ${revCount}</span>` : '';
+    var urgentBadge    = isUrgent ? `<span class="urgent-badge">🔴 URGENT</span>` : '';
     var publishedBadge = (item.published_at && (isAdmin || ROLE === 'eco_client' || isListing))
         ? `<span style="display:inline-block;padding:1px 8px;border-radius:10px;background:#15803d;color:#d1fae5;font-size:10px;font-weight:bold;margin-left:5px;vertical-align:middle;">📦 Published</span>` : '';
 
@@ -1425,11 +1413,7 @@ function buildCard(item){
       ${item.product_type==='Info + A Plus'&&item.status!=='All Generated'?'<option value="set_all_generated">🏷 Tag as All Generated</option>':''}
       ${item.product_type==='Info + A Plus'&&item.status==='All Generated'?'<option value="set_generated">🏷 Tag as Generated</option>':''}
       <option value="hold|${item.status==='Hold'?0:1}">${item.status==='Hold'?'▶ Unhold':'⏸ Hold'}</option>
-      <option value="urgent_1">🚨 Mark Urgent - Priority 1</option>
-      <option value="urgent_2">⚡ Mark Urgent - Priority 2</option>
-      <option value="urgent_3">📌 Mark Urgent - Priority 3</option>
-      <option value="urgent_0">🔴 Mark Urgent (No Priority)</option>
-      ${isUrgent ? '<option value="urgent_remove">⚪ Remove Urgent / Reset Priority</option>' : ''}
+      <option value="urgent|${isUrgent?0:1}">${isUrgent?'✅ Unmark Urgent':'🔴 Mark Urgent'}</option>
       <option value="settype|${item.product_type==='Info + A Plus'?'':'Info + A Plus'}">${item.product_type==='Info + A Plus'?'🏷 Remove Info+A Plus':'🏷 Set Info + A Plus'}</option>
       <option value="clear">🧹 Clear Task</option>
       <option value="delete">🗑 Delete Task</option>
@@ -1655,18 +1639,7 @@ ${item.published_link ? `<a href="${item.published_link}" target="_blank" rel="n
     var actionBtns = buildActionButtons(item, isAdmin, isWorker, isQa, isListing, isUrgent, lock, approvedDisabled);
 
     var hideEditor = isInfoStage && item.work_status !== 'Content Pending' && item.status !== 'Generated' && item.status !== 'All Generated' && item.status !== 'Approved' && item.status !== 'Updated' && !item.content_approved_at && !item.content_updated_at;
-    var priorityMetaBadge = '';
-    if(item.is_urgent == 1 && item.work_status !== 'Work Done'){
-        if(pVal === 1){
-            priorityMetaBadge = `<span class="badge-priority p1" title="Urgent - Priority 1">🚨 P1</span>`;
-        } else if(pVal === 2){
-            priorityMetaBadge = `<span class="badge-priority p2" title="Urgent - Priority 2">⚡ P2</span>`;
-        } else if(pVal === 3){
-            priorityMetaBadge = `<span class="badge-priority p3" title="Urgent - Priority 3">📌 P3</span>`;
-        } else {
-            priorityMetaBadge = `<span class="badge-priority p0" title="Urgent">🔴 Urgent</span>`;
-        }
-    }
+    var canRename = isAdmin || (typeof CAN_RENAME_PRODUCT !== 'undefined' && CAN_RENAME_PRODUCT) || (typeof MODULE_PERMS !== 'undefined' && MODULE_PERMS.products && MODULE_PERMS.products.rename);
 
     return `
 <div class="head" onclick="headClick(event,${item.id})" ontouchend="headTouch(event,${item.id})" style="cursor:pointer; display:flex; align-items:center; width:100%; box-sizing:border-box;">
@@ -1686,7 +1659,6 @@ ${item.published_link ? `<a href="${item.published_link}" target="_blank" rel="n
     </span>
 </div>
 <div class="card-meta${isAdmin?' admin-meta':''}" style="display:flex; align-items:center; gap:6px; flex-shrink:0; margin-left:auto;">
-    ${priorityMetaBadge}
     ${revBadge}
     ${invBadge}
     ${item.vendor_name ? `<span class="badge-vendor-slot" style="background:${item.vendor_color || '#0284c7'}22; border:1px solid ${item.vendor_color || '#0284c7'}88; color:${item.vendor_color || '#38bdf8'}; font-size:11px; font-weight:700; padding:2px 7px; border-radius:4px; white-space:nowrap; letter-spacing:0.3px; display:inline-flex; align-items:center; gap:3px;" title="Vendor: ${item.vendor_name}">🏷️ ${item.vendor_name}</span>` : ''}
@@ -1914,17 +1886,12 @@ function buildActionButtons(item, isAdmin, isWorker, isQa, isListing, isUrgent, 
         }
     }
     var isClientAct = (ROLE === 'eco_client' || (typeof USERNAME !== 'undefined' && USERNAME === 'ilyaeco'));
-    var canToggleUrgent = (isClientAct || isListing || (typeof USERNAME !== 'undefined' && USERNAME === 'ecolisting') || isAdmin || (typeof CAN_SET_PRIORITY !== 'undefined' && CAN_SET_PRIORITY));
     if(isClientAct){
         if(item.status === 'Generated' || item.status === 'All Generated' || item.status === 'Hold'){
             btns += `<button class="actionbtn" style="background:#0f766e;color:#fff;" onclick="holdProduct(${item.id},${item.status==='Hold'?0:1})">${item.status==='Hold'?'▶ Unhold':'⏸ Hold'}</button>`;
         }
-    }
-    if(canToggleUrgent && item.work_status !== 'Work Done'){
-        if(isUrgent){
-            btns += `<button class="actionbtn" style="background:#475569;color:#fff;" onclick="setUrgent(${item.id},0)">⚪ Clear Urgent</button>`;
-        } else {
-            btns += `<button class="actionbtn" style="background:#dc2626;color:#fff;" onclick="openPriorityPicker(${item.id})">🚨 Mark Urgent / Priority</button>`;
+        if((item.status === 'Generated' || item.status === 'All Generated') && item.work_status !== 'Work Done'){
+            btns += `<button class="actionbtn" style="background:${isUrgent?'#475569':'#ef4444'};color:#fff;" onclick="setUrgent(${item.id},${isUrgent?0:1})">${isUrgent?'✅ Unmark Urgent':'🔴 Mark Urgent'}</button>`;
         }
     }
     if((ROLE === 'd4u_writer' || ROLE === 'seo_manager') && (item.status === 'Pending' || item.status === 'All Generated')) btns += `<button class="btn-writer-save actionbtn" onclick="writerSave(${item.id})">💾 Save Draft</button>`;
@@ -2013,11 +1980,6 @@ function applyPerform(taskId){
     else if(act === 'set_all_generated')       forceStage(taskId, 'All Generated');
     else if(act === 'set_generated')           forceStage(taskId, 'Generated');
     else if(act.startsWith('hold|'))           holdProduct(taskId, parseInt(act.split('|')[1]));
-    else if(act === 'urgent_1')                setUrgent(taskId, 1, 1);
-    else if(act === 'urgent_2')                setUrgent(taskId, 1, 2);
-    else if(act === 'urgent_3')                setUrgent(taskId, 1, 3);
-    else if(act === 'urgent_0')                setUrgent(taskId, 1, 0);
-    else if(act === 'urgent_remove')           setUrgent(taskId, 0, 0);
     else if(act.startsWith('urgent|'))         setUrgent(taskId, parseInt(act.split('|')[1]));
     else if(act.startsWith('settype|'))        setProductType(taskId, act.split('|')[1] || '');
     else if(act === 'clear')                   clearTask(taskId);
@@ -2891,16 +2853,8 @@ function applyBulkAction() {
     }
     
     var msg = '';
-    if (action === 'urgent_1') {
-        msg = 'Kya aap select shuda products ko 🚨 Priority 1 (High) mark karna chahte hain?';
-    } else if (action === 'urgent_2') {
-        msg = 'Kya aap select shuda products ko ⚡ Priority 2 (Medium) mark karna chahte hain?';
-    } else if (action === 'urgent_3') {
-        msg = 'Kya aap select shuda products ko 📌 Priority 3 (Normal) mark karna chahte hain?';
-    } else if (action === 'urgent') {
-        msg = 'Kya aap select shuda products ko 🔴 URGENT mark karna chahte hain?';
-    } else if (action === 'remove_urgent') {
-        msg = 'Kya aap select shuda products se URGENT aur Priority hatana chahte hain?';
+    if (action === 'urgent') {
+        msg = 'Kya aap select shuda products ko URGENT mark karna chahte hain?';
     } else if (action === 'hold') {
         msg = 'Kya aap select shuda products ko HOLD par daalna chahte hain?';
     }
@@ -2921,77 +2875,8 @@ function applyBulkAction() {
                 } else {
                     alert('Failed: ' + (r.message || ''));
                 }
-            })
-            .catch(function(err){ alert('Request failed: ' + err.message); });
+            });
     });
-}
-
-function bulkApplyUrgentPriority() {
-    if (SELECTED_BULK_PRODUCTS.length === 0) {
-        alert('Pehle products select karein');
-        return;
-    }
-    var sel = document.getElementById('bulk-priority-select');
-    var val = sel ? parseInt(sel.value) : 1;
-    var count = SELECTED_BULK_PRODUCTS.length;
-
-    var action = 'urgent';
-    var priority = val;
-    var msg = '';
-    if (val === -1) {
-        action = 'remove_urgent';
-        priority = 0;
-        msg = 'Kya aap select shuda ' + count + ' products se URGENT aur Priority hatana chahte hain?';
-    } else if (val === 1) {
-        action = 'urgent_1';
-        msg = 'Kya aap select shuda ' + count + ' products ko 🚨 Priority 1 (High) mark karna chahte hain?';
-    } else if (val === 2) {
-        action = 'urgent_2';
-        msg = 'Kya aap select shuda ' + count + ' products ko ⚡ Priority 2 (Medium) mark karna chahte hain?';
-    } else if (val === 3) {
-        action = 'urgent_3';
-        msg = 'Kya aap select shuda ' + count + ' products ko 📌 Priority 3 (Normal) mark karna chahte hain?';
-    } else {
-        action = 'urgent';
-        priority = 0;
-        msg = 'Kya aap select shuda ' + count + ' products ko 🔴 Urgent mark karna chahte hain?';
-    }
-
-    _confirm(msg, function(){
-        var fd = new FormData();
-        fd.append('action', 'bulk_update_tasks');
-        fd.append('task_ids', SELECTED_BULK_PRODUCTS.join(','));
-        fd.append('bulk_action', action);
-        fd.append('priority', priority);
-        if(typeof CSRF_TOKEN !== 'undefined') fd.append('csrf_token', CSRF_TOKEN);
-        fetch('index.php', { method: 'POST', body: fd })
-            .then(function(r){ return r.json(); })
-            .then(function(r){
-                if (r.success) {
-                    SELECTED_BULK_PRODUCTS = [];
-                    updateBulkActionBar();
-                    loadTasks();
-                } else {
-                    alert('Failed: ' + (r.message || ''));
-                }
-            })
-            .catch(function(err){ alert('Request failed: ' + err.message); });
-    });
-}
-
-function openPriorityPicker(taskId) {
-    var p = prompt("Select Priority for this product:\n1 = 🚨 Priority 1 (High)\n2 = ⚡ Priority 2 (Medium)\n3 = 📌 Priority 3 (Normal)\n0 = 🔴 Urgent without priority\n-1 = ⚪ Clear Urgent / Reset", "1");
-    if(p === null) return;
-    var pInt = parseInt(p);
-    if(isNaN(pInt) || pInt < -1 || pInt > 3) {
-        alert("Invalid priority. Please enter 1, 2, 3, 0 or -1.");
-        return;
-    }
-    if(pInt === -1) {
-        setUrgent(taskId, 0, 0);
-    } else {
-        setUrgent(taskId, 1, pInt);
-    }
 }
 
 /* ── Page init ───────────────────────────────── */

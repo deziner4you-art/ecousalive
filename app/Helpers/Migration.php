@@ -34,7 +34,6 @@ function runMigrations(): void {
         "ALTER TABLE wp_eco_aplus_tasks ADD COLUMN qa_submitted_at DATETIME NULL",
         "ALTER TABLE wp_eco_aplus_tasks ADD COLUMN qa_submitted_by INT NULL",
         "ALTER TABLE wp_eco_aplus_tasks ADD COLUMN hold_prev_status TEXT DEFAULT NULL",
-        "ALTER TABLE wp_eco_aplus_tasks ADD COLUMN priority TINYINT DEFAULT 0",
         "ALTER TABLE wp_eco_aplus_tasks ADD COLUMN is_urgent TINYINT(1) DEFAULT 0",
         "ALTER TABLE wp_eco_aplus_tasks ADD COLUMN last_activity_at DATETIME NULL",
         "ALTER TABLE wp_eco_aplus_tasks ADD COLUMN work_paused_at DATETIME NULL",
@@ -74,8 +73,6 @@ function runMigrations(): void {
     } catch(Exception $e){}
 
     try{ db()->exec("CREATE INDEX idx_deleted_at ON wp_eco_aplus_tasks (deleted_at)"); }catch(Exception $e){}
-    try{ db()->exec("CREATE INDEX idx_priority ON wp_eco_aplus_tasks (priority)"); }catch(Exception $e){}
-    try{ db()->exec("CREATE INDEX idx_is_urgent_priority ON wp_eco_aplus_tasks (is_urgent, priority)"); }catch(Exception $e){}
     try{ db()->exec("CREATE INDEX idx_family_code ON wp_eco_aplus_tasks (family_code)"); }catch(Exception $e){}
 
     /* ── Backfill last_activity_at ──────────────────── */
@@ -262,13 +259,11 @@ function runMigrations(): void {
         can_delete TINYINT(1) NOT NULL DEFAULT 0,
         can_rename TINYINT(1) NOT NULL DEFAULT 0,
         can_group  TINYINT(1) NOT NULL DEFAULT 0,
-        can_priority TINYINT(1) NOT NULL DEFAULT 0,
         PRIMARY KEY (role, module)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     "); }catch(Exception $e){}
     try{ db()->exec("ALTER TABLE eco_module_permissions ADD COLUMN can_rename TINYINT(1) NOT NULL DEFAULT 0"); }catch(Exception $e){}
     try{ db()->exec("ALTER TABLE eco_module_permissions ADD COLUMN can_group TINYINT(1) NOT NULL DEFAULT 0"); }catch(Exception $e){}
-    try{ db()->exec("ALTER TABLE eco_module_permissions ADD COLUMN can_priority TINYINT(1) NOT NULL DEFAULT 0"); }catch(Exception $e){}
 
     try{ db()->exec("
     CREATE TABLE IF NOT EXISTS eco_user_permissions (
@@ -287,13 +282,11 @@ function runMigrations(): void {
         can_delete TINYINT(1) NOT NULL DEFAULT 0,
         can_rename TINYINT(1) NOT NULL DEFAULT 0,
         can_group  TINYINT(1) NOT NULL DEFAULT 0,
-        can_priority TINYINT(1) NOT NULL DEFAULT 0,
         PRIMARY KEY (user_id, module)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     "); }catch(Exception $e){}
     try{ db()->exec("ALTER TABLE eco_user_module_permissions ADD COLUMN can_rename TINYINT(1) NOT NULL DEFAULT 0"); }catch(Exception $e){}
     try{ db()->exec("ALTER TABLE eco_user_module_permissions ADD COLUMN can_group TINYINT(1) NOT NULL DEFAULT 0"); }catch(Exception $e){}
-    try{ db()->exec("ALTER TABLE eco_user_module_permissions ADD COLUMN can_priority TINYINT(1) NOT NULL DEFAULT 0"); }catch(Exception $e){}
 
     db()->exec("
     CREATE TABLE IF NOT EXISTS eco_seo_content (
