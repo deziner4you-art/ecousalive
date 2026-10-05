@@ -62,7 +62,7 @@ class Task {
                       OR t.aplus_worker_id = ?
                       OR t.work_completed_by_worker_id = ?
                   )
-                ORDER BY (CASE WHEN t.is_urgent > 0 AND t.work_status != 'Work Done' THEN t.is_urgent ELSE 999 END) ASC, t.id DESC
+                ORDER BY t.id DESC
                 ");
                 $stmt->execute([$user['id'], $user['id'], $user['id'], $user['id']]);
                 break;
@@ -93,7 +93,7 @@ class Task {
                             AND (t2.work_status = 'In QA' OR t2.work_status = 'SEO Review' OR t2.work_status = 'Info Done' OR t2.qa_submitted_by = ?)
                       ))
                   )
-                ORDER BY (CASE WHEN t.is_urgent > 0 AND t.work_status != 'Work Done' THEN t.is_urgent ELSE 999 END) ASC, t.id DESC
+                ORDER BY t.id DESC
                 ");
                 $stmt->execute([$user['id'], $user['id']]);
                 break;
@@ -130,7 +130,7 @@ class Task {
                             )
                       ))
                   )
-                ORDER BY (CASE WHEN t.is_urgent > 0 AND t.work_status != 'Work Done' THEN t.is_urgent ELSE 999 END) ASC, t.id DESC
+                ORDER BY t.id DESC
                 ");
                 $stmt->execute([$user['id'], $user['id'], $user['id'], $user['id']]);
                 break;
@@ -152,7 +152,7 @@ class Task {
                       a.worker_id = ?
                       OR t.ai_worked_by = ?
                   )
-                ORDER BY (CASE WHEN t.is_urgent > 0 AND t.work_status != 'Work Done' THEN t.is_urgent ELSE 999 END) ASC, t.id DESC
+                ORDER BY t.id DESC
                 ");
                 $stmt->execute([$user['id'], $user['id']]);
                 break;
@@ -170,7 +170,7 @@ class Task {
                 LEFT JOIN eco_tool_users infow ON infow.id = t.info_worker_id
                 LEFT JOIN eco_tool_users aplusw ON aplusw.id = t.aplus_worker_id
                 WHERE t.deleted_at IS NULL
-                ORDER BY (CASE WHEN t.is_urgent > 0 AND t.published_at IS NULL THEN t.is_urgent ELSE 999 END) ASC, t.id DESC
+                ORDER BY t.is_urgent DESC, t.id DESC
                 ");
                 $stmt->execute([]);
                 break;
@@ -188,7 +188,7 @@ class Task {
                 LEFT JOIN eco_tool_users infow ON infow.id = t.info_worker_id
                 LEFT JOIN eco_tool_users aplusw ON aplusw.id = t.aplus_worker_id
                 WHERE t.deleted_at IS NULL
-                ORDER BY (CASE WHEN t.is_urgent > 0 AND t.work_status != 'Work Done' THEN t.is_urgent ELSE 999 END) ASC, t.id DESC
+                ORDER BY t.id DESC
                 ");
                 break;
         }
