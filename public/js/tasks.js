@@ -1318,6 +1318,68 @@ function buildCard(item){
             priorityMetaBadge = `<span class="badge-priority p0" title="Urgent">🔴 Urgent</span>`;
         }
     }
+
+    /* Invoice badge */
+    var invBadge = '';
+    if(!isListing){
+        var paidByPayroll = item.payslip_status === 'Paid';
+        var invoicePaid   = item.invoice_status === 'Paid' || item.info_invoice_status === 'Paid' || item.aplus_invoice_status === 'Paid';
+        var isWorkerView  = ['worker','qa','d4u_writer','seo_manager','ai_work'].includes(ROLE);
+
+        if(isWorkerView){
+            if(paidByPayroll){
+                invBadge = '<span class="inv-badge-paid" style="margin-right:12px;">✅ Paid</span>';
+            } else if(item.payslip_status === 'Generated'){
+                invBadge = '<span class="inv-badge-invoiced" style="margin-right:12px;">🧾 Payslip Generated</span>';
+            } else if(invoicePaid){
+                invBadge = '<span class="inv-badge-invoiced" style="margin-right:12px;">🧾 Invoiced</span>';
+            } else {
+                invBadge = '';
+            }
+        } else {
+            if(item.product_type === 'Info + A Plus'){
+                var iBadge = (item.info_invoice_status === 'Paid')     ? '<span class="inv-badge-paid" style="margin-right:4px;">✅ Info Paid</span>'
+                           : (item.info_invoice_status === 'Invoiced') ? '<span class="inv-badge-invoiced" style="margin-right:4px;">🧾 Info Invoiced</span>' : '';
+                var aBadge = (item.aplus_invoice_status === 'Paid')    ? '<span class="inv-badge-paid" style="margin-right:12px;">✅ A+ Paid</span>'
+                           : (item.aplus_invoice_status === 'Invoiced')? '<span class="inv-badge-invoiced" style="margin-right:12px;">🧾 A+ Invoiced</span>' : '';
+                invBadge = iBadge + aBadge;
+            } else if(item.product_type === 'Infographics'){
+                invBadge = (item.info_invoice_status === 'Invoiced') ? '<span class="inv-badge-invoiced" style="margin-right:12px;">🧾 Invoiced</span>'
+                         : (item.info_invoice_status === 'Paid')     ? '<span class="inv-badge-paid" style="margin-right:12px;">✅ Paid</span>' : '';
+            } else if(item.product_type === 'A+'){
+                invBadge = (item.aplus_invoice_status === 'Invoiced') ? '<span class="inv-badge-invoiced" style="margin-right:12px;">🧾 Invoiced</span>'
+                         : (item.aplus_invoice_status === 'Paid')     ? '<span class="inv-badge-paid" style="margin-right:12px;">✅ Paid</span>' : '';
+            } else {
+                invBadge = (item.invoice_status === 'Invoiced') ? '<span class="inv-badge-invoiced" style="margin-right:12px;">🧾 Invoiced</span>'
+                         : (item.invoice_status === 'Paid')     ? '<span class="inv-badge-paid" style="margin-right:12px;">✅ Paid</span>' : '';
+            }
+        }
+    }
+
+    var typeBadge = '';
+    var tbStyle = "display:inline-block; font-size:9.5px; padding:2px 6px; white-space:nowrap; border-radius:12px; box-shadow:0 2px 4px rgba(0,0,0,0.3); letter-spacing:0.5px; line-height:1;";
+    if(item.product_type === 'Info + A Plus'){
+        typeBadge = '<span style="' + tbStyle + ' background:#8b5cf6; color:#fff;">Info + A Plus</span>';
+    } else if(item.product_type === 'Infographics'){
+        typeBadge = '<span style="' + tbStyle + ' background:#f59e0b; color:#fff;">Infographics</span>';
+    } else {
+        typeBadge = '<span style="' + tbStyle + ' background:#0ea5e9; color:#fff;">A Plus</span>';
+    }
+
+    var linkIcon = '';
+    if(item.product_link && item.product_link.trim() !== ''){
+        var cleanLink = item.product_link.trim();
+        if(!/^https?:\/\//i.test(cleanLink)){
+            cleanLink = 'https://' + cleanLink;
+        }
+        linkIcon = ` <a href="${cleanLink}" target="_blank" rel="noopener" onclick="event.stopPropagation();" class="product-research-link" title="Research Link">🔗 Ref. link for Research</a>`;
+    }
+
+    var revCount = parseInt(item.revision_count) || 0;
+    if(!revCount){ try{ if(item.revision_log) revCount = JSON.parse(item.revision_log).length; }catch(e){} }
+    if(!revCount && item.revision_comment) revCount = 1;
+    var revBadge = revCount > 0 ? `<span style="display:inline-block;padding:1px 8px;border-radius:10px;background:#7c2d12;color:#fed7aa;font-size:10px;font-weight:bold;margin-left:4px;vertical-align:middle;border:1px solid #c2410c;">✏ Changes ${revCount}</span>` : '';
+
     var publishedBadge = (item.published_at && (isAdmin || ROLE === 'eco_client' || isListing))
         ? `<span style="display:inline-block;padding:1px 8px;border-radius:10px;background:#15803d;color:#d1fae5;font-size:10px;font-weight:bold;margin-left:5px;vertical-align:middle;">📦 Published</span>` : '';
 
