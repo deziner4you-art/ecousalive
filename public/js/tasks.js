@@ -1448,7 +1448,10 @@ function buildCard(item){
       ${item.product_type==='Info + A Plus'&&item.status!=='All Generated'?'<option value="set_all_generated">🏷 Tag as All Generated</option>':''}
       ${item.product_type==='Info + A Plus'&&item.status==='All Generated'?'<option value="set_generated">🏷 Tag as Generated</option>':''}
       <option value="hold|${item.status==='Hold'?0:1}">${item.status==='Hold'?'▶ Unhold':'⏸ Hold'}</option>
-      <option value="urgent|${isUrgent?0:1}">${isUrgent?'✅ Unmark Urgent':'🔴 Mark Urgent'}</option>
+      ${isUrgent ? '<option value="urgent_remove">❌ Remove Priority (Normal Blue)</option>' : ''}
+      <option value="urgent_1">🚨 Mark Priority 1 (High)</option>
+      <option value="urgent_2">⚡ Mark Priority 2 (Medium)</option>
+      <option value="urgent_3">📌 Mark Priority 3 (Normal)</option>
       <option value="settype|${item.product_type==='Info + A Plus'?'':'Info + A Plus'}">${item.product_type==='Info + A Plus'?'🏷 Remove Info+A Plus':'🏷 Set Info + A Plus'}</option>
       <option value="clear">🧹 Clear Task</option>
       <option value="delete">🗑 Delete Task</option>
@@ -1930,9 +1933,10 @@ function buildActionButtons(item, isAdmin, isWorker, isQa, isListing, isUrgent, 
     }
     if(canToggleUrgent && item.work_status !== 'Work Done' && !item.published_at){
         if(isUrgent){
-            btns += `<button class="actionbtn" style="background:#475569;color:#fff;" onclick="setUrgent(${item.id},0)">⚪ Clear Urgent (Normal)</button>`;
+            btns += `<button class="actionbtn" style="background:#475569;color:#fff;border:1px solid #64748b;" onclick="setUrgent(${item.id},0)" title="Priority khatam karein aur product/group ko normal blue karein">❌ Remove Priority</button>`;
+            btns += `<button class="actionbtn" style="background:#ea580c;color:#fff;" onclick="openPriorityPicker(${item.id})" title="Priority level change karein">✏️ Change Priority</button>`;
         } else {
-            btns += `<button class="actionbtn" style="background:#dc2626;color:#fff;" onclick="openPriorityPicker(${item.id})">🚨 Mark Urgent / Priority</button>`;
+            btns += `<button class="actionbtn" style="background:#dc2626;color:#fff;" onclick="openPriorityPicker(${item.id})" title="Priority level set karein">🚨 Set Priority</button>`;
         }
     }
     if((ROLE === 'd4u_writer' || ROLE === 'seo_manager') && (item.status === 'Pending' || item.status === 'All Generated')) btns += `<button class="btn-writer-save actionbtn" onclick="writerSave(${item.id})">💾 Save Draft</button>`;
@@ -1996,9 +2000,10 @@ function buildAdminButtons(item, isUrgent, lock){
     }
     if((typeof CAN_MODIFY_URGENT !== 'undefined' ? CAN_MODIFY_URGENT : true) && item.work_status !== 'Work Done' && !item.published_at){
         if(isUrgent){
-            btns += `<button class="actionbtn" style="background:#475569;color:#fff;" onclick="setUrgent(${item.id},0)">⚪ Clear Urgent (Normal)</button>`;
+            btns += `<button class="actionbtn" style="background:#475569;color:#fff;border:1px solid #64748b;" onclick="setUrgent(${item.id},0)" title="Priority khatam karein aur product/group ko normal blue karein">❌ Remove Priority</button>`;
+            btns += `<button class="actionbtn" style="background:#ea580c;color:#fff;" onclick="openPriorityPicker(${item.id})" title="Priority level change karein">✏️ Change Priority</button>`;
         } else {
-            btns += `<button class="actionbtn" style="background:#dc2626;color:#fff;" onclick="openPriorityPicker(${item.id})">🚨 Mark Urgent / Priority</button>`;
+            btns += `<button class="actionbtn" style="background:#dc2626;color:#fff;" onclick="openPriorityPicker(${item.id})" title="Priority level set karein">🚨 Set Priority</button>`;
         }
     }
     return btns;
@@ -2986,8 +2991,37 @@ function bulkApplyUrgentPriority() {
     });
 }
 
+function bulkRemoveUrgentPriority() {
+    if (SELECTED_BULK_PRODUCTS.length === 0) {
+        alert('Pehle products select karein');
+        return;
+    }
+    var count = SELECTED_BULK_PRODUCTS.length;
+    var msg = 'Kya aap select shuda ' + count + ' products aur un ke groups se Priority hatana chahte hain (Normal blue karna chahte hain)?';
+    _confirm(msg, function(){
+        var fd = new FormData();
+        fd.append('action', 'bulk_update_tasks');
+        fd.append('task_ids', SELECTED_BULK_PRODUCTS.join(','));
+        fd.append('bulk_action', 'remove_urgent');
+        fd.append('priority', 0);
+        if(typeof CSRF_TOKEN !== 'undefined') fd.append('csrf_token', CSRF_TOKEN);
+        fetch('index.php', { method: 'POST', body: fd })
+            .then(function(r){ return r.json(); })
+            .then(function(r){
+                if (r.success) {
+                    SELECTED_BULK_PRODUCTS = [];
+                    updateBulkActionBar();
+                    loadTasks();
+                } else {
+                    alert('Failed: ' + (r.message || ''));
+                }
+            })
+            .catch(function(err){ alert('Request failed: ' + err.message); });
+    });
+}
+
 function openPriorityPicker(taskId) {
-    var p = prompt("Select Priority for this product (aur is ke pooray group ke liye):\n1 = 🚨 Priority 1 (High)\n2 = ⚡ Priority 2 (Medium)\n3 = 📌 Priority 3 (Normal Urgent)\n0 = ⚪ Clear Urgent / Normal Blue", "1");
+    var p = prompt("Select Priority for this product (aur is ke pooray group ke liye):\n1 = 🚨 Priority 1 (High)\n2 = ⚡ Priority 2 (Medium)\n3 = 📌 Priority 3 (Normal Urgent)\n0 = ❌ Remove Priority / Normal Blue", "1");
     if(p === null) return;
     var pInt = parseInt(p);
     if(isNaN(pInt) || pInt < 0 || pInt > 3) {

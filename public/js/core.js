@@ -491,7 +491,7 @@ function setUrgent(taskId, urgent, priority){
     var pName = priority === 1 ? 'Priority 1 (High)' : (priority === 2 ? 'Priority 2 (Medium)' : (priority === 3 ? 'Priority 3 (Normal)' : 'Urgent'));
     var msg = urgent
         ? ('Is product aur is ke pooray group ko ' + pName + ' mark karein?')
-        : 'Is product aur is ke pooray group se URGENT aur Priority tag hatayein (Normal blue karein)?';
+        : 'Is product aur is ke pooray group se Priority hatayein (Normal blue karein)?';
     _confirm(msg, function(){
         var fd = new FormData();
         fd.append('action', 'toggle_urgent');

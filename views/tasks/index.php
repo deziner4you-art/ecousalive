@@ -221,9 +221,10 @@ if (current_user()) {
                 <option value="1">🚨 Priority 1 (High)</option>
                 <option value="2">⚡ Priority 2 (Medium)</option>
                 <option value="3">📌 Priority 3 (Normal)</option>
-                <option value="0">⚪ Clear Urgent / Reset</option>
+                <option value="0">❌ Remove Priority (Normal Blue)</option>
             </select>
             <button type="button" onclick="bulkApplyUrgentPriority()" style="background:#dc2626; color:#fff; border:none; padding:6px 12px; border-radius:5px; font-size:12px; font-weight:bold; cursor:pointer; transition:background-color 0.15s;" onmouseover="this.style.backgroundColor='#b91c1c';" onmouseout="this.style.backgroundColor='#dc2626';" title="Set Urgent & Priority for selected products and groups">Set Priority</button>
+            <button type="button" onclick="bulkRemoveUrgentPriority()" style="background:#475569; color:#f1f5f9; border:1px solid #64748b; padding:6px 12px; border-radius:5px; font-size:12px; font-weight:bold; cursor:pointer; transition:background-color 0.15s;" onmouseover="this.style.backgroundColor='#334155';" onmouseout="this.style.backgroundColor='#475569';" title="Remove Priority from selected products and groups (Reset to Normal Blue)">❌ Remove Priority</button>
         </div>
         <?php endif; ?>
         <button type="button" onclick="bulkGroupSelected()" style="background:#8b5cf6; color:#fff; border:none; padding:8px 16px; border-radius:6px; font-size:13px; font-weight:bold; cursor:pointer; display:inline-flex; align-items:center; gap:6px; transition:background-color 0.2s; box-shadow: 0 2px 4px rgba(139,92,246,0.3);" onmouseover="this.style.backgroundColor='#7c3aed';" onmouseout="this.style.backgroundColor='#8b5cf6';" title="Group all selected products together into one family">💜 Group Selected</button>
@@ -233,7 +234,7 @@ if (current_user()) {
             <option value="urgent_1">🚨 Mark Urgent - Priority 1</option>
             <option value="urgent_2">⚡ Mark Urgent - Priority 2</option>
             <option value="urgent_3">📌 Mark Urgent - Priority 3</option>
-            <option value="remove_urgent">⚪ Remove Urgent / Reset to Normal</option>
+            <option value="remove_urgent">❌ Remove Priority (Reset to Normal Blue)</option>
             <?php endif; ?>
             <option value="move_vendor">🚚 Move to Selected Vendor</option>
             <option value="group">💜 Group Selected Products</option>

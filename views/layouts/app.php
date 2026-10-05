@@ -2012,9 +2012,9 @@ try {
 </div>
 
 <!-- ── JS Modules ── -->
-<?php $v = '2.9.1'; ?>
+<?php $v = '2.9.2'; ?>
 <script src="<?= $publicUrl ?>/js/core.js?v=<?= $v ?>"></script>
-<script src="<?= $publicUrl ?>/js/tasks.js?v=3.4.0"></script>
+<script src="<?= $publicUrl ?>/js/tasks.js?v=3.4.1"></script>
 <script src="<?= $publicUrl ?>/js/admin.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/invoices.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/payroll.js?v=2.7.13"></script>
