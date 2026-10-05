@@ -16,9 +16,11 @@ $isSEO     = $user['role'] === 'seo_manager';
 $isListing = $user['role'] === 'eco_listing';
 
 $userPerms = ModulePermission::getForUser($user);
-$canAddProduct = $isAdmin || !empty($userPerms['products']['add']);
-$canRenameProduct = $isAdmin || !empty($userPerms['products']['rename']);
-$canGroupProduct = $isAdmin || !empty($userPerms['products']['group']);
+$uname_cur = strtolower($user['username'] ?? '');
+$isIrfanAi = ($user['role'] === 'ai_work' || $uname_cur === 'irfan');
+$canAddProduct = $isAdmin || $isIrfanAi || !empty($userPerms['products']['add']);
+$canRenameProduct = $isAdmin || $isIrfanAi || !empty($userPerms['products']['rename']);
+$canGroupProduct = $isAdmin || $isIrfanAi || !empty($userPerms['products']['group']);
 
 /* Build the full filter option list */
 $allFilters = [
@@ -56,7 +58,7 @@ $allFilters = [
 ];
 
 /* Allowed keys for this role */
-$allowed = $filterPerms ?: array_keys($allFilters);
+$allowed = ($isAdmin || $isIrfanAi) ? array_keys($allFilters) : ($filterPerms ?: array_keys($allFilters));
 if(!in_array('Info Done', $allowed)){
     $allowed[] = 'Info Done';
 }

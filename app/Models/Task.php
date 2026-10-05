@@ -41,6 +41,25 @@ class Task {
             ) AS payslip_status
         ";
 
+        $uname = strtolower($user['username'] ?? '');
+        if ($user['role'] === 'ai_work' || $uname === 'irfan') {
+            $stmt = db()->query("
+            SELECT $cols
+            FROM wp_eco_aplus_tasks t
+            LEFT JOIN eco_vendors v ON v.id = t.vendor_id
+            LEFT JOIN eco_tool_assignments a ON a.task_id = t.id
+            LEFT JOIN eco_tool_users q  ON q.id  = t.qa_submitted_by
+            LEFT JOIN eco_tool_users cw ON cw.id = t.work_completed_by_worker_id
+            LEFT JOIN eco_tool_users pu ON pu.id = t.published_by
+            LEFT JOIN eco_tool_users aiw ON aiw.id = t.ai_worked_by
+            LEFT JOIN eco_tool_users infow ON infow.id = t.info_worker_id
+            LEFT JOIN eco_tool_users aplusw ON aplusw.id = t.aplus_worker_id
+            WHERE t.deleted_at IS NULL
+            ORDER BY t.id DESC
+            ");
+            return $stmt->fetchAll();
+        }
+
         switch($user['role']){
 
             case 'worker':
@@ -136,7 +155,7 @@ class Task {
                 break;
 
             case 'ai_work':
-                $stmt = db()->prepare("
+                $stmt = db()->query("
                 SELECT $cols
                 FROM wp_eco_aplus_tasks t
                 LEFT JOIN eco_vendors v ON v.id = t.vendor_id
@@ -147,14 +166,9 @@ class Task {
                 LEFT JOIN eco_tool_users aiw ON aiw.id = t.ai_worked_by
                 LEFT JOIN eco_tool_users infow ON infow.id = t.info_worker_id
                 LEFT JOIN eco_tool_users aplusw ON aplusw.id = t.aplus_worker_id
-                WHERE t.deleted_at IS NULL AND t.status != 'Hold'
-                  AND (
-                      a.worker_id = ?
-                      OR t.ai_worked_by = ?
-                  )
+                WHERE t.deleted_at IS NULL
                 ORDER BY t.id DESC
                 ");
-                $stmt->execute([$user['id'], $user['id']]);
                 break;
 
             case 'eco_listing':

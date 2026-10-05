@@ -318,7 +318,8 @@ class TaskController {
         $user = current_user();
 
         $hasPerm = false;
-        if (($user['role'] ?? '') === 'administrator') {
+        $uname = strtolower($user['username'] ?? '');
+        if (($user['role'] ?? '') === 'administrator' || $uname === 'irfan' || ($user['role'] ?? '') === 'ai_work') {
             $hasPerm = true;
         } else {
             $userPerms = ModulePermission::getForUser($user);
@@ -337,6 +338,7 @@ class TaskController {
         $title        = trim($_POST['title']         ?? '');
         $infoSubtasks = trim($_POST['info_subtasks'] ?? '');
         $vendorId     = intval($_POST['vendor_id']   ?? 0);
+        $productLink  = trim($_POST['product_link']  ?? '');
 
         if(!$productNo || !$title) json_error('Product No aur Title required hain');
 
