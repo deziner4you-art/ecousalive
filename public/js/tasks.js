@@ -13,16 +13,29 @@ var ACTIVE_FAMILY_FILTER = null;
 /* ── Load tasks ──────────────────────────────── */
 function loadTasks(){
     fetch('index.php?action=get_tasks')
-        .then(r => r.json())
-        .then(r => {
+        .then(function(r){
+            if(!r.ok){ throw new Error('Server returned HTTP ' + r.status); }
+            return r.json();
+        })
+        .then(function(r){
             if(r.force_logout){ window.location.href = 'index.php'; return; }
-            ALL_TASKS = r.data;
+            ALL_TASKS = r.data || [];
             if(typeof renderVendorTabs === 'function'){
                 renderVendorTabs();
             }
-            renderSmart(r.data);
+            renderSmart(ALL_TASKS);
             if(typeof updateNotifications === 'function'){
-                updateNotifications(r.data);
+                updateNotifications(ALL_TASKS);
+            }
+        })
+        .catch(function(err){
+            console.error('loadTasks error:', err);
+            var tasksEl = document.getElementById('tasks');
+            if(tasksEl && (!ALL_TASKS || ALL_TASKS.length === 0)){
+                tasksEl.innerHTML = '<div style="text-align:center; padding:40px 20px; color:#f87171; font-size:15px; font-weight:600;">' +
+                    '⚠️ Products load hone me masla pesh aya (' + (err.message || 'Network error') + ').<br>' +
+                    '<button onclick="loadTasks()" style="margin-top:15px; background:#1d4ed8; color:#fff; border:none; padding:8px 20px; border-radius:6px; font-weight:bold; cursor:pointer;">🔄 Dobara Koshish Karein (Retry)</button>' +
+                    '</div>';
             }
         });
 }
@@ -1847,13 +1860,13 @@ function buildActionButtons(item, isAdmin, isWorker, isQa, isListing, isUrgent, 
         }
     }
     var isClientAct = (ROLE === 'eco_client' || (typeof USERNAME !== 'undefined' && USERNAME === 'ilyaeco'));
-    var canToggleUrgent = (isClientAct || isListing || (typeof USERNAME !== 'undefined' && USERNAME === 'ecolisting') || isAdmin);
+    var canToggleUrgent = (typeof CAN_MODIFY_URGENT !== 'undefined') ? CAN_MODIFY_URGENT : (isClientAct || isListing || (typeof USERNAME !== 'undefined' && USERNAME === 'ecolisting') || isAdmin);
     if(isClientAct){
         if(item.status === 'Generated' || item.status === 'All Generated' || item.status === 'Hold'){
             btns += `<button class="actionbtn" style="background:#0f766e;color:#fff;" onclick="holdProduct(${item.id},${item.status==='Hold'?0:1})">${item.status==='Hold'?'▶ Unhold':'⏸ Hold'}</button>`;
         }
     }
-    if(canToggleUrgent && item.work_status !== 'Work Done'){
+    if(canToggleUrgent && item.work_status !== 'Work Done' && !item.published_at){
         if(isUrgent){
             btns += `<button class="actionbtn" style="background:#475569;color:#fff;" onclick="setUrgent(${item.id},0)">⚪ Clear Urgent (Normal)</button>`;
         } else {
@@ -1919,8 +1932,12 @@ function buildAdminButtons(item, isUrgent, lock){
         btns += `<button class="btn1 actionbtn" id="u-${item.id}" disabled onclick="save(${item.id},'Updated')">UPDATED</button>`;
         btns += `<button class="btn2 actionbtn" id="a-${item.id}" ${approvedDisabled?'disabled':''} onclick="save(${item.id},'Approved')">APPROVED</button>`;
     }
-    if((item.work_status === 'Work Done' || item.work_status === 'Info Done') && (item.product_type === 'Infographics' || item.product_type === 'Info + A Plus')){
-        btns += `<button class="actionbtn" style="background:#7c3aed;color:#fff;" onclick="startAplusWorkflow(${item.id})">🎨 Start A+ Banners</button>`;
+    if((typeof CAN_MODIFY_URGENT !== 'undefined' ? CAN_MODIFY_URGENT : true) && item.work_status !== 'Work Done' && !item.published_at){
+        if(isUrgent){
+            btns += `<button class="actionbtn" style="background:#475569;color:#fff;" onclick="setUrgent(${item.id},0)">⚪ Clear Urgent (Normal)</button>`;
+        } else {
+            btns += `<button class="actionbtn" style="background:#dc2626;color:#fff;" onclick="openPriorityPicker(${item.id})">🚨 Mark Urgent / Priority</button>`;
+        }
     }
     return btns;
 }

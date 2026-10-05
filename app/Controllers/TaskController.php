@@ -59,6 +59,14 @@ class TaskController {
             json_error('No products selected');
         }
 
+        $isUrgentAction = (str_starts_with($bulk_action, 'urgent') || $bulk_action === 'remove_urgent');
+        if ($isUrgentAction) {
+            $allowedUrgent = ($u['role'] === 'administrator' || $u['role'] === 'eco_listing' || $uname === 'ecolisting' || $uname === 'ilyaeco');
+            if (!$allowedUrgent) {
+                json_error('Only Admins and ecolisting can modify Urgent and Priority', 403);
+            }
+        }
+
         if ($bulk_action === 'urgent_1') {
             Task::bulkMarkUrgent($task_ids, 1);
             json_success(['message' => 'Products and groups marked as Priority 1 (High)']);

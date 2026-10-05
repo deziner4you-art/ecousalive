@@ -204,6 +204,17 @@ if(!in_array('Priority 3', $allowed)){ $allowed[] = 'Priority 3'; }
             </select>
             <button type="button" onclick="bulkMoveSelectedToVendor()" style="background:#0284c7; color:#fff; border:none; padding:6px 12px; border-radius:5px; font-size:12px; font-weight:bold; cursor:pointer; transition:background-color 0.15s;" onmouseover="this.style.backgroundColor='#0369a1';" onmouseout="this.style.backgroundColor='#0284c7';" title="Move selected products to chosen vendor">Move</button>
         </div>
+<?php
+$canModifyUrgent = false;
+if (current_user()) {
+    $u_chk = current_user();
+    $uname_chk = strtolower($u_chk['username'] ?? '');
+    if ($u_chk['role'] === 'administrator' || $u_chk['role'] === 'eco_listing' || $uname_chk === 'ecolisting' || $uname_chk === 'ilyaeco') {
+        $canModifyUrgent = true;
+    }
+}
+?>
+        <?php if($canModifyUrgent): ?>
         <!-- Priority Quick Widget -->
         <div style="display:flex; align-items:center; gap:6px; background:#0f172a; padding:4px 8px; border-radius:8px; border:1px solid #7f1d1d;">
             <select id="bulk-priority-select" style="background:transparent; border:none; color:#f87171; padding:5px 6px; font-size:13px; font-weight:700; outline:none; cursor:pointer; min-width:150px;">
@@ -214,13 +225,16 @@ if(!in_array('Priority 3', $allowed)){ $allowed[] = 'Priority 3'; }
             </select>
             <button type="button" onclick="bulkApplyUrgentPriority()" style="background:#dc2626; color:#fff; border:none; padding:6px 12px; border-radius:5px; font-size:12px; font-weight:bold; cursor:pointer; transition:background-color 0.15s;" onmouseover="this.style.backgroundColor='#b91c1c';" onmouseout="this.style.backgroundColor='#dc2626';" title="Set Urgent & Priority for selected products and groups">Set Priority</button>
         </div>
+        <?php endif; ?>
         <button type="button" onclick="bulkGroupSelected()" style="background:#8b5cf6; color:#fff; border:none; padding:8px 16px; border-radius:6px; font-size:13px; font-weight:bold; cursor:pointer; display:inline-flex; align-items:center; gap:6px; transition:background-color 0.2s; box-shadow: 0 2px 4px rgba(139,92,246,0.3);" onmouseover="this.style.backgroundColor='#7c3aed';" onmouseout="this.style.backgroundColor='#8b5cf6';" title="Group all selected products together into one family">💜 Group Selected</button>
         <select id="bulk-action-select" style="background:#0f172a; border:1px solid #334155; border-radius:6px; color:#e2e8f0; padding:8px 12px; font-size:13px; outline:none; cursor:pointer; min-width:175px;">
             <option value="">⚡ More Bulk Actions...</option>
+            <?php if($canModifyUrgent): ?>
             <option value="urgent_1">🚨 Mark Urgent - Priority 1</option>
             <option value="urgent_2">⚡ Mark Urgent - Priority 2</option>
             <option value="urgent_3">📌 Mark Urgent - Priority 3</option>
             <option value="remove_urgent">⚪ Remove Urgent / Reset to Normal</option>
+            <?php endif; ?>
             <option value="move_vendor">🚚 Move to Selected Vendor</option>
             <option value="group">💜 Group Selected Products</option>
             <option value="ungroup">❌ Remove from Group (Ungroup)</option>

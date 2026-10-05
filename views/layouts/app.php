@@ -1693,8 +1693,17 @@ if(current_user()){
         $role_bulk_action = !empty($perm_settings['bulk_action']);
     }
 }
+$can_modify_urgent = false;
+if(current_user()){
+    $u = current_user();
+    $uname = strtolower($u['username'] ?? '');
+    if($u['role'] === 'administrator' || $uname === 'ilyaeco' || $u['role'] === 'eco_listing' || $uname === 'ecolisting' || $u['role'] === 'eco_client'){
+        $can_modify_urgent = true;
+    }
+}
 ?>
 var HAS_BULK_ACTION = <?= $role_bulk_action ? 'true' : 'false' ?>;
+var CAN_MODIFY_URGENT = <?= $can_modify_urgent ? 'true' : 'false' ?>;
 <?php
 $allVendors = Vendor::getAll();
 $defaultVendor = Vendor::getDefault();
@@ -2003,9 +2012,9 @@ try {
 </div>
 
 <!-- ── JS Modules ── -->
-<?php $v = '2.8.9'; ?>
+<?php $v = '2.9.0'; ?>
 <script src="<?= $publicUrl ?>/js/core.js?v=<?= $v ?>"></script>
-<script src="<?= $publicUrl ?>/js/tasks.js?v=3.3.8"></script>
+<script src="<?= $publicUrl ?>/js/tasks.js?v=3.3.9"></script>
 <script src="<?= $publicUrl ?>/js/admin.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/invoices.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/payroll.js?v=2.7.13"></script>

@@ -170,7 +170,7 @@ class Task {
                 LEFT JOIN eco_tool_users infow ON infow.id = t.info_worker_id
                 LEFT JOIN eco_tool_users aplusw ON aplusw.id = t.aplus_worker_id
                 WHERE t.deleted_at IS NULL
-                ORDER BY t.is_urgent DESC, t.id DESC
+                ORDER BY t.id DESC
                 ");
                 $stmt->execute([]);
                 break;
