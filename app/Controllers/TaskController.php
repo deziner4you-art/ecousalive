@@ -22,7 +22,7 @@ class TaskController {
         $u = current_user();
         $uname = strtolower($u['username'] ?? '');
         $has_permission = false;
-        if ($u['role'] === 'administrator' || $uname === 'ilyaeco' || $uname === 'irfan' || $u['role'] === 'ai_work' || ModulePermission::can($u, 'products', 'group')) {
+        if ($u['role'] === 'administrator' || $uname === 'ilyaeco' || $uname === 'irfan' || $u['role'] === 'ai_work' || $u['role'] === 'eco_listing' || $uname === 'ecolisting' || ModulePermission::can($u, 'products', 'group') || ModulePermission::can($u, 'products', 'priority')) {
             $has_permission = true;
         } else {
             $settings = null;
@@ -50,7 +50,8 @@ class TaskController {
         verify_csrf();
 
         $task_ids_raw = $_POST['task_ids'] ?? '';
-        $bulk_action = $_POST['bulk_action'] ?? ''; // 'urgent' or 'hold'
+        $bulk_action = $_POST['bulk_action'] ?? '';
+        $priority = intval($_POST['priority'] ?? 0);
 
         $task_ids = array_filter(array_map('intval', explode(',', $task_ids_raw)));
 
@@ -58,9 +59,23 @@ class TaskController {
             json_error('No products selected');
         }
 
-        if ($bulk_action === 'urgent') {
-            Task::bulkMarkUrgent($task_ids);
-            json_success(['message' => 'Products marked as urgent']);
+        if ($bulk_action === 'urgent' || $bulk_action === 'urgent_0') {
+            $p = $priority > 0 ? $priority : 0;
+            Task::bulkMarkUrgent($task_ids, $p);
+            $msg = $p > 0 ? "Products marked as Urgent (Priority $p)" : "Products marked as urgent";
+            json_success(['message' => $msg]);
+        } elseif ($bulk_action === 'urgent_1') {
+            Task::bulkMarkUrgent($task_ids, 1);
+            json_success(['message' => 'Products marked as Urgent (Priority 1)']);
+        } elseif ($bulk_action === 'urgent_2') {
+            Task::bulkMarkUrgent($task_ids, 2);
+            json_success(['message' => 'Products marked as Urgent (Priority 2)']);
+        } elseif ($bulk_action === 'urgent_3') {
+            Task::bulkMarkUrgent($task_ids, 3);
+            json_success(['message' => 'Products marked as Urgent (Priority 3)']);
+        } elseif ($bulk_action === 'remove_urgent') {
+            Task::bulkRemoveUrgent($task_ids);
+            json_success(['message' => 'Urgent status and priority removed from selected products']);
         } elseif ($bulk_action === 'hold') {
             Task::bulkMarkHold($task_ids);
             json_success(['message' => 'Products marked as hold']);
@@ -268,11 +283,14 @@ class TaskController {
     public function toggleUrgent(): void {
         AuthMiddleware::requireAuth();
         $user = current_user();
-        if($user['role'] !== 'eco_client' && $user['role'] !== 'administrator') json_error('Unauthorized', 403);
+        $uname = strtolower($user['username'] ?? '');
+        $canToggle = ($user['role'] === 'eco_client' || $user['role'] === 'administrator' || $user['role'] === 'eco_listing' || $uname === 'ecolisting' || $uname === 'ilyaeco' || ModulePermission::can($user, 'products', 'priority'));
+        if(!$canToggle) json_error('Unauthorized', 403);
         verify_csrf();
 
         $taskId = intval($_POST['task_id'] ?? 0);
         $urgent = intval($_POST['urgent']  ?? 0) ? 1 : 0;
+        $priority = intval($_POST['priority'] ?? 0);
         if(!$taskId) json_error('Invalid task');
 
         if($user['role'] === 'eco_client'){
@@ -285,7 +303,7 @@ class TaskController {
             }
         }
 
-        Task::toggleUrgent($taskId, $urgent);
+        Task::toggleUrgent($taskId, $urgent, $priority);
         json_success();
     }
 

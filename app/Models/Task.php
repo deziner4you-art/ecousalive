@@ -62,7 +62,7 @@ class Task {
                       OR t.aplus_worker_id = ?
                       OR t.work_completed_by_worker_id = ?
                   )
-                ORDER BY t.id DESC
+                ORDER BY (t.is_urgent = 1 AND t.work_status != 'Work Done') DESC, (CASE WHEN t.priority > 0 THEN t.priority ELSE 999 END) ASC, t.id DESC
                 ");
                 $stmt->execute([$user['id'], $user['id'], $user['id'], $user['id']]);
                 break;
@@ -93,7 +93,7 @@ class Task {
                             AND (t2.work_status = 'In QA' OR t2.work_status = 'SEO Review' OR t2.work_status = 'Info Done' OR t2.qa_submitted_by = ?)
                       ))
                   )
-                ORDER BY t.id DESC
+                ORDER BY (t.is_urgent = 1 AND t.work_status != 'Work Done') DESC, (CASE WHEN t.priority > 0 THEN t.priority ELSE 999 END) ASC, t.id DESC
                 ");
                 $stmt->execute([$user['id'], $user['id']]);
                 break;
@@ -130,7 +130,7 @@ class Task {
                             )
                       ))
                   )
-                ORDER BY t.id DESC
+                ORDER BY (t.is_urgent = 1 AND t.work_status != 'Work Done') DESC, (CASE WHEN t.priority > 0 THEN t.priority ELSE 999 END) ASC, t.id DESC
                 ");
                 $stmt->execute([$user['id'], $user['id'], $user['id'], $user['id']]);
                 break;
@@ -152,7 +152,7 @@ class Task {
                       a.worker_id = ?
                       OR t.ai_worked_by = ?
                   )
-                ORDER BY t.id DESC
+                ORDER BY (t.is_urgent = 1 AND t.work_status != 'Work Done') DESC, (CASE WHEN t.priority > 0 THEN t.priority ELSE 999 END) ASC, t.id DESC
                 ");
                 $stmt->execute([$user['id'], $user['id']]);
                 break;
@@ -170,7 +170,7 @@ class Task {
                 LEFT JOIN eco_tool_users infow ON infow.id = t.info_worker_id
                 LEFT JOIN eco_tool_users aplusw ON aplusw.id = t.aplus_worker_id
                 WHERE t.deleted_at IS NULL
-                ORDER BY t.is_urgent DESC, t.id DESC
+                ORDER BY (t.is_urgent = 1 AND t.published_at IS NULL) DESC, (CASE WHEN t.priority > 0 THEN t.priority ELSE 999 END) ASC, t.id DESC
                 ");
                 $stmt->execute([]);
                 break;
@@ -188,7 +188,7 @@ class Task {
                 LEFT JOIN eco_tool_users infow ON infow.id = t.info_worker_id
                 LEFT JOIN eco_tool_users aplusw ON aplusw.id = t.aplus_worker_id
                 WHERE t.deleted_at IS NULL
-                ORDER BY t.id DESC
+                ORDER BY (t.is_urgent = 1 AND t.work_status != 'Work Done') DESC, (CASE WHEN t.priority > 0 THEN t.priority ELSE 999 END) ASC, t.id DESC
                 ");
                 break;
         }
@@ -379,7 +379,7 @@ class Task {
                 SET media_link=?, work_status='Info Done',
                     info_worker_id=COALESCE(info_worker_id, ?),
                     work_completed_by_worker_id=COALESCE(work_completed_by_worker_id, ?),
-                    qa_submitted_at=NOW(), qa_submitted_by=?, is_urgent=0, active_revision_type=NULL, last_activity_at=NOW()
+                    qa_submitted_at=NOW(), qa_submitted_by=?, is_urgent=0, priority=0, active_revision_type=NULL, last_activity_at=NOW()
                 WHERE id=? AND work_status='In QA'
             ");
             $stmt->execute([$mediaLink, $workerId, $workerId, $user['id'], $taskId]);
@@ -392,7 +392,7 @@ class Task {
             $stmt = db()->prepare("
                 UPDATE wp_eco_aplus_tasks
                 SET media_link=?, seo_doc_link=?, work_status='Work Done',
-                    qa_submitted_at=NOW(), seo_submitted_by=?, is_urgent=0, active_revision_type=NULL, last_activity_at=NOW()
+                    qa_submitted_at=NOW(), seo_submitted_by=?, is_urgent=0, priority=0, active_revision_type=NULL, last_activity_at=NOW()
                 WHERE id=? AND work_status='SEO Review'
             ");
             $stmt->execute([$mediaLink, $seoLink, $user['id'], $taskId]);
@@ -400,7 +400,7 @@ class Task {
             $stmt = db()->prepare("
                 UPDATE wp_eco_aplus_tasks
                 SET media_link=?, seo_doc_link=?, work_status='Work Done',
-                    qa_submitted_at=NOW(), qa_submitted_by=?, is_urgent=0, active_revision_type=NULL, last_activity_at=NOW()
+                    qa_submitted_at=NOW(), qa_submitted_by=?, is_urgent=0, priority=0, active_revision_type=NULL, last_activity_at=NOW()
                 WHERE id=? AND work_status='In QA'
             ");
             $stmt->execute([$mediaLink, $seoLink, $user['id'], $taskId]);
@@ -434,7 +434,7 @@ class Task {
 
         db()->prepare("
             UPDATE wp_eco_aplus_tasks
-            SET media_link=?, seo_doc_link=?, work_status=?, is_urgent=0, active_revision_type=NULL, last_activity_at=NOW()
+            SET media_link=?, seo_doc_link=?, work_status=?, is_urgent=0, priority=0, active_revision_type=NULL, last_activity_at=NOW()
             WHERE id=?
         ")->execute([$mediaLink, $seoLink, $targetStatus, $taskId]);
     }
@@ -454,7 +454,7 @@ class Task {
                         status='Pending', work_status='Pending', content='',
                         work_started_at=NULL, work_completed_at=NULL, work_paused_at=NULL,
                         work_total_seconds=0, media_link=NULL, seo_doc_link=NULL,
-                        qa_submitted_at=NULL, qa_submitted_by=NULL, is_urgent=0,
+                        qa_submitted_at=NULL, qa_submitted_by=NULL, is_urgent=0, priority=0,
                         content_approved_at=NULL, content_updated_at=NULL, last_activity_at=NOW()
                     WHERE id=?
                 ")->execute([$taskId]);
@@ -483,6 +483,7 @@ class Task {
                         qa_submitted_at=NULL,
                         qa_submitted_by=NULL,
                         is_urgent=0,
+                        priority=0,
                         work_completed_by_worker_id=NULL,
                         active_revision_type=NULL,
                         last_activity_at=NOW()
@@ -498,7 +499,7 @@ class Task {
                         status=?, work_status='Pending',
                         work_started_at=NULL, work_completed_at=NULL, work_paused_at=NULL,
                         work_total_seconds=0, media_link=NULL, seo_doc_link=NULL,
-                        qa_submitted_at=NULL, qa_submitted_by=NULL, is_urgent=0,
+                        qa_submitted_at=NULL, qa_submitted_by=NULL, is_urgent=0, priority=0,
                         content_approved_at=NULL, content_updated_at=NULL, last_activity_at=NOW()
                     WHERE id=?
                 ")->execute([$stage, $taskId]);
@@ -514,7 +515,7 @@ class Task {
                         status='Approved', work_status='Pending',
                         work_started_at=NULL, work_completed_at=NULL, work_paused_at=NULL,
                         work_total_seconds=0, media_link=NULL, seo_doc_link=NULL,
-                        qa_submitted_at=NULL, qa_submitted_by=NULL, is_urgent=0, last_activity_at=NOW()
+                        qa_submitted_at=NULL, qa_submitted_by=NULL, is_urgent=0, priority=0, last_activity_at=NOW()
                     WHERE id=?
                 ")->execute([$taskId]);
                 break;
@@ -553,7 +554,7 @@ class Task {
                 $awRow->execute([$taskId]);
                 $awFetch = $awRow->fetch();
                 $wcwId = $awFetch ? $awFetch['worker_id'] : null;
-                db()->prepare("UPDATE wp_eco_aplus_tasks SET work_status='Info Done', work_completed_at=NOW(), work_completed_by_worker_id=COALESCE(work_completed_by_worker_id, ?), info_worker_id=COALESCE(info_worker_id, ?), is_urgent=0, active_revision_type=NULL, last_activity_at=NOW() WHERE id=?")->execute([$wcwId, $wcwId, $taskId]);
+                db()->prepare("UPDATE wp_eco_aplus_tasks SET work_status='Info Done', work_completed_at=NOW(), work_completed_by_worker_id=COALESCE(work_completed_by_worker_id, ?), info_worker_id=COALESCE(info_worker_id, ?), is_urgent=0, priority=0, active_revision_type=NULL, last_activity_at=NOW() WHERE id=?")->execute([$wcwId, $wcwId, $taskId]);
                 break;
 
             case 'Republish':
@@ -614,8 +615,12 @@ class Task {
         }
     }
 
-    public static function toggleUrgent(int $taskId, int $urgent): void {
-        db()->prepare("UPDATE wp_eco_aplus_tasks SET is_urgent=?, last_activity_at=NOW() WHERE id=?")->execute([$urgent, $taskId]);
+    public static function toggleUrgent(int $taskId, int $urgent, int $priority = 0): void {
+        if ($urgent) {
+            db()->prepare("UPDATE wp_eco_aplus_tasks SET is_urgent=1, priority=?, last_activity_at=NOW() WHERE id=?")->execute([$priority, $taskId]);
+        } else {
+            db()->prepare("UPDATE wp_eco_aplus_tasks SET is_urgent=0, priority=0, last_activity_at=NOW() WHERE id=?")->execute([$taskId]);
+        }
     }
 
     public static function assignProduct(int $taskId, int $workerId): array {
@@ -1062,12 +1067,23 @@ class Task {
         return ['ok'=>true];
     }
 
-    public static function bulkMarkUrgent(array $taskIds): void {
+    public static function bulkMarkUrgent(array $taskIds, int $priority = 0): void {
+        if (empty($taskIds)) return;
+        $inQuery = implode(',', array_fill(0, count($taskIds), '?'));
+        $params = array_merge([$priority], $taskIds);
+        db()->prepare("
+            UPDATE wp_eco_aplus_tasks
+            SET is_urgent = 1, priority = ?, last_activity_at = NOW()
+            WHERE id IN ($inQuery)
+        ")->execute($params);
+    }
+
+    public static function bulkRemoveUrgent(array $taskIds): void {
         if (empty($taskIds)) return;
         $inQuery = implode(',', array_fill(0, count($taskIds), '?'));
         db()->prepare("
             UPDATE wp_eco_aplus_tasks
-            SET is_urgent = 1, last_activity_at = NOW()
+            SET is_urgent = 0, priority = 0, last_activity_at = NOW()
             WHERE id IN ($inQuery)
         ")->execute($taskIds);
     }

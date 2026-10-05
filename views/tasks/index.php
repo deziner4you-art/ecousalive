@@ -43,6 +43,10 @@ $allFilters = [
     'Changes in Content'=> 'Changes in Content',
     'Changing'      => 'Changing',
     'Hold'          => 'Hold',
+    'Urgent'        => '🚨 All Urgent',
+    'Priority 1'    => '🚨 Priority 1',
+    'Priority 2'    => '⚡ Priority 2',
+    'Priority 3'    => '📌 Priority 3',
     'Published'     => 'Published',
     'Invoiced'      => 'Invoiced',
     'Paid'          => 'Paid',
@@ -56,6 +60,10 @@ $allowed = $filterPerms ?: array_keys($allFilters);
 if(!in_array('Info Done', $allowed)){
     $allowed[] = 'Info Done';
 }
+if(!in_array('Urgent', $allowed)){ $allowed[] = 'Urgent'; }
+if(!in_array('Priority 1', $allowed)){ $allowed[] = 'Priority 1'; }
+if(!in_array('Priority 2', $allowed)){ $allowed[] = 'Priority 2'; }
+if(!in_array('Priority 3', $allowed)){ $allowed[] = 'Priority 3'; }
 ?>
 
 <!-- ── Filter bar ── -->
@@ -196,14 +204,29 @@ if(!in_array('Info Done', $allowed)){
             </select>
             <button type="button" onclick="bulkMoveSelectedToVendor()" style="background:#0284c7; color:#fff; border:none; padding:6px 12px; border-radius:5px; font-size:12px; font-weight:bold; cursor:pointer; transition:background-color 0.15s;" onmouseover="this.style.backgroundColor='#0369a1';" onmouseout="this.style.backgroundColor='#0284c7';" title="Move selected products to chosen vendor">Move</button>
         </div>
+        <!-- Priority Quick Widget -->
+        <div style="display:flex; align-items:center; gap:6px; background:#0f172a; padding:4px 8px; border-radius:8px; border:1px solid #7f1d1d;">
+            <select id="bulk-priority-select" style="background:transparent; border:none; color:#f87171; padding:5px 6px; font-size:13px; font-weight:700; outline:none; cursor:pointer; min-width:150px;">
+                <option value="1">🚨 Priority 1 (High)</option>
+                <option value="2">⚡ Priority 2 (Medium)</option>
+                <option value="3">📌 Priority 3 (Normal)</option>
+                <option value="0">🔴 Urgent (No Priority)</option>
+                <option value="-1">⚪ Clear Urgent / Reset</option>
+            </select>
+            <button type="button" onclick="bulkApplyUrgentPriority()" style="background:#dc2626; color:#fff; border:none; padding:6px 12px; border-radius:5px; font-size:12px; font-weight:bold; cursor:pointer; transition:background-color 0.15s;" onmouseover="this.style.backgroundColor='#b91c1c';" onmouseout="this.style.backgroundColor='#dc2626';" title="Set Urgent & Priority for selected products">Set Priority</button>
+        </div>
         <button type="button" onclick="bulkGroupSelected()" style="background:#8b5cf6; color:#fff; border:none; padding:8px 16px; border-radius:6px; font-size:13px; font-weight:bold; cursor:pointer; display:inline-flex; align-items:center; gap:6px; transition:background-color 0.2s; box-shadow: 0 2px 4px rgba(139,92,246,0.3);" onmouseover="this.style.backgroundColor='#7c3aed';" onmouseout="this.style.backgroundColor='#8b5cf6';" title="Group all selected products together into one family">💜 Group Selected</button>
-        <select id="bulk-action-select" style="background:#0f172a; border:1px solid #334155; border-radius:6px; color:#e2e8f0; padding:8px 12px; font-size:13px; outline:none; cursor:pointer; min-width:165px;">
-            <option value="">⚡ Bulk Action...</option>
+        <select id="bulk-action-select" style="background:#0f172a; border:1px solid #334155; border-radius:6px; color:#e2e8f0; padding:8px 12px; font-size:13px; outline:none; cursor:pointer; min-width:175px;">
+            <option value="">⚡ More Bulk Actions...</option>
+            <option value="urgent_1">🚨 Mark Urgent - Priority 1</option>
+            <option value="urgent_2">⚡ Mark Urgent - Priority 2</option>
+            <option value="urgent_3">📌 Mark Urgent - Priority 3</option>
+            <option value="urgent">🔴 Mark Urgent (Standard)</option>
+            <option value="remove_urgent">⚪ Remove Urgent / Reset Priority</option>
             <option value="move_vendor">🚚 Move to Selected Vendor</option>
             <option value="group">💜 Group Selected Products</option>
             <option value="ungroup">❌ Remove from Group (Ungroup)</option>
-            <option value="urgent">Mark as Urgent</option>
-            <option value="hold">Mark as Hold</option>
+            <option value="hold">⏸️ Mark as Hold</option>
         </select>
         <button onclick="applyBulkAction()" style="background:#c2410c; color:#fff; border:none; padding:8px 20px; border-radius:6px; font-size:13px; font-weight:bold; cursor:pointer; transition:background-color 0.2s;" onmouseover="this.style.backgroundColor='#ea580c';" onmouseout="this.style.backgroundColor='#c2410c';">Apply</button>
     </div>

@@ -235,6 +235,18 @@ function getSortedFiltered(data){
         else if(filter === 'Completed'){
             if((item.work_status !== 'Work Done' && item.work_status !== 'Info Done') || item.published_at) return false;
         }
+        else if(filter === 'Urgent'){
+            if(item.is_urgent != 1 || (item.work_status === 'Work Done' && item.published_at)) return false;
+        }
+        else if(filter === 'Priority 1'){
+            if(item.is_urgent != 1 || parseInt(item.priority) !== 1) return false;
+        }
+        else if(filter === 'Priority 2'){
+            if(item.is_urgent != 1 || parseInt(item.priority) !== 2) return false;
+        }
+        else if(filter === 'Priority 3'){
+            if(item.is_urgent != 1 || parseInt(item.priority) !== 3) return false;
+        }
         else if(filter && currentStatus !== filter) return false;
 
         if(search){
@@ -325,6 +337,12 @@ function getSortedFiltered(data){
         var aUrgent = (a.is_urgent == 1 && a.work_status !== 'Work Done') ? 1 : 0;
         var bUrgent = (b.is_urgent == 1 && b.work_status !== 'Work Done') ? 1 : 0;
         if(aUrgent !== bUrgent) return bUrgent - aUrgent;
+
+        if(aUrgent && bUrgent){
+            var aP = (parseInt(a.priority) > 0) ? parseInt(a.priority) : 999;
+            var bP = (parseInt(b.priority) > 0) ? parseInt(b.priority) : 999;
+            if(aP !== bP) return aP - bP;
+        }
 
         if(sort === 'az')      return (a.title || '').localeCompare(b.title || '');
         if(sort === 'za')      return (b.title || '').localeCompare(a.title || '');
@@ -474,15 +492,19 @@ function holdProduct(taskId, hold){
     });
 }
 
-function setUrgent(taskId, urgent){
+function setUrgent(taskId, urgent, priority){
+    priority = parseInt(priority) || 0;
+    var pText = priority > 0 ? (' (Priority ' + priority + ')') : '';
     var msg = urgent
-        ? 'Is product ko URGENT mark karein? Ye hamesha top per rahegi.'
-        : 'Is product se URGENT tag hatayein?';
+        ? ('Is product ko URGENT' + pText + ' mark karein? Ye hamesha top per rahegi.')
+        : 'Is product se URGENT tag aur priority hatayein?';
     _confirm(msg, function(){
         var fd = new FormData();
         fd.append('action', 'toggle_urgent');
         fd.append('task_id', taskId);
-        fd.append('urgent', urgent);
+        fd.append('urgent', urgent ? 1 : 0);
+        if(priority > 0) fd.append('priority', priority);
+        if(typeof CSRF_TOKEN !== 'undefined') fd.append('csrf_token', CSRF_TOKEN);
         fetch('index.php', {method:'POST', body:fd})
             .then(r => r.json())
             .then(r => { if(r.success) loadTasks(); else alert('Failed: ' + (r.message || '')); });
