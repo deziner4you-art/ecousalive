@@ -283,6 +283,50 @@ tailwind.config = {
     color: #38bdf8;
     transform: translateY(-1px);
 }
+.vendor-browser-select {
+    display: inline-flex;
+    align-items: center;
+    height: 31px;
+    padding: 0 28px 0 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #94a3b8;
+    background: #0f1d32;
+    border: 1px solid #1e3a5f;
+    border-top: 2.5px solid transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+    outline: none;
+    box-sizing: border-box;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='12'%20height='12'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='%2394a3b8'%20stroke-width='2.5'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpolyline%20points='6%209%2012%2015%2018%209'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 9px center;
+    background-size: 11px;
+}
+.vendor-browser-select:hover {
+    background-color: #162742;
+    color: #e2e8f0;
+    border-color: #2b4c77;
+}
+.vendor-browser-select:focus,
+.vendor-browser-select.active {
+    background-color: #192a45;
+    color: #ffffff;
+    border-color: #3b82f6;
+    border-top: 2.5px solid #38bdf8;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+}
+.vendor-browser-select option {
+    background: #0a1628;
+    color: #e2e8f0;
+    padding: 6px 10px;
+    font-size: 12.5px;
+}
 
 /* Nav right group */
 #topbar .nav-right {
@@ -2018,7 +2062,7 @@ try {
 <!-- ── JS Modules ── -->
 <?php $v = '2.9.3'; ?>
 <script src="<?= $publicUrl ?>/js/core.js?v=<?= $v ?>"></script>
-<script src="<?= $publicUrl ?>/js/tasks.js?v=3.4.2"></script>
+<script src="<?= $publicUrl ?>/js/tasks.js?v=3.4.3"></script>
 <script src="<?= $publicUrl ?>/js/admin.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/invoices.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/payroll.js?v=2.7.13"></script>

@@ -64,14 +64,14 @@ function renderInvTable(){
     var anyChecked = fAll||fWD||fID||fIA;
 
     var filtered = _invTasks.filter(function(t){
-        var isIA   = t.product_type === 'Info + A Plus';
-        var isInfo = t.product_type === 'Infographics';
+        var isIA   = t.product_type === 'Info + A Plus' || (t.aplus_worker_id && (t.info_worker_id || t.product_type === 'Infographics'));
+        var isInfo = !isIA && t.product_type === 'Infographics';
         var isAplus = !isIA && !isInfo;
-        var infoInvd  = !!(t.info_invoice_status  && t.info_invoice_status  !== '');
-        var aplusInvd = !!(t.aplus_invoice_status && t.aplus_invoice_status !== '') || (isAplus && !!(t.invoice_status && t.invoice_status !== ''));
+        var infoInvd  = !!(t.info_invoice_status  && t.info_invoice_status  !== '') || (!t.aplus_invoice_status && !!(t.invoice_status && t.invoice_status !== ''));
+        var aplusInvd = !!(t.aplus_invoice_status && t.aplus_invoice_status !== '');
         var isFullyInvoiced = isIA ? (infoInvd&&aplusInvd)
-                            : (isInfo ? infoInvd
-                            : (isAplus ? aplusInvd
+                            : (isInfo ? (infoInvd || !!(t.invoice_status && t.invoice_status !== ''))
+                            : (isAplus ? (aplusInvd || !!(t.invoice_status && t.invoice_status !== ''))
                             : !!(t.invoice_status && t.invoice_status !== '')));
         if(isFullyInvoiced && !_invCart[t.id]) return false;
 
@@ -80,7 +80,7 @@ function renderInvTable(){
             if(fAll) match=true;
             if(!match&&fWD&&t.work_status==='Work Done') match=true;
             if(!match&&fID&&t.work_status==='Info Done') match=true;
-            if(!match&&fIA&&t.product_type==='Info + A Plus') match=true;
+            if(!match&&fIA&&(t.product_type==='Info + A Plus' || isIA)) match=true;
             if(!match) return false;
         }
         return !q||t.title.toLowerCase().indexOf(q)!==-1||t.product_no.toLowerCase().indexOf(q)!==-1;
@@ -98,15 +98,15 @@ function renderInvTable(){
 
     filtered.forEach(function(t){
         var inCart = !!_invCart[t.id];
-        var isIA   = t.product_type === 'Info + A Plus';
-        var isInfo = t.product_type === 'Infographics';
+        var isIA   = t.product_type === 'Info + A Plus' || (t.aplus_worker_id && (t.info_worker_id || t.product_type === 'Infographics'));
+        var isInfo = !isIA && t.product_type === 'Infographics';
         var isAplus = !isIA && !isInfo;
         var isSelectableStatus = t.work_status==='Work Done' || t.work_status==='Info Done' || !!t.published_at;
-        var infoInvd  = !!(t.info_invoice_status  && t.info_invoice_status  !== '');
-        var aplusInvd = !!(t.aplus_invoice_status && t.aplus_invoice_status !== '') || (isAplus && !!(t.invoice_status && t.invoice_status !== ''));
+        var infoInvd  = !!(t.info_invoice_status  && t.info_invoice_status  !== '') || (!t.aplus_invoice_status && !!(t.invoice_status && t.invoice_status !== ''));
+        var aplusInvd = !!(t.aplus_invoice_status && t.aplus_invoice_status !== '');
         var isFullyInvoiced = isIA ? (infoInvd&&aplusInvd)
-                            : (isInfo ? infoInvd
-                            : (isAplus ? aplusInvd
+                            : (isInfo ? (infoInvd || !!(t.invoice_status && t.invoice_status !== ''))
+                            : (isAplus ? (aplusInvd || !!(t.invoice_status && t.invoice_status !== ''))
                             : !!(t.invoice_status && t.invoice_status !== '')));
         var canSelect = isSelectableStatus && !isFullyInvoiced;
 
@@ -117,11 +117,15 @@ function renderInvTable(){
             var lockLabel='';
             if(isFullyInvoiced){
                 if(isIA){
-                    lockLabel='<span style="font-size:10px;color:#4ade80;margin-left:5px;">'+(infoInvd?'✅ Info '+t.info_invoice_status:'')+'</span><span style="font-size:10px;color:#4ade80;margin-left:3px;">'+(aplusInvd?'✅ A+ '+t.aplus_invoice_status:'')+'</span>';
+                    var iStatus = t.info_invoice_status || t.invoice_status || 'Paid';
+                    var aStatus = t.aplus_invoice_status || 'Paid';
+                    lockLabel='<span style="font-size:10px;color:#4ade80;margin-left:5px;">'+(infoInvd?'✅ Info '+iStatus:'')+'</span><span style="font-size:10px;color:#4ade80;margin-left:3px;">'+(aplusInvd?'✅ A+ '+aStatus:'')+'</span>';
                 } else if(isInfo){
-                    lockLabel='<span style="font-size:10px;color:'+(t.info_invoice_status==='Paid'?'#4ade80':'#93c5fd')+';margin-left:5px;">'+(t.info_invoice_status==='Paid'?'✅ Paid':'🧾 Invoiced')+'</span>';
+                    var st = t.info_invoice_status || t.invoice_status;
+                    lockLabel='<span style="font-size:10px;color:'+(st==='Paid'?'#4ade80':'#93c5fd')+';margin-left:5px;">'+(st==='Paid'?'✅ Paid':'🧾 Invoiced')+'</span>';
                 } else if(isAplus){
-                    lockLabel='<span style="font-size:10px;color:'+(t.aplus_invoice_status==='Paid'?'#4ade80':'#93c5fd')+';margin-left:5px;">'+(t.aplus_invoice_status==='Paid'?'✅ Paid':'🧾 Invoiced')+'</span>';
+                    var st = t.aplus_invoice_status || t.invoice_status;
+                    lockLabel='<span style="font-size:10px;color:'+(st==='Paid'?'#4ade80':'#93c5fd')+';margin-left:5px;">'+(st==='Paid'?'✅ Paid':'🧾 Invoiced')+'</span>';
                 } else {
                     lockLabel='<span style="font-size:10px;color:'+(t.invoice_status==='Paid'?'#4ade80':'#93c5fd')+';margin-left:5px;">'+(t.invoice_status==='Paid'?'✅ Paid':'🧾 Invoiced')+'</span>';
                 }
@@ -133,7 +137,7 @@ function renderInvTable(){
             
             if (isIA || isInfo) {
                 var infoDisabled = infoInvd ? 'disabled style="opacity:0.35;cursor:not-allowed;background:#0a0f1a;"' : '';
-                var infoVal = infoInvd ? `placeholder="(${t.info_invoice_status})"` : 'placeholder="0.00"';
+                var infoVal = infoInvd ? `placeholder="(${t.info_invoice_status || t.invoice_status})"` : 'placeholder="0.00"';
                 infoHtml = `<input type="number" class="inv-ia-info" id="inv-info-${t.id}" data-id="${t.id}" min="0" step="0.01" ${infoVal} style="width:90px;" oninput="applyInfoAplusPrice('${t.id}','info',this.value)" ${infoDisabled}>`;
             }
             
@@ -233,8 +237,8 @@ function addSelectedToCart(){
         var task = _invTasks.find(function(t){ return String(t.id)===String(id); });
         if(!task) return;
         var price=0, info_price=0, aplus_price=0;
-        var isIA = task.product_type === 'Info + A Plus';
-        var isInfo = task.product_type === 'Infographics';
+        var isIA = task.product_type === 'Info + A Plus' || (task.aplus_worker_id && (task.info_worker_id || task.product_type === 'Infographics'));
+        var isInfo = !isIA && task.product_type === 'Infographics';
         var isAplus = !isIA && !isInfo;
         var isSubtaskProduct = isIA || isInfo || isAplus;
         if(isSubtaskProduct){
@@ -248,7 +252,7 @@ function addSelectedToCart(){
             price   = parseFloat(inp ? inp.value : 0)||0;
         }
         if(!price) return;
-        _invCart[id] = {id, product_no:task.product_no, title:task.title, work_status:task.work_status, product_type:task.product_type, price, info_price, aplus_price};
+        _invCart[id] = {id, product_no:task.product_no, title:task.title, work_status:task.work_status, product_type: (isIA ? 'Info + A Plus' : task.product_type), price, info_price, aplus_price};
         added++;
     });
     if(!added){ alert('Pehle products check karein aur price darj karein'); return; }

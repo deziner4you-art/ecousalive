@@ -70,6 +70,27 @@ function runMigrations(): void {
         db()->exec("UPDATE wp_eco_aplus_tasks SET info_worker_id = work_completed_by_worker_id WHERE (info_worker_id IS NULL OR info_worker_id = 0) AND (product_type = 'Infographics' OR info_subtasks LIKE '%Infographics%') AND work_completed_by_worker_id IS NOT NULL");
         db()->exec("UPDATE wp_eco_aplus_tasks t JOIN eco_tool_assignments a ON a.task_id = t.id SET t.info_worker_id = a.worker_id WHERE (t.info_worker_id IS NULL OR t.info_worker_id = 0) AND (t.product_type = 'Infographics' OR t.info_subtasks LIKE '%Infographics%')");
         db()->exec("UPDATE wp_eco_aplus_tasks SET aplus_worker_id = work_completed_by_worker_id WHERE (aplus_worker_id IS NULL OR aplus_worker_id = 0) AND product_type = 'A+' AND work_completed_by_worker_id IS NOT NULL");
+        
+        // Auto-heal tasks that have both Infographics and A+ Banners assigned to 'Info + A Plus' tag
+        db()->exec("UPDATE wp_eco_aplus_tasks
+            SET product_type = 'Info + A Plus',
+                info_subtasks = CASE 
+                    WHEN info_subtasks IS NULL OR info_subtasks = '' THEN 'Infographics, A+ Banners'
+                    WHEN info_subtasks NOT LIKE '%A+ Banners%' THEN CONCAT(info_subtasks, ', A+ Banners')
+                    ELSE info_subtasks
+                END,
+                info_invoice_status = COALESCE(info_invoice_status, invoice_status)
+            WHERE deleted_at IS NULL
+              AND aplus_worker_id IS NOT NULL AND aplus_worker_id > 0
+              AND (info_worker_id IS NOT NULL AND info_worker_id > 0 OR product_type = 'Infographics' OR info_subtasks LIKE '%Infographics%')
+              AND product_type != 'Info + A Plus'");
+
+        db()->exec("UPDATE wp_eco_aplus_tasks
+            SET info_invoice_status = invoice_status
+            WHERE deleted_at IS NULL
+              AND product_type = 'Info + A Plus'
+              AND info_invoice_status IS NULL
+              AND invoice_status IS NOT NULL");
     } catch(Exception $e){}
 
     try{ db()->exec("CREATE INDEX idx_deleted_at ON wp_eco_aplus_tasks (deleted_at)"); }catch(Exception $e){}

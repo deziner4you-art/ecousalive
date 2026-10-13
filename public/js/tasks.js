@@ -1321,6 +1321,9 @@ function buildCard(item){
 
     /* Invoice badge */
     var invBadge = '';
+    var isInfoPlusAplus = item.product_type === 'Info + A Plus' || 
+        (item.aplus_worker_id && (item.info_worker_id || item.product_type === 'Infographics' || (item.info_subtasks && item.info_subtasks.includes('Infographics'))));
+
     if(!isListing){
         var paidByPayroll = item.payslip_status === 'Paid';
         var invoicePaid   = item.invoice_status === 'Paid' || item.info_invoice_status === 'Paid' || item.aplus_invoice_status === 'Paid';
@@ -1337,18 +1340,25 @@ function buildCard(item){
                 invBadge = '';
             }
         } else {
-            if(item.product_type === 'Info + A Plus'){
-                var iBadge = (item.info_invoice_status === 'Paid')     ? '<span class="inv-badge-paid" style="margin-right:4px;">✅ Info Paid</span>'
-                           : (item.info_invoice_status === 'Invoiced') ? '<span class="inv-badge-invoiced" style="margin-right:4px;">🧾 Info Invoiced</span>' : '';
-                var aBadge = (item.aplus_invoice_status === 'Paid')    ? '<span class="inv-badge-paid" style="margin-right:12px;">✅ A+ Paid</span>'
-                           : (item.aplus_invoice_status === 'Invoiced')? '<span class="inv-badge-invoiced" style="margin-right:12px;">🧾 A+ Invoiced</span>' : '';
-                invBadge = iBadge + aBadge;
+            if(isInfoPlusAplus){
+                var infoInvStatus  = item.info_invoice_status || (!item.aplus_invoice_status ? item.invoice_status : '');
+                var aplusInvStatus = item.aplus_invoice_status;
+                if(infoInvStatus || aplusInvStatus){
+                    var iBadge = (infoInvStatus === 'Paid')     ? '<span class="inv-badge-paid" style="margin-right:4px;">✅ Info Paid</span>'
+                               : (infoInvStatus === 'Invoiced') ? '<span class="inv-badge-invoiced" style="margin-right:4px;">🧾 Info Invoiced</span>' : '';
+                    var aBadge = (aplusInvStatus === 'Paid')    ? '<span class="inv-badge-paid" style="margin-right:12px;">✅ A+ Paid</span>'
+                               : (aplusInvStatus === 'Invoiced')? '<span class="inv-badge-invoiced" style="margin-right:12px;">🧾 A+ Invoiced</span>' : '';
+                    invBadge = iBadge + aBadge;
+                } else if(item.invoice_status){
+                    invBadge = (item.invoice_status === 'Invoiced') ? '<span class="inv-badge-invoiced" style="margin-right:12px;">🧾 Invoiced</span>'
+                             : (item.invoice_status === 'Paid')     ? '<span class="inv-badge-paid" style="margin-right:12px;">✅ Paid</span>' : '';
+                }
             } else if(item.product_type === 'Infographics'){
-                invBadge = (item.info_invoice_status === 'Invoiced') ? '<span class="inv-badge-invoiced" style="margin-right:12px;">🧾 Invoiced</span>'
-                         : (item.info_invoice_status === 'Paid')     ? '<span class="inv-badge-paid" style="margin-right:12px;">✅ Paid</span>' : '';
+                invBadge = (item.info_invoice_status === 'Invoiced' || item.invoice_status === 'Invoiced') ? '<span class="inv-badge-invoiced" style="margin-right:12px;">🧾 Invoiced</span>'
+                         : (item.info_invoice_status === 'Paid'     || item.invoice_status === 'Paid')     ? '<span class="inv-badge-paid" style="margin-right:12px;">✅ Paid</span>' : '';
             } else if(item.product_type === 'A+'){
-                invBadge = (item.aplus_invoice_status === 'Invoiced') ? '<span class="inv-badge-invoiced" style="margin-right:12px;">🧾 Invoiced</span>'
-                         : (item.aplus_invoice_status === 'Paid')     ? '<span class="inv-badge-paid" style="margin-right:12px;">✅ Paid</span>' : '';
+                invBadge = (item.aplus_invoice_status === 'Invoiced' || item.invoice_status === 'Invoiced') ? '<span class="inv-badge-invoiced" style="margin-right:12px;">🧾 Invoiced</span>'
+                         : (item.aplus_invoice_status === 'Paid'     || item.invoice_status === 'Paid')     ? '<span class="inv-badge-paid" style="margin-right:12px;">✅ Paid</span>' : '';
             } else {
                 invBadge = (item.invoice_status === 'Invoiced') ? '<span class="inv-badge-invoiced" style="margin-right:12px;">🧾 Invoiced</span>'
                          : (item.invoice_status === 'Paid')     ? '<span class="inv-badge-paid" style="margin-right:12px;">✅ Paid</span>' : '';
@@ -1358,7 +1368,7 @@ function buildCard(item){
 
     var typeBadge = '';
     var tbStyle = "display:inline-block; font-size:9.5px; padding:2px 6px; white-space:nowrap; border-radius:12px; box-shadow:0 2px 4px rgba(0,0,0,0.3); letter-spacing:0.5px; line-height:1;";
-    if(item.product_type === 'Info + A Plus'){
+    if(isInfoPlusAplus){
         typeBadge = '<span style="' + tbStyle + ' background:#8b5cf6; color:#fff;">Info + A Plus</span>';
     } else if(item.product_type === 'Infographics'){
         typeBadge = '<span style="' + tbStyle + ' background:#f59e0b; color:#fff;">Infographics</span>';
@@ -2183,8 +2193,8 @@ function openEditServices(taskId){
 
     var subtasks = (task.info_subtasks || '').split(',').map(function(s){ return s.trim(); });
     var hasAi = subtasks.includes('AI Work') || task.status === 'AI Work' || task.status === 'AI DONE' || !!task.ai_worked_by;
-    var hasInfo = subtasks.includes('Infographics') || task.product_type === 'Infographics' || task.product_type === 'Info + A Plus' || (!task.info_subtasks && !task.product_type);
-    var hasAplus = subtasks.includes('A+ Banners') || task.product_type === 'Info + A Plus' || task.product_type === 'A+' || task.product_type === 'A Plus';
+    var hasInfo = subtasks.includes('Infographics') || task.product_type === 'Infographics' || task.product_type === 'Info + A Plus' || (!task.info_subtasks && !task.product_type) || !!task.info_worker_id;
+    var hasAplus = subtasks.includes('A+ Banners') || task.product_type === 'Info + A Plus' || task.product_type === 'A+' || task.product_type === 'A Plus' || !!task.aplus_worker_id;
 
     document.getElementById('es-chk-ai').checked = hasAi;
     document.getElementById('es-chk-info').checked = hasInfo;
@@ -2214,7 +2224,19 @@ function openEditServices(taskId){
     
     if(task.aplus_worker_id) selAplus.value = String(task.aplus_worker_id);
 
-    document.getElementById('es-sel-active').value = 'unchanged';
+    // Event listeners to ensure selecting a worker or stage enables that service
+    selAi.onchange = function(){ if(this.value) document.getElementById('es-chk-ai').checked = true; };
+    selInfo.onchange = function(){ if(this.value) document.getElementById('es-chk-info').checked = true; };
+    selAplus.onchange = function(){ if(this.value) document.getElementById('es-chk-aplus').checked = true; };
+
+    var selActive = document.getElementById('es-sel-active');
+    selActive.value = 'unchanged';
+    selActive.onchange = function(){
+        if(this.value === 'aplus' || this.value === 'start_aplus_content') document.getElementById('es-chk-aplus').checked = true;
+        else if(this.value === 'info') document.getElementById('es-chk-info').checked = true;
+        else if(this.value === 'ai') document.getElementById('es-chk-ai').checked = true;
+    };
+
     modal.style.display = 'flex';
 }
 
@@ -2231,6 +2253,27 @@ function saveEditServices(){
     var hasInfo = document.getElementById('es-chk-info').checked;
     var hasAplus = document.getElementById('es-chk-aplus').checked;
 
+    var aiWorkerId = document.getElementById('es-sel-ai').value || '';
+    var infoWorkerId = document.getElementById('es-sel-info').value || '';
+    var aplusWorkerId = document.getElementById('es-sel-aplus').value || '';
+    var activeAssign = document.getElementById('es-sel-active').value || 'unchanged';
+
+    // Auto-detect services from assigned workers or active stage
+    if(aplusWorkerId || activeAssign === 'aplus' || activeAssign === 'start_aplus_content') hasAplus = true;
+    if(infoWorkerId || activeAssign === 'info') hasInfo = true;
+    if(aiWorkerId || activeAssign === 'ai') hasAi = true;
+
+    // If product originally had Infographics and A+ Banners is being added, ensure Infographics is preserved -> Info + A Plus
+    var task = (typeof ALL_TASKS !== 'undefined' ? ALL_TASKS : []).find(function(t){ return parseInt(t.id) === parseInt(taskId); });
+    if(task){
+        var prevSubtasks = (task.info_subtasks || '').split(',').map(function(s){ return s.trim(); });
+        var hadInfo = task.product_type === 'Infographics' || task.product_type === 'Info + A Plus' || !!task.info_worker_id || prevSubtasks.includes('Infographics');
+        if(hadInfo && (hasAplus || aplusWorkerId || activeAssign === 'aplus' || activeAssign === 'start_aplus_content')){
+            hasInfo = true;
+            if(!infoWorkerId && task.info_worker_id) infoWorkerId = String(task.info_worker_id);
+        }
+    }
+
     if(!hasAi && !hasInfo && !hasAplus){
         alert('Kam az kam aik service zaroor select karein!');
         return;
@@ -2240,11 +2283,6 @@ function saveEditServices(){
     if(hasAi) services.push('AI Work');
     if(hasInfo) services.push('Infographics');
     if(hasAplus) services.push('A+ Banners');
-
-    var aiWorkerId = document.getElementById('es-sel-ai').value || '';
-    var infoWorkerId = document.getElementById('es-sel-info').value || '';
-    var aplusWorkerId = document.getElementById('es-sel-aplus').value || '';
-    var activeAssign = document.getElementById('es-sel-active').value || 'unchanged';
 
     var btn = document.getElementById('es-btn-save');
     if(btn){ btn.disabled = true; btn.innerText = 'Saving...'; }
@@ -3613,6 +3651,13 @@ function renderVendorTabs() {
     var tasks = window.ALL_TASKS || [];
     var activeId = String(window.ACTIVE_VENDOR_ID || 'all');
 
+    // Ensure activeId is valid if not 'all'
+    if (activeId !== 'all' && !vendors.some(function(v){ return String(v.id) === activeId; })) {
+        activeId = 'all';
+        window.ACTIVE_VENDOR_ID = 'all';
+        try { localStorage.setItem('d4u_active_vendor_id', 'all'); } catch(e){}
+    }
+
     // Count tasks per vendor (respects any worker isolation already applied in ALL_TASKS)
     var vendorCounts = {};
     var totalTasks = tasks.length;
@@ -3630,22 +3675,33 @@ function renderVendorTabs() {
     html += '<span class="vendor-tab-count">' + totalTasks + '</span>';
     html += '</button>';
 
-    // Individual vendor browser tabs
+    // Vendor Dropdown List
+    var isVendorSelected = (activeId !== 'all');
+    var selectActiveStyle = '';
+    if (isVendorSelected) {
+        var selectedVendor = vendors.find(function(v){ return String(v.id) === activeId; });
+        var activeDotColor = (selectedVendor && selectedVendor.color) ? selectedVendor.color : '#38bdf8';
+        selectActiveStyle = 'border-color:#3b82f6;border-top-color:' + activeDotColor + ';color:#ffffff;background:#192a45;';
+    }
+
+    var isAdmin = (typeof ROLE !== 'undefined' && ROLE === 'administrator');
+
+    html += '<select id="vendor-browser-select" class="vendor-browser-select' + (isVendorSelected ? ' active' : '') + '" style="' + selectActiveStyle + '" onchange="handleVendorSelectChange(this)" title="Choose Vendor">';
+    html += '<option value="all"' + (activeId === 'all' ? ' selected' : '') + '>Vendor</option>';
+
     vendors.forEach(function(v) {
         var isThisActive = (String(v.id) === activeId);
         var vCount = vendorCounts[String(v.id)] || 0;
-        var dotColor = v.color || '#0284c7';
-        var activeStyle = isThisActive ? ('border-top-color:' + dotColor + ';') : '';
-
-        html += '<button type="button" class="vendor-browser-tab' + (isThisActive ? ' active' : '') + '" style="' + activeStyle + '" onclick="switchVendorTab(' + v.id + ')" title="Vendor: ' + (v.name ? v.name.replace(/"/g, '&quot;') : '') + '">';
-        html += '<span class="vendor-tab-color-dot" style="background:' + dotColor + ';"></span>';
-        html += '<span style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (v.name || 'Vendor') + '</span>';
-        html += '<span class="vendor-tab-count">' + vCount + '</span>';
-        html += '</button>';
+        html += '<option value="' + v.id + '"' + (isThisActive ? ' selected' : '') + ' style="background:#0a1628;color:#f8fafc;">' + (v.name || 'Vendor') + ' (' + vCount + ')</option>';
     });
 
+    if (isAdmin) {
+        html += '<option value="__manage__" style="background:#0f2744;color:#60a5fa;font-weight:bold;">⚙️ Manage Vendors...</option>';
+    }
+
+    html += '</select>';
+
     // Add Vendor Button (for Admin)
-    var isAdmin = (typeof ROLE !== 'undefined' && ROLE === 'administrator');
     if (isAdmin) {
         html += '<button type="button" class="vendor-browser-tab-add" onclick="openVendorModal()" title="Add or Manage Vendors">';
         html += '<span style="font-weight:bold;font-size:14px;line-height:1;">+</span> <span style="font-size:11px;">Vendor</span>';
@@ -3656,6 +3712,17 @@ function renderVendorTabs() {
 
     // Populate vendor dropdowns in addProductCard, bulk action bar, etc.
     populateVendorDropdowns();
+}
+
+function handleVendorSelectChange(sel) {
+    if (!sel) return;
+    var val = sel.value;
+    if (val === '__manage__') {
+        sel.value = window.ACTIVE_VENDOR_ID || 'all';
+        if (typeof openVendorModal === 'function') openVendorModal();
+        return;
+    }
+    switchVendorTab(val);
 }
 
 function switchVendorTab(vendorId) {

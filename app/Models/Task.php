@@ -693,6 +693,28 @@ class Task {
         $hasInfo  = in_array('Infographics', $services) || in_array('infographics', $services);
         $hasAplus = in_array('A+ Banners', $services) || in_array('aplus', $services) || in_array('A Plus', $services);
 
+        // Auto-enable service flags if worker or active stage is specified
+        if ($aplusWorkerId || $activeAssign === 'aplus' || $activeAssign === 'start_aplus_content') {
+            $hasAplus = true;
+        }
+        if ($infoWorkerId || $activeAssign === 'info') {
+            $hasInfo = true;
+        }
+        if ($aiWorkerId || $activeAssign === 'ai') {
+            $hasAi = true;
+        }
+
+        // If product originally had Infographics (via product_type, existing worker, or existing subtasks)
+        // and A+ Banners is being added or assigned, ensure Infographics remains preserved so it shifts to 'Info + A Plus'
+        $prevSubtasks = array_map('trim', explode(',', $task['info_subtasks'] ?? ''));
+        $hadInfo = ($task['product_type'] === 'Infographics' || $task['product_type'] === 'Info + A Plus' || !empty($task['info_worker_id']) || !empty($task['work_completed_by_worker_id']) || in_array('Infographics', $prevSubtasks));
+        if ($hadInfo && ($hasAplus || $infoWorkerId || in_array('Infographics', $services))) {
+            $hasInfo = true;
+            if (!$infoWorkerId) {
+                $infoWorkerId = $task['info_worker_id'] ?: $task['work_completed_by_worker_id'] ?: null;
+            }
+        }
+
         $subtasksList = [];
         if($hasAi)    $subtasksList[] = 'AI Work';
         if($hasInfo)  $subtasksList[] = 'Infographics';
@@ -709,13 +731,24 @@ class Task {
             $productType = 'Infographics';
         }
 
-        $sql = "UPDATE wp_eco_aplus_tasks SET product_type=?, info_subtasks=?, ai_worked_by=?, info_worker_id=?, aplus_worker_id=?, last_activity_at=NOW() WHERE id=?";
+        // Preserve previous invoice status for Infographics if shifting to Info + A Plus
+        $infoInvoiceStatus = $task['info_invoice_status'];
+        if(empty($infoInvoiceStatus) && !empty($task['invoice_status'])){
+            $infoInvoiceStatus = $task['invoice_status'];
+        }
+
+        $sql = "UPDATE wp_eco_aplus_tasks 
+                SET product_type=?, info_subtasks=?, ai_worked_by=?, info_worker_id=?, aplus_worker_id=?, 
+                    info_invoice_status=COALESCE(info_invoice_status, ?),
+                    last_activity_at=NOW() 
+                WHERE id=?";
         db()->prepare($sql)->execute([
             $productType,
             $infoSubtasks ?: null,
             $aiWorkerId ?: null,
             $infoWorkerId ?: null,
             $aplusWorkerId ?: null,
+            $infoInvoiceStatus ?: null,
             $taskId
         ]);
 
@@ -808,6 +841,7 @@ class Task {
             UPDATE wp_eco_aplus_tasks
             SET product_type='Info + A Plus',
                 info_subtasks=?,
+                info_invoice_status=COALESCE(info_invoice_status, invoice_status),
                 status='Pending',
                 work_status='Pending',
                 content=?,
@@ -1013,7 +1047,11 @@ class Task {
     }
 
     public static function setProductType(int $taskId, string $type): void {
-        db()->prepare("UPDATE wp_eco_aplus_tasks SET product_type=?, last_activity_at=NOW() WHERE id=?")->execute([$type ?: null, $taskId]);
+        if ($type === 'Info + A Plus') {
+            db()->prepare("UPDATE wp_eco_aplus_tasks SET product_type=?, info_invoice_status=COALESCE(info_invoice_status, invoice_status), last_activity_at=NOW() WHERE id=?")->execute([$type, $taskId]);
+        } else {
+            db()->prepare("UPDATE wp_eco_aplus_tasks SET product_type=?, last_activity_at=NOW() WHERE id=?")->execute([$type ?: null, $taskId]);
+        }
     }
 
     public static function publishProduct(int $taskId, int $userId, ?string $link): void {

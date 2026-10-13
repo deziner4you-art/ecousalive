@@ -288,19 +288,19 @@ if (current_user()) {
             <div style="display:flex;flex-direction:column;gap:10px;">
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
                     <span style="font-size:12px;color:#e9d5ff;width:140px;">🤖 AI Worker:</span>
-                    <select id="es-sel-ai" style="flex:1;background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:6px 10px;border-radius:6px;font-size:12px;outline:none;">
+                    <select id="es-sel-ai" onchange="if(this.value)document.getElementById('es-chk-ai').checked=true;" style="flex:1;background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:6px 10px;border-radius:6px;font-size:12px;outline:none;">
                         <option value="">(None / Unassigned)</option>
                     </select>
                 </div>
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
                     <span style="font-size:12px;color:#bae6fd;width:140px;">🎨 Info Worker:</span>
-                    <select id="es-sel-info" style="flex:1;background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:6px 10px;border-radius:6px;font-size:12px;outline:none;">
+                    <select id="es-sel-info" onchange="if(this.value)document.getElementById('es-chk-info').checked=true;" style="flex:1;background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:6px 10px;border-radius:6px;font-size:12px;outline:none;">
                         <option value="">(None / Unassigned)</option>
                     </select>
                 </div>
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
                     <span style="font-size:12px;color:#ddd6fe;width:140px;">🏷 A+ Worker:</span>
-                    <select id="es-sel-aplus" style="flex:1;background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:6px 10px;border-radius:6px;font-size:12px;outline:none;">
+                    <select id="es-sel-aplus" onchange="if(this.value)document.getElementById('es-chk-aplus').checked=true;" style="flex:1;background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:6px 10px;border-radius:6px;font-size:12px;outline:none;">
                         <option value="">(None / Unassigned)</option>
                     </select>
                 </div>
@@ -310,7 +310,7 @@ if (current_user()) {
         <!-- Active Assignment Selection -->
         <div style="margin-bottom:20px;background:#09111e;padding:12px 14px;border-radius:8px;border:1px solid #1e293b;">
             <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Active Stage / Re-assign To:</div>
-            <select id="es-sel-active" style="width:100%;background:#0f172a;border:1px solid #2563eb;color:#bfdbfe;padding:8px 10px;border-radius:6px;font-size:12px;outline:none;font-weight:bold;">
+            <select id="es-sel-active" onchange="if(this.value==='aplus'||this.value==='start_aplus_content')document.getElementById('es-chk-aplus').checked=true;else if(this.value==='info')document.getElementById('es-chk-info').checked=true;else if(this.value==='ai')document.getElementById('es-chk-ai').checked=true;" style="width:100%;background:#0f172a;border:1px solid #2563eb;color:#bfdbfe;padding:8px 10px;border-radius:6px;font-size:12px;outline:none;font-weight:bold;">
                 <option value="unchanged">Keep Current Assignment</option>
                 <option value="ai">Assign to AI Worker Now</option>
                 <option value="info">Assign to Infographics Worker Now</option>
@@ -318,7 +318,9 @@ if (current_user()) {
                 <option value="start_aplus_content">Start A+ Content Flow (Pending for D4U Writer)</option>
                 <option value="none">Unassign (Clear Active Assignment)</option>
             </select>
-            <div style="font-size:11px;color:#64748b;margin-top:6px;line-height:1.4;">Har worker ki service ka record permanently maintain rahay ga taa k un ka payroll sahi se ban sakay.</div>
+            <div style="font-size:11px;color:#38bdf8;margin-top:7px;line-height:1.4;">
+                💡 <strong>Auto Tag Shift:</strong> Infographics product per A+ Banners worker assign honay se ye product <strong>Info + A Plus</strong> tag per shift ho jaye gi. Purani Infographics invoicing, payroll aur stage history 100% maintain rahay gi aur new A+ Banners ki invoicing alag maintain ho gi.
+            </div>
         </div>
 
         <div style="display:flex;justify-content:flex-end;gap:10px;">
