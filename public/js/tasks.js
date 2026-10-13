@@ -2706,8 +2706,16 @@ function startAplusWorkflow(id){
             fd.append('csrf_token', CSRF_TOKEN);
         }
         fetch('index.php?action=start_aplus_workflow', {method:'POST', body:fd})
-            .then(r => r.json())
-            .then(r => { 
+            .then(function(r){
+                return r.text().then(function(txt){
+                    try {
+                        return JSON.parse(txt);
+                    } catch(e) {
+                        throw new Error('Server response: ' + txt.substring(0, 150));
+                    }
+                });
+            })
+            .then(function(r){ 
                 if(r.success || r.ok) {
                     alert(r.message || 'A+ Banner workflow shuru ho gaya');
                     loadTasks();
@@ -2715,7 +2723,9 @@ function startAplusWorkflow(id){
                     alert(r.message || 'Failed');
                 }
             })
-            .catch(function(){ alert('Request failed'); });
+            .catch(function(err){
+                alert(err && err.message ? err.message : 'Request failed');
+            });
     });
 }
 

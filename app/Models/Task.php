@@ -805,72 +805,68 @@ class Task {
     }
 
     public static function startAplusWorkflow(int $taskId): array {
-        $stmt = db()->prepare("SELECT * FROM wp_eco_aplus_tasks WHERE id=?");
-        $stmt->execute([$taskId]);
-        $task = $stmt->fetch();
-        if(!$task) return ['ok'=>false, 'message'=>'Task not found'];
+        try {
+            $stmt = db()->prepare("SELECT * FROM wp_eco_aplus_tasks WHERE id=?");
+            $stmt->execute([$taskId]);
+            $task = $stmt->fetch();
+            if(!$task) return ['ok'=>false, 'message'=>'Task not found'];
 
-        // Add 'A+ Banners' to info_subtasks if not already present
-        $subtasks = [];
-        if(!empty($task['info_subtasks'])){
-            $subtasks = array_map('trim', explode(',', $task['info_subtasks']));
-        }
-        if(!in_array('A+ Banners', $subtasks)){
-            $subtasks[] = 'A+ Banners';
-        }
-        $infoSubtasks = implode(',', $subtasks);
-
-        // Delete current assignment so product goes into writer pool for content generation
-        // db()->prepare("DELETE FROM eco_tool_assignments WHERE task_id=?")->execute([$taskId]);
-
-        // Preserve existing Infographics content so worker and client can reference it
-        $existingContent = $task['content'] ?? '';
-        $newContent = '';
-        if(!empty($existingContent)){
-            $decoded = json_decode($existingContent, true);
-            if(is_array($decoded) && isset($decoded['_format']) && $decoded['_format'] === 'grid_v2'){
-                $decoded['aplus'] = ['b1'=>'', 'b2'=>'', 'b3'=>'', 'b4'=>'', 'extra'=>''];
-                $newContent = json_encode($decoded);
-            } else {
-                $newContent = $existingContent;
+            // Add 'A+ Banners' to info_subtasks if not already present
+            $subtasks = [];
+            if(!empty($task['info_subtasks'])){
+                $subtasks = array_map('trim', explode(',', $task['info_subtasks']));
             }
+            if(!in_array('A+ Banners', $subtasks)){
+                $subtasks[] = 'A+ Banners';
+            }
+            $infoSubtasks = implode(',', $subtasks);
+
+            // Preserve existing Infographics content so worker and client can reference it
+            $existingContent = $task['content'] ?? '';
+            $newContent = '';
+            if(!empty($existingContent)){
+                $decoded = json_decode($existingContent, true);
+                if(is_array($decoded) && isset($decoded['_format']) && $decoded['_format'] === 'grid_v2'){
+                    $decoded['aplus'] = ['b1'=>'', 'b2'=>'', 'b3'=>'', 'b4'=>'', 'extra'=>''];
+                    $newContent = json_encode($decoded);
+                } else {
+                    $newContent = $existingContent;
+                }
+            }
+
+            $aplusWorkerId = !empty($task['aplus_worker_id']) ? (int)$task['aplus_worker_id'] : null;
+
+            // Transition to standard A+ content generation workflow
+            db()->prepare("
+                UPDATE wp_eco_aplus_tasks
+                SET product_type='Info + A Plus',
+                    info_subtasks=?,
+                    info_invoice_status=COALESCE(info_invoice_status, invoice_status),
+                    status='Pending',
+                    work_status='Pending',
+                    content=?,
+                    original_content=?,
+                    content_approved_at=NULL,
+                    content_updated_at=NULL,
+                    seo_doc_link=NULL,
+                    published_at=NULL,
+                    published_by=NULL,
+                    published_link=NULL,
+                    last_activity_at=NOW()
+                WHERE id=?
+            ")->execute([$infoSubtasks, $newContent, $newContent, $taskId]);
+
+            // Set current assignment to aplus_worker_id if specified, or clear old Info assignment
+            db()->prepare("DELETE FROM eco_tool_assignments WHERE task_id=?")->execute([$taskId]);
+            if ($aplusWorkerId) {
+                db()->prepare("INSERT INTO eco_tool_assignments (worker_id, task_id) VALUES (?, ?)")->execute([$aplusWorkerId, $taskId]);
+            }
+
+            return ['ok'=>true, 'message'=>'A+ Banner workflow shuru ho gaya. Product writer content generation ke liye Pending ho gaya hai.'];
+        } catch (\Throwable $e) {
+            error_log('startAplusWorkflow error: ' . $e->getMessage());
+            return ['ok'=>false, 'message'=>'Database error: ' . $e->getMessage()];
         }
-
-        $aplusWorkerId = !empty($task['aplus_worker_id']) ? (int)$task['aplus_worker_id'] : null;
-        $assignSql = "";
-        $params = [$infoSubtasks, $newContent, $newContent];
-        if ($aplusWorkerId) {
-            $assignSql = ", assigned_worker_id=?";
-            $params[] = $aplusWorkerId;
-        }
-        $params[] = $taskId;
-
-        // Transition to standard A+ content generation workflow
-        db()->prepare("
-            UPDATE wp_eco_aplus_tasks
-            SET product_type='Info + A Plus',
-                info_subtasks=?,
-                info_invoice_status=COALESCE(info_invoice_status, invoice_status),
-                status='Pending',
-                work_status='Pending',
-                content=?,
-                original_content=?,
-                content_approved_at=NULL,
-                content_updated_at=NULL,
-                seo_doc_link=NULL,
-                published_at=NULL,
-                published_by=NULL,
-                published_link=NULL,
-                last_activity_at=NOW()
-                {$assignSql}
-            WHERE id=?
-        ")->execute($params);
-
-        if ($aplusWorkerId) {
-            db()->prepare("INSERT INTO eco_tool_assignments (task_id, worker_id, assigned_at) VALUES (?, ?, NOW()) ON DUPLICATE KEY UPDATE worker_id=?, assigned_at=NOW()")->execute([$taskId, $aplusWorkerId, $aplusWorkerId]);
-        }
-
-        return ['ok'=>true, 'message'=>'A+ Banner workflow shuru ho gaya. Product writer content generation ke liye Pending ho gaya hai.'];
     }
 
     public static function saveTask(int $id, string $content, string $status, array $user): array {
