@@ -836,6 +836,15 @@ class Task {
             }
         }
 
+        $aplusWorkerId = !empty($task['aplus_worker_id']) ? (int)$task['aplus_worker_id'] : null;
+        $assignSql = "";
+        $params = [$infoSubtasks, $newContent, $newContent];
+        if ($aplusWorkerId) {
+            $assignSql = ", assigned_worker_id=?";
+            $params[] = $aplusWorkerId;
+        }
+        $params[] = $taskId;
+
         // Transition to standard A+ content generation workflow
         db()->prepare("
             UPDATE wp_eco_aplus_tasks
@@ -853,8 +862,13 @@ class Task {
                 published_by=NULL,
                 published_link=NULL,
                 last_activity_at=NOW()
+                {$assignSql}
             WHERE id=?
-        ")->execute([$infoSubtasks, $newContent, $newContent, $taskId]);
+        ")->execute($params);
+
+        if ($aplusWorkerId) {
+            db()->prepare("INSERT INTO eco_tool_assignments (task_id, worker_id, assigned_at) VALUES (?, ?, NOW()) ON DUPLICATE KEY UPDATE worker_id=?, assigned_at=NOW()")->execute([$taskId, $aplusWorkerId, $aplusWorkerId]);
+        }
 
         return ['ok'=>true, 'message'=>'A+ Banner workflow shuru ho gaya. Product writer content generation ke liye Pending ho gaya hai.'];
     }

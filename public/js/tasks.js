@@ -1949,6 +1949,10 @@ function buildActionButtons(item, isAdmin, isWorker, isQa, isListing, isUrgent, 
             btns += `<button class="actionbtn" style="background:#dc2626;color:#fff;" onclick="openPriorityPicker(${item.id})" title="Priority level set karein">🚨 Set Priority</button>`;
         }
     }
+    var canStartAplus = (item.work_status === 'Info Done') || (item.product_type === 'Info + A Plus' && (item.work_status === 'Info Done' || item.work_status === 'Work Done'));
+    if(canStartAplus && (isClientAct || isListing)){
+        btns += `<button class="actionbtn" style="background:#7c3aed;color:#fff;font-weight:700;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 6px rgba(124,58,237,0.35);" onclick="startAplusWorkflow(${item.id})" title="Start A+ Banner Content & Design Workflow">🎨 Start A+ Banners</button>`;
+    }
     if((ROLE === 'd4u_writer' || ROLE === 'seo_manager') && (item.status === 'Pending' || item.status === 'All Generated')) btns += `<button class="btn-writer-save actionbtn" onclick="writerSave(${item.id})">💾 Save Draft</button>`;
     if(ROLE === 'ai_work' && item.status === 'AI Work') btns += `<button class="btn2 actionbtn" style="background:#16a34a;color:#fff;" onclick="updateWorkStatus(${item.id},'AI DONE')">🤖 AI Done</button>`;
     if(isListing && item.work_status === 'Work Done' && !item.published_at) {
@@ -2015,6 +2019,10 @@ function buildAdminButtons(item, isUrgent, lock){
         } else {
             btns += `<button class="actionbtn" style="background:#dc2626;color:#fff;" onclick="openPriorityPicker(${item.id})" title="Priority level set karein">🚨 Set Priority</button>`;
         }
+    }
+    var canStartAplus = (item.work_status === 'Info Done') || (item.product_type === 'Info + A Plus' && (item.work_status === 'Info Done' || item.work_status === 'Work Done'));
+    if(canStartAplus){
+        btns += `<button class="actionbtn" style="background:#7c3aed;color:#fff;font-weight:700;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 6px rgba(124,58,237,0.35);" onclick="startAplusWorkflow(${item.id})" title="Start A+ Banner Content & Design Workflow">🎨 Start A+ Banners</button>`;
     }
     return btns;
 }
@@ -2693,7 +2701,10 @@ function startAplusWorkflow(id){
         var fd = new FormData();
         fd.append('action', 'start_aplus_workflow');
         fd.append('task_id', id);
-        if(typeof CSRF_TOKEN !== 'undefined') fd.append('_csrf', CSRF_TOKEN);
+        if(typeof CSRF_TOKEN !== 'undefined') {
+            fd.append('_csrf', CSRF_TOKEN);
+            fd.append('csrf_token', CSRF_TOKEN);
+        }
         fetch('index.php?action=start_aplus_workflow', {method:'POST', body:fd})
             .then(r => r.json())
             .then(r => { 

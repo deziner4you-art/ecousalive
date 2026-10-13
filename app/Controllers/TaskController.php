@@ -229,7 +229,10 @@ class TaskController {
 
     public function enableAplusService(): void {
         AuthMiddleware::requireAuth();
-        RoleMiddleware::requireAdmin();
+        $user = current_user();
+        if ($user['role'] !== 'administrator' && $user['role'] !== 'eco_client') {
+            json_error('Unauthorized', 403);
+        }
         verify_csrf();
 
         $taskId = intval($_POST['task_id'] ?? 0);
