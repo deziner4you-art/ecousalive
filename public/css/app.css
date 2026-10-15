@@ -269,6 +269,12 @@ background:#0891b2;
 background:#92400e;
 }
 
+.NoCharge{
+background:#64748b;
+color:#e2e8f0;
+opacity:.72;
+}
+
 .Changes{
 background:#d97706 !important;
 }
@@ -1960,6 +1966,12 @@ padding:8px;
         background: rgba(146, 64, 14, 0.15) !important;
         border-color: #92400e !important;
         color: #ffb690 !important;
+    }
+    .NoCharge {
+        background: rgba(100, 116, 139, 0.12) !important;
+        border-color: #64748b !important;
+        color: #cbd5e1 !important;
+        opacity: .72;
     }
     .Changes {
         background: rgba(217, 119, 6, 0.15) !important;

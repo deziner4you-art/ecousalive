@@ -27,6 +27,7 @@ DATABASE SETTINGS
 */
 
 define('DB_HOST', $_env['DB_HOST'] ?? '127.0.0.1');
+define('DB_PORT', $_env['DB_PORT'] ?? '3306');
 define('DB_NAME', $_env['DB_NAME'] ?? '');
 define('DB_USER', $_env['DB_USER'] ?? '');
 define('DB_PASS', $_env['DB_PASS'] ?? '');

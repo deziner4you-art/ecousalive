@@ -32,6 +32,7 @@ return [
     'save_final_links'   => ['TaskController', 'saveFinalLinks'],
     'force_stage'        => ['TaskController', 'forceStage'],
     'hold_product'       => ['TaskController', 'holdProduct'],
+    'no_charge_product'  => ['TaskController', 'noChargeProduct'],
     'toggle_urgent'      => ['TaskController', 'toggleUrgent'],
     'add_product'        => ['TaskController', 'addProduct'],
     'send_for_content'   => ['TaskController', 'sendForContent'],

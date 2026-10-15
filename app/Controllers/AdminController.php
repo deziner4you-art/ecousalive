@@ -304,7 +304,7 @@ class AdminController {
                 $activeStmt = $db->prepare("
                     SELECT COUNT(*) FROM eco_tool_assignments a
                     JOIN wp_eco_aplus_tasks t ON t.id = a.task_id
-                    WHERE a.worker_id = ? AND t.work_status NOT IN ('Work Done', 'Info Done', 'Hold') AND t.status != 'Hold' AND t.deleted_at IS NULL
+                    WHERE a.worker_id = ? AND t.work_status NOT IN ('Work Done', 'Info Done', 'Hold', 'No Charge') AND t.status NOT IN ('Hold','No Charge') AND t.deleted_at IS NULL
                 ");
                 $activeStmt->execute([$uid]);
                 $activeTasks = intval($activeStmt->fetchColumn());

@@ -54,7 +54,7 @@ class Task {
             LEFT JOIN eco_tool_users aiw ON aiw.id = t.ai_worked_by
             LEFT JOIN eco_tool_users infow ON infow.id = t.info_worker_id
             LEFT JOIN eco_tool_users aplusw ON aplusw.id = t.aplus_worker_id
-            WHERE t.deleted_at IS NULL
+            WHERE t.deleted_at IS NULL AND t.status != 'No Charge'
             ORDER BY t.id DESC
             ");
             return $stmt->fetchAll();
@@ -74,7 +74,7 @@ class Task {
                 LEFT JOIN eco_tool_users aiw ON aiw.id = t.ai_worked_by
                 LEFT JOIN eco_tool_users infow ON infow.id = t.info_worker_id
                 LEFT JOIN eco_tool_users aplusw ON aplusw.id = t.aplus_worker_id
-                WHERE t.deleted_at IS NULL AND t.status != 'Hold'
+                WHERE t.deleted_at IS NULL AND t.status NOT IN ('Hold','No Charge')
                   AND (
                       a.worker_id = ?
                       OR t.info_worker_id = ?
@@ -98,7 +98,7 @@ class Task {
                 LEFT JOIN eco_tool_users aiw ON aiw.id = t.ai_worked_by
                 LEFT JOIN eco_tool_users infow ON infow.id = t.info_worker_id
                 LEFT JOIN eco_tool_users aplusw ON aplusw.id = t.aplus_worker_id
-                WHERE t.deleted_at IS NULL AND t.status != 'Hold'
+                WHERE t.deleted_at IS NULL AND t.status NOT IN ('Hold','No Charge')
                   AND (
                       t.work_status = 'In QA'
                       OR t.work_status = 'SEO Review'
@@ -130,20 +130,20 @@ class Task {
                 LEFT JOIN eco_tool_users aiw ON aiw.id = t.ai_worked_by
                 LEFT JOIN eco_tool_users infow ON infow.id = t.info_worker_id
                 LEFT JOIN eco_tool_users aplusw ON aplusw.id = t.aplus_worker_id
-                WHERE t.deleted_at IS NULL AND t.status != 'Hold'
+                WHERE t.deleted_at IS NULL AND t.status NOT IN ('Hold','No Charge')
                   AND (
                       t.written_by_user_id = ?
-                      OR t.status = 'Pending'
+                      OR t.status IN ('Pending', 'A Plus')
                       OR t.work_status = 'SEO Review'
                       OR t.qa_submitted_by = ?
                       OR (t.family_code IS NOT NULL AND t.family_code IN (
                           SELECT DISTINCT t2.family_code
                           FROM wp_eco_aplus_tasks t2
                           WHERE t2.family_code IS NOT NULL
-                            AND t2.deleted_at IS NULL
+                            AND t2.deleted_at IS NULL AND t2.status NOT IN ('Hold','No Charge')
                             AND (
                                 t2.written_by_user_id = ?
-                                OR t2.status = 'Pending'
+                                OR t2.status IN ('Pending', 'A Plus')
                                 OR t2.work_status = 'SEO Review'
                                 OR t2.qa_submitted_by = ?
                             )
@@ -166,7 +166,7 @@ class Task {
                 LEFT JOIN eco_tool_users aiw ON aiw.id = t.ai_worked_by
                 LEFT JOIN eco_tool_users infow ON infow.id = t.info_worker_id
                 LEFT JOIN eco_tool_users aplusw ON aplusw.id = t.aplus_worker_id
-                WHERE t.deleted_at IS NULL
+                WHERE t.deleted_at IS NULL AND t.status != 'No Charge'
                 ORDER BY t.id DESC
                 ");
                 break;
@@ -183,7 +183,7 @@ class Task {
                 LEFT JOIN eco_tool_users aiw ON aiw.id = t.ai_worked_by
                 LEFT JOIN eco_tool_users infow ON infow.id = t.info_worker_id
                 LEFT JOIN eco_tool_users aplusw ON aplusw.id = t.aplus_worker_id
-                WHERE t.deleted_at IS NULL
+                WHERE t.deleted_at IS NULL AND t.status != 'No Charge'
                 ORDER BY t.id DESC
                 ");
                 $stmt->execute([]);
@@ -217,6 +217,10 @@ class Task {
     ──────────────────────────────────────────────────
     */
     public static function updateWorkStatus(int $taskId, string $status, array $user): bool {
+
+        $chargeStmt = db()->prepare("SELECT status FROM wp_eco_aplus_tasks WHERE id=?");
+        $chargeStmt->execute([$taskId]);
+        if ($chargeStmt->fetchColumn() === 'No Charge') return false;
 
         /* Check assignment for non-admin workers */
         if($user['role'] !== 'administrator'){
@@ -504,6 +508,13 @@ class Task {
                 ")->execute([$newType, $taskId]);
                 break;
 
+            case 'A Plus':
+                /* Preserve the existing Infographics content/history while
+                   explicitly reopening the task at the A+ content stage. */
+                db()->prepare("UPDATE wp_eco_aplus_tasks SET status='A Plus', work_status='Pending', last_activity_at=NOW() WHERE id=?")
+                    ->execute([$taskId]);
+                break;
+
             case 'Generated':
             case 'All Generated':
                 db()->prepare("DELETE FROM eco_tool_assignments WHERE task_id=?")->execute([$taskId]);
@@ -626,6 +637,42 @@ class Task {
                 db()->prepare("UPDATE wp_eco_aplus_tasks SET status='Generated', work_status='Pending', hold_prev_status=NULL WHERE id=?")->execute([$taskId]);
             }
         }
+    }
+
+    public static function setNoCharge(int $taskId, int $noCharge, string $reason = '', int $userId = 0): array {
+        $row = db()->prepare("SELECT status, work_status, no_charge_prev_status FROM wp_eco_aplus_tasks WHERE id=? AND deleted_at IS NULL");
+        $row->execute([$taskId]);
+        $task = $row->fetch();
+        if (!$task) return ['ok'=>false, 'message'=>'Product not found'];
+
+        if (!$noCharge) {
+            if ($task['status'] !== 'No Charge') return ['ok'=>false, 'message'=>'Product is not marked No Charge'];
+            $prev = $task['no_charge_prev_status'] ? json_decode($task['no_charge_prev_status'], true) : null;
+            $prevStatus = $prev['status'] ?? 'Pending';
+            $prevWork = $prev['work_status'] ?? 'Pending';
+            db()->prepare("UPDATE wp_eco_aplus_tasks SET status=?, work_status=?, no_charge_prev_status=NULL, no_charge_reason=NULL, no_charge_at=NULL, no_charge_by=NULL, last_activity_at=NOW() WHERE id=?")
+               ->execute([$prevStatus, $prevWork, $taskId]);
+            return ['ok'=>true];
+        }
+
+        if ($task['status'] === 'No Charge') return ['ok'=>true];
+
+        $inv = db()->prepare("SELECT COUNT(*) FROM eco_invoice_items WHERE task_id=?");
+        $inv->execute([$taskId]);
+        if ((int)$inv->fetchColumn() > 0) {
+            return ['ok'=>false, 'message'=>'Product invoice mein already maujood hai. Pehle invoice se remove karein.'];
+        }
+        $ps = db()->prepare("SELECT COUNT(*) FROM eco_payslip_items WHERE task_id=?");
+        $ps->execute([$taskId]);
+        if ((int)$ps->fetchColumn() > 0) {
+            return ['ok'=>false, 'message'=>'Product payslip mein already maujood hai. Pehle payroll record resolve karein.'];
+        }
+
+        $prev = json_encode(['status'=>$task['status'], 'work_status'=>$task['work_status']]);
+        $reason = $reason !== '' ? $reason : 'Client ne split products ko single product mein convert kar diya';
+        db()->prepare("UPDATE wp_eco_aplus_tasks SET status='No Charge', work_status='No Charge', invoice_status=NULL, info_invoice_status=NULL, aplus_invoice_status=NULL, is_urgent=0, no_charge_prev_status=?, no_charge_reason=?, no_charge_at=NOW(), no_charge_by=?, last_activity_at=NOW() WHERE id=?")
+           ->execute([$prev, $reason, $userId ?: null, $taskId]);
+        return ['ok'=>true];
     }
 
     public static function toggleUrgent(int $taskId, int $urgent, int $priority = 1): void {
@@ -842,12 +889,10 @@ class Task {
                 SET product_type='Info + A Plus',
                     info_subtasks=?,
                     info_invoice_status=COALESCE(info_invoice_status, invoice_status),
-                    status='Pending',
+                    status='A Plus',
                     work_status='Pending',
                     content=?,
                     original_content=?,
-                    content_approved_at=NULL,
-                    content_updated_at=NULL,
                     seo_doc_link=NULL,
                     published_at=NULL,
                     published_by=NULL,
@@ -927,6 +972,16 @@ class Task {
 
     public static function deleteTask(int $id): void {
         db()->prepare("UPDATE wp_eco_aplus_tasks SET deleted_at = NOW() WHERE id=?")->execute([$id]);
+    }
+
+    public static function bulkDeleteTasks(array $taskIds): int {
+        $taskIds = array_values(array_unique(array_filter(array_map('intval', $taskIds))));
+        if (empty($taskIds)) return 0;
+
+        $inQuery = implode(',', array_fill(0, count($taskIds), '?'));
+        $stmt = db()->prepare("UPDATE wp_eco_aplus_tasks SET deleted_at = NOW() WHERE id IN ($inQuery) AND deleted_at IS NULL");
+        $stmt->execute($taskIds);
+        return $stmt->rowCount();
     }
 
     public static function getDeletedTasks(): array {
@@ -1196,6 +1251,28 @@ class Task {
                     WHERE id = ?
                 ")->execute([$prev, $taskId]);
             }
+        }
+    }
+
+    public static function bulkMarkNoCharge(array $taskIds, string $reason = '', int $userId = 0): array {
+        $skipped = [];
+        try {
+            db()->beginTransaction();
+            foreach ($taskIds as $taskId) {
+                $result = self::setNoCharge((int)$taskId, 1, $reason, $userId);
+                if (!$result['ok']) {
+                    $skipped[] = '#' . (int)$taskId . ': ' . ($result['message'] ?? 'unknown error');
+                }
+            }
+            if (!empty($skipped)) {
+                db()->rollBack();
+                return ['updated'=>0, 'skipped'=>$skipped];
+            }
+            db()->commit();
+            return ['updated'=>count($taskIds), 'skipped'=>[]];
+        } catch(Exception $e) {
+            if (db()->inTransaction()) db()->rollBack();
+            return ['updated'=>0, 'skipped'=>['Database error: ' . $e->getMessage()]];
         }
     }
 

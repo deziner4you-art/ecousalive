@@ -64,6 +64,7 @@ function renderInvTable(){
     var anyChecked = fAll||fWD||fID||fIA;
 
     var filtered = _invTasks.filter(function(t){
+        if(t.status === 'No Charge') return false;
         var isIA   = t.product_type === 'Info + A Plus' || (t.aplus_worker_id && (t.info_worker_id || t.product_type === 'Infographics'));
         var isInfo = !isIA && t.product_type === 'Infographics';
         var isAplus = !isIA && !isInfo;

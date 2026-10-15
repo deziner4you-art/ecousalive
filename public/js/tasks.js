@@ -316,9 +316,11 @@ function renderSmart(data){
 
 /* ── Status label/class helper ───────────────── */
 function getDisplayStatus(item){
+    if(item.status === 'No Charge')                            return {cls:'NoCharge',      label:'No Charge'};
     if(item.status === 'Hold')                                 return {cls:'Hold',          label:'Hold'};
     if(item.status === 'AI Work')                              return {cls:'AIWork',        label:'AI Work'};
     if(item.status === 'All Generated')                        return {cls:'AllGenerated',  label:'All Generated'};
+    if(item.status === 'A Plus')                                 return {cls:'Pending',       label:'A+ Banners'};
     if(item.status === 'Generate info Content' || item.status === 'Generate Info Content') return {cls:'Pending', label:'Generate Info Content'};
     if(item.status === 'AI DONE' && (!item.assigned_worker_id || item.assigned_worker_id == 0) && (!item.work_status || item.work_status === 'Pending')) return {cls:'AIDone', label:'AI DONE'};
     if(item.work_status === 'Changes')                         return {cls:'Changes',       label:'Changes in Design'};
@@ -485,6 +487,16 @@ function isMultiBoxTask(item){
     var content = String(item.content || '').trim();
     var stripped = content.replace(/^<p[^>]*>/i, '').replace(/<\/p>$/i, '').trim();
     stripped = stripped.replace(/^<div[^>]*>/i, '').replace(/<\/div>$/i, '').trim();
+
+    // Once an A+ workflow is active, always use the two-phase grid UI.
+    // Older Info + A Plus records can still contain legacy HTML/plain text
+    // from phase 1; treating those as legacy here hides both the saved Info
+    // boxes and the new A+ banner boxes. parseTaskContent() safely maps that
+    // old content into the appropriate grid fields and preserves it on save.
+    var activeAplus = item.status === 'A Plus';
+    var aplusProduct = item.product_type === 'A+' || item.product_type === 'A Plus';
+    var infoPlusAplus = item.product_type === 'Info + A Plus';
+    if(activeAplus && (aplusProduct || infoPlusAplus)) return true;
 
     // 1. If content is already explicitly stored in JSON grid_v2 format (even if wrapped in tags):
     if((stripped.startsWith('{') && stripped.endsWith('}')) || (content.startsWith('{') && content.endsWith('}'))){
@@ -797,7 +809,7 @@ function buildProductContentSection(item, canEdit, lock, isWorker, isQa, origina
         }
     }
     if(isBothProd){
-        if(item.aplus_worker_name || hasAplusContent || (item.work_status === 'Info Done' && item.status === 'Pending') || (item.product_type === 'Info + A Plus' && item.work_completed_worker_name) || item.status === 'All Generated'){
+        if(item.status === 'A Plus' || item.aplus_worker_name || hasAplusContent || (item.work_status === 'Info Done' && item.status === 'Pending') || (item.product_type === 'Info + A Plus' && item.work_completed_worker_name) || item.status === 'All Generated'){
             aplusStarted = true;
         }
     }
@@ -846,7 +858,7 @@ function buildProductContentSection(item, canEdit, lock, isWorker, isQa, origina
 
     // 1. Infographics 6-Image Grid
     if(isInfoProd || isBothProd){
-        var infoIsLocked = isBothProd ? ((aplusStarted && !isAllGenPhase && item.work_status === 'Info Done') || lock || isWorker || isQa) : (lock || isWorker || isQa);
+        var infoIsLocked = isBothProd ? ((aplusStarted && !isAllGenPhase && (item.work_status === 'Info Done' || item.status === 'A Plus')) || lock || isWorker || isQa) : (lock || isWorker || isQa);
         var infoCanEdit  = isBothProd ? ((!aplusStarted || isAllGenPhase || item.status === 'Pending' || item.status === 'Generated' || item.status === 'Generate info Content' || item.status === 'Generate Info Content') && canEdit && !lock) : (canEdit && !lock);
 
         if(isBothProd && aplusStarted && !isAllGenPhase && item.work_status === 'Info Done'){
@@ -1291,7 +1303,7 @@ function buildCard(item){
     var isListing    = ROLE === 'eco_listing';
     var isClient     = ROLE === 'eco_client' || (typeof USERNAME !== 'undefined' && USERNAME === 'ilyaeco');
     var showWorkerBadges = !isListing && !isClient && (typeof USERNAME === 'undefined' || (USERNAME.toLowerCase() !== 'ecolisting' && USERNAME.toLowerCase() !== 'ilyaeco'));
-    var canEdit      = ((ROLE === 'd4u_writer' || ROLE === 'seo_manager' || ROLE === 'ai_work') && (item.status === 'Pending' || item.status === 'All Generated'))
+    var canEdit      = ((ROLE === 'd4u_writer' || ROLE === 'seo_manager' || ROLE === 'ai_work') && (item.status === 'Pending' || item.status === 'A Plus' || item.status === 'All Generated'))
                     || (isClient && (item.status === 'Generated' || item.status === 'All Generated'))
                     || isAdmin;
     var approvedDisabled  = lock || (item.status !== 'Generated' && item.status !== 'All Generated');
@@ -1303,6 +1315,9 @@ function buildCard(item){
     var pVal      = isUrgent ? parseInt(item.is_urgent) : 0;
     var urgentBadge = '';
     var priorityMetaBadge = '';
+    var noChargeNote = (item.status === 'No Charge' && item.no_charge_reason)
+        ? `<div style="margin:0 0 10px;padding:7px 10px;background:rgba(100,116,139,.10);border:1px solid rgba(100,116,139,.45);border-radius:5px;color:#cbd5e1;font-size:11px;opacity:.78;">🚫 <strong>No Charge:</strong> ${escapeHtmlContent(item.no_charge_reason)}</div>`
+        : '';
     if (isUrgent) {
         if (pVal === 1) {
             urgentBadge = `<span class="urgent-badge" style="background:#b91c1c; border:1px solid #ef4444; box-shadow:0 0 10px rgba(239,68,68,0.5);">🚨 URGENT — PRIORITY 1 (TOP)</span>`;
@@ -1457,6 +1472,7 @@ function buildCard(item){
       ${item.product_type==='Info + A Plus'?'<option value="save_all_generated">✨ Save All Generated</option>':''}
       ${item.product_type==='Info + A Plus'&&item.status!=='All Generated'?'<option value="set_all_generated">🏷 Tag as All Generated</option>':''}
       ${item.product_type==='Info + A Plus'&&item.status==='All Generated'?'<option value="set_generated">🏷 Tag as Generated</option>':''}
+      ${item.status==='No Charge'?'<option value="no_charge|0">↩ Restore from No Charge</option>':'<option value="no_charge|1">🚫 No Charge (No Invoice / Payroll)</option>'}
       <option value="hold|${item.status==='Hold'?0:1}">${item.status==='Hold'?'▶ Unhold':'⏸ Hold'}</option>
       ${isUrgent ? '<option value="urgent_remove">❌ Remove Priority (Normal Blue)</option>' : ''}
       <option value="urgent_1">🚨 Mark Priority 1 (High)</option>
@@ -1723,6 +1739,7 @@ ${item.published_link ? `<a href="${item.published_link}" target="_blank" rel="n
 <div class="body${OPEN[item.id]?' open':''}" id="body-${item.id}">
 <div class="card-close-bar" onclick="toggle(${item.id})" ontouchend="headTouch(event,${item.id})">▲ &nbsp;Close</div>
 ${isUrgent ? `<div style="margin-bottom:10px;">${urgentBadge}</div>` : ''}
+${noChargeNote}
 ${(() => {
     var logs = [];
     try { logs = item.revision_log ? JSON.parse(item.revision_log) : []; } catch(e){}
@@ -1889,7 +1906,9 @@ function buildActionButtons(item, isAdmin, isWorker, isQa, isListing, isUrgent, 
         var isInfoStage = (item.status === 'Generate info Content' || item.status === 'Generate Info Content')
                        || (item.product_type === 'Infographics')
                        || (item.product_type === 'Info + A Plus' && !item.work_completed_worker_name && (item.status === 'Pending' || item.status === 'AI DONE' || item.status === 'Infographics' || item.status === 'Generate info Content' || item.status === 'Generate Info Content') && !item.content_approved_at && !item.content_updated_at);
-        if(isInfoStage){
+        if(item.status === 'A Plus'){
+            btns += `<div style="color:#c4b5fd;font-size:12px;padding:8px 0;font-style:italic;">⏳ A+ Content generate hone ka intezaar karein...</div>`;
+        } else if(isInfoStage){
             var isContentApproved = item.status === 'Approved' || item.status === 'Updated' || item.content_approved_at || item.content_updated_at;
             if(!isContentApproved) {
                 if(item.work_status === 'Pending' || item.status === 'AI DONE' || item.status === 'Infographics' || item.status === 'Generate info Content' || item.status === 'Generate Info Content') {
@@ -1953,7 +1972,8 @@ function buildActionButtons(item, isAdmin, isWorker, isQa, isListing, isUrgent, 
     if(canStartAplus && (isClientAct || isListing)){
         btns += `<button class="actionbtn" style="background:#7c3aed;color:#fff;font-weight:700;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 6px rgba(124,58,237,0.35);" onclick="startAplusWorkflow(${item.id})" title="Start A+ Banner Content & Design Workflow">🎨 Start A+ Banners</button>`;
     }
-    if((ROLE === 'd4u_writer' || ROLE === 'seo_manager') && (item.status === 'Pending' || item.status === 'All Generated')) btns += `<button class="btn-writer-save actionbtn" onclick="writerSave(${item.id})">💾 Save Draft</button>`;
+    if((ROLE === 'd4u_writer' || ROLE === 'seo_manager') && item.status === 'A Plus') btns += `<button class="btn-writer-save actionbtn" style="background:#7c3aed;color:#fff;" onclick="focusAplusContent(${item.id})">✍ Generate A+ Content</button>`;
+    if((ROLE === 'd4u_writer' || ROLE === 'seo_manager') && (item.status === 'Pending' || item.status === 'A Plus' || item.status === 'All Generated')) btns += `<button class="btn-writer-save actionbtn" onclick="writerSave(${item.id})">💾 Save Draft</button>`;
     if(ROLE === 'ai_work' && item.status === 'AI Work') btns += `<button class="btn2 actionbtn" style="background:#16a34a;color:#fff;" onclick="updateWorkStatus(${item.id},'AI DONE')">🤖 AI Done</button>`;
     if(isListing && item.work_status === 'Work Done' && !item.published_at) {
         btns += `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;width:100%;margin-top:4px;"><input type="url" id="pub-link-${item.id}" placeholder="Amazon published link (optional)" style="flex:1;min-width:160px;padding:9px 12px;border:1px solid #334155;border-radius:5px;background:#0a1628;color:#e2e8f0;font-size:13px;outline:none;"><button class="btn2 actionbtn" style="flex-shrink:0;" onclick="publishProduct(${item.id})">📦 Publish</button></div>`;
@@ -2008,7 +2028,8 @@ function buildAdminButtons(item, isUrgent, lock){
         }
     }
 
-    if(item.work_status !== 'Work Done' && item.work_status !== 'Info Done' && !isInfoStage){
+    if(item.status === 'A Plus') btns += `<button class="actionbtn" style="background:#7c3aed;color:#fff;font-weight:700;" onclick="focusAplusContent(${item.id})">✍ Generate A+ Content</button>`;
+    if(item.work_status !== 'Work Done' && item.work_status !== 'Info Done' && !isInfoStage && item.status !== 'A Plus'){
         btns += `<button class="btn1 actionbtn" id="u-${item.id}" disabled onclick="save(${item.id},'Updated')">UPDATED</button>`;
         btns += `<button class="btn2 actionbtn" id="a-${item.id}" ${approvedDisabled?'disabled':''} onclick="save(${item.id},'Approved')">APPROVED</button>`;
     }
@@ -2048,6 +2069,7 @@ function applyPerform(taskId){
     else if(act === 'set_all_generated')       forceStage(taskId, 'All Generated');
     else if(act === 'set_generated')           forceStage(taskId, 'Generated');
     else if(act.startsWith('hold|'))           holdProduct(taskId, parseInt(act.split('|')[1]));
+    else if(act.startsWith('no_charge|'))      noChargeProduct(taskId, parseInt(act.split('|')[1]));
     else if(act === 'urgent_1')                setUrgent(taskId, 1, 1);
     else if(act === 'urgent_2')                setUrgent(taskId, 1, 2);
     else if(act === 'urgent_3')                setUrgent(taskId, 1, 3);
@@ -2065,6 +2087,26 @@ function applyPerform(taskId){
     else if(act === 'qaready')                 updateWorkStatus(taskId, 'In QA');
     else if(act === 'remove_invoiced')         clearInvoiceStatus(taskId);
     else if(act === 'enable_aplus' || act === 'start_aplus') startAplusWorkflow(taskId);
+}
+
+function noChargeProduct(taskId, noCharge){
+    var reason = '';
+    if(noCharge){
+        reason = window.prompt('No Charge reason enter karein:', 'Client ne split products ko single product mein convert kar diya');
+        if(reason === null) return;
+    }
+    _confirm(noCharge ? 'Is product ko No Charge mark karein? Ye invoice aur payroll dono se exclude ho jayega.' : 'Is product ko No Charge se restore karein?', function(){
+        var fd = new FormData();
+        fd.append('action','no_charge_product');
+        fd.append('task_id',taskId);
+        fd.append('no_charge',noCharge ? 1 : 0);
+        if(noCharge) fd.append('reason', reason || '');
+        if(typeof CSRF_TOKEN !== 'undefined') fd.append('csrf_token', CSRF_TOKEN);
+        fetch('index.php',{method:'POST',body:fd})
+            .then(function(r){ return r.json(); })
+            .then(function(r){ if(r.success) loadTasks(); else alert('No Charge update failed: ' + (r.message || '')); })
+            .catch(function(err){ alert('Request failed: ' + err.message); });
+    });
 }
 
 /* ── Rename Product (Admin Only) ──────────────── */
@@ -2733,6 +2775,17 @@ function enableAplusService(id){
     startAplusWorkflow(id);
 }
 
+function focusAplusContent(id){
+    var body = document.getElementById('body-' + id);
+    if(body && !body.classList.contains('open')) toggle(id);
+    setTimeout(function(){
+        var target = document.getElementById('grid-aplus-' + id) || document.getElementById('aplus-section-' + id);
+        if(target) target.scrollIntoView({behavior:'smooth', block:'center'});
+        var first = document.getElementById('cbox-' + id + '-aplus-1');
+        if(first && first.getAttribute('contenteditable') === 'true') first.focus();
+    }, 120);
+}
+
 /* ── Revision system ──────────────────────────── */
 function openRevisionBox(taskId, revisionType){
     var boxId = 'revision-box-' + taskId;
@@ -2978,6 +3031,16 @@ function applyBulkAction() {
         msg = 'Kya aap select shuda products aur un ke groups se URGENT aur Priority tag hatana chahte hain (Normal blue karna chahte hain)?';
     } else if (action === 'hold') {
         msg = 'Kya aap select shuda products ko HOLD par daalna chahte hain?';
+    } else if (action === 'no_charge') {
+        msg = 'Kya aap select shuda products ko No Charge mark karna chahte hain? Ye invoice aur payroll dono se exclude ho jayenge.';
+    } else if (action === 'delete') {
+        msg = 'Kya aap select shuda products ko Delete karna chahte hain? Ye Recycle Bin mein move ho jayenge aur wahan se restore kiye ja sakte hain.';
+    }
+
+    var bulkReason = '';
+    if (action === 'no_charge') {
+        bulkReason = window.prompt('No Charge reason enter karein:', 'Client ne split products ko single product mein convert kar diya');
+        if (bulkReason === null) return;
     }
     
     _confirm(msg, function(){
@@ -2985,6 +3048,7 @@ function applyBulkAction() {
         fd.append('action', 'bulk_update_tasks');
         fd.append('task_ids', SELECTED_BULK_PRODUCTS.join(','));
         fd.append('bulk_action', action);
+        if (action === 'no_charge') fd.append('reason', bulkReason || '');
         if(typeof CSRF_TOKEN !== 'undefined') fd.append('csrf_token', CSRF_TOKEN);
         fetch('index.php', { method: 'POST', body: fd })
             .then(function(r){ return r.json(); })

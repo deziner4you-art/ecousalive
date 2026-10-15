@@ -67,6 +67,14 @@ class TaskController {
             }
         }
 
+        if ($bulk_action === 'no_charge' && $u['role'] !== 'administrator') {
+            json_error('Only administrators can mark products as No Charge', 403);
+        }
+
+        if ($bulk_action === 'delete' && $u['role'] !== 'administrator') {
+            json_error('Only administrators can delete products', 403);
+        }
+
         if ($bulk_action === 'urgent_1') {
             Task::bulkMarkUrgent($task_ids, 1);
             json_success(['message' => 'Products and groups marked as Priority 1 (High)']);
@@ -85,6 +93,15 @@ class TaskController {
         } elseif ($bulk_action === 'hold') {
             Task::bulkMarkHold($task_ids);
             json_success(['message' => 'Products marked as hold']);
+        } elseif ($bulk_action === 'no_charge') {
+            $result = Task::bulkMarkNoCharge($task_ids, trim($_POST['reason'] ?? ''), (int)$u['id']);
+            if (!empty($result['skipped'])) {
+                json_error('Kuch products No Charge nahi ban sakay: ' . implode(' | ', $result['skipped']));
+            }
+            json_success(['message' => 'Products marked as No Charge']);
+        } elseif ($bulk_action === 'delete') {
+            $deleted = Task::bulkDeleteTasks($task_ids);
+            json_success(['message' => $deleted . ' selected task(s) Recycle Bin mein move kar diye gaye']);
         } elseif ($bulk_action === 'group') {
             $res = Task::bulkGroupTasks($task_ids);
             if (!$res['ok']) {
@@ -254,9 +271,15 @@ class TaskController {
 
         $taskId = intval($_POST['task_id'] ?? 0);
         $stage  = trim($_POST['stage']     ?? '');
-        $allowed = ['Pending','AI Work','AI DONE','Generated','All Generated','Updated','Approved','Working','Paused','In QA','SEO Review','Work Done','Info Done','Republish','Changes','Changes in Content','Changing','Generate info Content','Generate Info Content'];
+        $allowed = ['Pending','AI Work','AI DONE','A Plus','Generated','All Generated','Updated','Approved','Working','Paused','In QA','SEO Review','Work Done','Info Done','Republish','Changes','Changes in Content','Changing','Generate info Content','Generate Info Content'];
 
         if(!$taskId || !in_array($stage, $allowed)) json_error('Invalid task or stage');
+
+        $currentStmt = db()->prepare("SELECT status FROM wp_eco_aplus_tasks WHERE id=?");
+        $currentStmt->execute([$taskId]);
+        if ($currentStmt->fetchColumn() === 'No Charge') {
+            json_error('Pehle product ko No Charge se restore karein, phir stage reset karein.');
+        }
 
         Task::forceStage($taskId, $stage);
         json_success();
@@ -286,6 +309,21 @@ class TaskController {
         }
 
         Task::holdProduct($taskId, $hold);
+        json_success();
+    }
+
+    public function noChargeProduct(): void {
+        AuthMiddleware::requireAuth();
+        RoleMiddleware::requireAdmin();
+        verify_csrf();
+
+        $taskId = intval($_POST['task_id'] ?? 0);
+        $noCharge = intval($_POST['no_charge'] ?? 1);
+        $reason = trim($_POST['reason'] ?? '');
+        if (!$taskId) json_error('Invalid task');
+
+        $result = Task::setNoCharge($taskId, $noCharge, $reason, (int)current_user()['id']);
+        if (!$result['ok']) json_error($result['message'] ?? 'No Charge update failed');
         json_success();
     }
 

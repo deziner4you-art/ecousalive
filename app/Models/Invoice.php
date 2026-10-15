@@ -47,13 +47,27 @@ class Invoice {
             SELECT t.id, t.product_no, t.title, t.work_status, t.product_type,
                    t.invoice_status, t.info_invoice_status, t.aplus_invoice_status, t.published_at
             FROM wp_eco_aplus_tasks t
-            WHERE t.deleted_at IS NULL
+            WHERE t.deleted_at IS NULL AND t.status <> 'No Charge'
             ORDER BY t.id DESC
         ")->fetchAll();
     }
 
     public static function create(int $clientId, string $notes, array $items): array {
         if(!$clientId || empty($items)) return ['ok'=>false,'message'=>'Client and at least one product required'];
+
+        /* Server-side protection: No Charge products must never enter an invoice,
+           even if a stale browser submits an old cart. Validate before creating
+           the invoice so a mixed cart cannot leave a partial invoice behind. */
+        foreach($items as $it){
+            $tid = intval($it['task_id'] ?? 0);
+            $price = floatval($it['price'] ?? 0);
+            if(!$tid || $price <= 0) continue;
+            $chargeCheck = db()->prepare("SELECT status FROM wp_eco_aplus_tasks WHERE id=? AND deleted_at IS NULL");
+            $chargeCheck->execute([$tid]);
+            if ($chargeCheck->fetchColumn() === 'No Charge') {
+                return ['ok'=>false,'message'=>'No Charge product invoice mein add nahi ho sakta: #' . $tid];
+            }
+        }
 
         $year     = date('Y');
         $count    = db()->query("SELECT COUNT(*) FROM eco_invoices WHERE YEAR(created_at)=$year")->fetchColumn();
@@ -75,6 +89,13 @@ class Invoice {
             $aplusPrice = floatval($it['aplus_price'] ?? 0);
             $ptype      = trim($it['product_type']  ?? '');
             if(!$tid || $price <= 0) continue;
+
+            $chargeCheck = db()->prepare("SELECT status FROM wp_eco_aplus_tasks WHERE id=? AND deleted_at IS NULL");
+            $chargeCheck->execute([$tid]);
+            $taskStatus = $chargeCheck->fetchColumn();
+            if ($taskStatus === 'No Charge') {
+                return ['ok'=>false,'message'=>'No Charge product invoice mein add nahi ho sakta: #' . $tid];
+            }
             $iStmt->execute([$invoiceId, $tid, $price, $infoPrice, $aplusPrice]);
             $total += $price;
             $taskIds[] = ['id'=>$tid,'product_type'=>$ptype,'info_price'=>$infoPrice,'aplus_price'=>$aplusPrice];

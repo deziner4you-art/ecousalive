@@ -723,9 +723,12 @@ function renderPayslipTableInline(wid){
     var all  = _psAllProducts[wid] || [];
 
     var filtered = all.filter(function(t){
+        if(t.status === 'No Charge') return false;
         if(!fAll){
             var match = false;
-            if(fWD  && t.work_status==='Work Done') match = true;
+            /* AI tasks keep work_status=Pending after AI Done. Treat the
+               existing Work Done filter as completed for AI payroll too. */
+            if(fWD  && (t.work_status==='Work Done' || t.work_status==='Info Done' || t.ai_payroll_eligible==1)) match = true;
             if(fInv && (t.invoice_status==='Invoiced'||t.info_invoice_status==='Invoiced'||t.aplus_invoice_status==='Invoiced')) match = true;
             if(fPd  && (t.invoice_status==='Paid'   ||t.info_invoice_status==='Paid'   ||t.aplus_invoice_status==='Paid'))    match = true;
             if(!match) return false;
@@ -740,12 +743,13 @@ function renderPayslipTableInline(wid){
     var html = '<table class="inv-table"><thead><tr><th style="width:30px;"></th><th>#</th><th>Type</th><th>Work Status</th><th>Invoice</th><th>Title</th></tr></thead><tbody>';
     filtered.forEach(function(t){
         var inCart   = !!cart[t.id];
+        var displayWorkStatus = t.ai_payroll_eligible==1 ? 'AI DONE' : (t.work_status || '-');
         var invBadge = '';
         var typeCell = '<td style="white-space:nowrap;font-size:10px;color:#a78bfa;">'+_typeLabel(t.product_type)+'</td>';
         if(t.invoice_status==='Paid'||t.info_invoice_status==='Paid'||t.aplus_invoice_status==='Paid') invBadge='<span class="inv-badge-paid">✅ Paid</span>';
         else if(t.invoice_status==='Invoiced'||t.info_invoice_status==='Invoiced'||t.aplus_invoice_status==='Invoiced') invBadge='<span class="inv-badge-invoiced">🧾 Inv</span>';
-        if(inCart) html+=`<tr style="opacity:0.45;"><td style="text-align:center;color:#4ade80;font-size:11px;">✓</td><td style="white-space:nowrap;">${t.product_no}</td>${typeCell}<td style="white-space:nowrap;font-size:11px;color:#94a3b8;">${t.work_status}</td><td>${invBadge}</td><td style="white-space:normal;word-break:break-word;">${t.title} <span style="font-size:10px;color:#4ade80;">In Cart</span></td></tr>`;
-        else       html+=`<tr><td><input type="checkbox" class="ps-chk-${wid}" data-id="${t.id}" onchange="syncPayslipSelectAllInline(${wid});calcPayslipTotalInline(${wid})"></td><td style="white-space:nowrap;">${t.product_no}</td>${typeCell}<td style="white-space:nowrap;font-size:11px;color:#94a3b8;">${t.work_status}</td><td>${invBadge}</td><td style="white-space:normal;word-break:break-word;">${t.title}</td></tr>`;
+        if(inCart) html+=`<tr style="opacity:0.45;"><td style="text-align:center;color:#4ade80;font-size:11px;">✓</td><td style="white-space:nowrap;">${t.product_no}</td>${typeCell}<td style="white-space:nowrap;font-size:11px;color:#94a3b8;">${displayWorkStatus}</td><td>${invBadge}</td><td style="white-space:normal;word-break:break-word;">${t.title} <span style="font-size:10px;color:#4ade80;">In Cart</span></td></tr>`;
+        else       html+=`<tr><td><input type="checkbox" class="ps-chk-${wid}" data-id="${t.id}" onchange="syncPayslipSelectAllInline(${wid});calcPayslipTotalInline(${wid})"></td><td style="white-space:nowrap;">${t.product_no}</td>${typeCell}<td style="white-space:nowrap;font-size:11px;color:#94a3b8;">${displayWorkStatus}</td><td>${invBadge}</td><td style="white-space:normal;word-break:break-word;">${t.title}</td></tr>`;
     });
     html += '</tbody></table>';
     wrap.innerHTML = html;
@@ -782,7 +786,7 @@ function addSelectedToPayslipCartInline(wid){
         var id   = chk.getAttribute('data-id');
         var task = (_psAllProducts[wid] || []).find(function(t){ return String(t.id) === String(id); });
         if(!task) return;
-        _psCart[wid][id] = {id: id, product_no: task.product_no, title: task.title, work_status: task.work_status, product_type: task.product_type};
+        _psCart[wid][id] = {id: id, product_no: task.product_no, title: task.title, work_status: task.ai_payroll_eligible==1 ? 'AI DONE' : task.work_status, product_type: task.product_type};
         added++;
     });
     if(!added){ alert('Pehle products select karein'); return; }

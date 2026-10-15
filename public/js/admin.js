@@ -85,6 +85,7 @@ var ALL_FILTER_OPTS = [
     {val:'Changes in Content', label:'Changes in Content'},
     {val:'Changing',  label:'Changing'},
     {val:'Hold',      label:'Hold'},
+    {val:'No Charge', label:'No Charge'},
     {val:'Published', label:'Published'},
     {val:'Invoiced',  label:'Invoiced'},
     {val:'Paid',      label:'Paid'},

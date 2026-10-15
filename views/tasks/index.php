@@ -45,6 +45,7 @@ $allFilters = [
     'Changes in Content'=> 'Changes in Content',
     'Changing'      => 'Changing',
     'Hold'          => 'Hold',
+    'No Charge'     => 'No Charge',
     'Urgent'        => '🚨 All Urgent',
     'Priority 1'    => '🚨 Priority 1',
     'Priority 2'    => '⚡ Priority 2',
@@ -242,6 +243,8 @@ if (current_user()) {
             <option value="group">💜 Group Selected Products</option>
             <option value="ungroup">❌ Remove from Group (Ungroup)</option>
             <option value="hold">⏸️ Mark as Hold</option>
+            <?php if($isAdmin): ?><option value="no_charge">🚫 Mark as No Charge</option><?php endif; ?>
+            <?php if($isAdmin): ?><option value="delete">🗑 Delete Selected Tasks</option><?php endif; ?>
         </select>
         <button onclick="applyBulkAction()" style="background:#c2410c; color:#fff; border:none; padding:8px 20px; border-radius:6px; font-size:13px; font-weight:bold; cursor:pointer; transition:background-color 0.2s;" onmouseover="this.style.backgroundColor='#ea580c';" onmouseout="this.style.backgroundColor='#c2410c';">Apply</button>
     </div>

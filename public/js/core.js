@@ -202,8 +202,8 @@ function getSortedFiltered(data){
         if (typeof ACTIVE_FAMILY_FILTER !== 'undefined' && ACTIVE_FAMILY_FILTER) {
             return item.family_code === ACTIVE_FAMILY_FILTER;
         }
-        var currentStatus = item.status === 'Hold'
-            ? 'Hold'
+        var currentStatus = (item.status === 'Hold' || item.status === 'No Charge')
+            ? item.status
             : (item.work_status && item.work_status !== 'Pending'
                 ? item.work_status
                 : item.status);
@@ -852,7 +852,7 @@ function updateNotifications(tasks){
     if(uRole === 'worker' || uRole === 'ai_work'){
         subtitle = 'Products assigned to you';
         notifItems = tasks.filter(function(t){
-            if(t.status === 'Hold' || t.deleted_at) return false;
+            if(t.status === 'Hold' || t.status === 'No Charge' || t.deleted_at) return false;
             if(t.work_status === 'Work Done' || t.work_status === 'Info Done') return false;
             return (parseInt(t.assigned_worker_id) === uId || 
                     parseInt(t.info_worker_id) === uId || 
@@ -862,31 +862,31 @@ function updateNotifications(tasks){
     } else if(uRole === 'eco_listing' || uName === 'ecolisting'){
         subtitle = 'Completed products to list (Info Done / Work Done)';
         notifItems = tasks.filter(function(t){
-            if(t.status === 'Hold' || t.deleted_at) return false;
+            if(t.status === 'Hold' || t.status === 'No Charge' || t.deleted_at) return false;
             return (t.work_status === 'Work Done' || t.work_status === 'Info Done') && !t.published_at;
         });
     } else if(uRole === 'qa'){
         subtitle = 'Products currently in QA review';
         notifItems = tasks.filter(function(t){
-            if(t.status === 'Hold' || t.deleted_at) return false;
+            if(t.status === 'Hold' || t.status === 'No Charge' || t.deleted_at) return false;
             return t.work_status === 'In QA';
         });
     } else if(uRole === 'seo_manager' || uRole === 'd4u_writer'){
         subtitle = 'Products pending content writing & SEO review';
         notifItems = tasks.filter(function(t){
-            if(t.status === 'Hold' || t.deleted_at) return false;
+            if(t.status === 'Hold' || t.status === 'No Charge' || t.deleted_at) return false;
             return t.work_status === 'SEO Review' || (t.status === 'Pending' && t.product_type !== 'Infographics');
         });
     } else if(uRole === 'eco_client'){
         subtitle = 'Products in Generated awaiting review';
         notifItems = tasks.filter(function(t){
-            if(t.status === 'Hold' || t.deleted_at) return false;
+            if(t.status === 'Hold' || t.status === 'No Charge' || t.deleted_at) return false;
             return (t.status === 'Generated' || t.status === 'All Generated') && t.work_status !== 'Work Done' && t.work_status !== 'Info Done';
         });
     } else if(uRole === 'administrator'){
         subtitle = 'Products requiring QA or ready to publish';
         notifItems = tasks.filter(function(t){
-            if(t.status === 'Hold' || t.deleted_at) return false;
+            if(t.status === 'Hold' || t.status === 'No Charge' || t.deleted_at) return false;
             return t.work_status === 'In QA' || ((t.work_status === 'Work Done' || t.work_status === 'Info Done') && !t.published_at);
         });
     }
