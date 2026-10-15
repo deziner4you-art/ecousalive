@@ -202,6 +202,19 @@ function getSortedFiltered(data){
         if (typeof ACTIVE_FAMILY_FILTER !== 'undefined' && ACTIVE_FAMILY_FILTER) {
             return item.family_code === ACTIVE_FAMILY_FILTER;
         }
+
+        // Routine work isolation:
+        // Do NOT show 'No Charge' products in the default 'All' or regular stage views.
+        // They only appear when:
+        // 1. User specifically selects the 'No Charge' filter, OR
+        // 2. User searches in the search bar, OR
+        // 3. User clicks on a Group button (handled above via ACTIVE_FAMILY_FILTER)
+        if (item.status === 'No Charge') {
+            if (filter !== 'No Charge' && !search) {
+                return false;
+            }
+        }
+
         var currentStatus = (item.status === 'Hold' || item.status === 'No Charge')
             ? item.status
             : (item.work_status && item.work_status !== 'Pending'
@@ -334,6 +347,11 @@ function getSortedFiltered(data){
     });
 
     result.sort(function(a, b){
+        // No Charge products ALWAYS remain at the end of listings (bottom zone)
+        var aNoCharge = (a.status === 'No Charge') ? 1 : 0;
+        var bNoCharge = (b.status === 'No Charge') ? 1 : 0;
+        if(aNoCharge !== bNoCharge) return aNoCharge - bNoCharge;
+
         var aUrgent = (a.is_urgent > 0 && a.work_status !== 'Work Done') ? parseInt(a.is_urgent) : 999;
         var bUrgent = (b.is_urgent > 0 && b.work_status !== 'Work Done') ? parseInt(b.is_urgent) : 999;
         if(aUrgent !== bUrgent) return aUrgent - bUrgent;
