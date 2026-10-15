@@ -204,13 +204,18 @@ function getSortedFiltered(data){
         }
 
         // Routine work isolation:
-        // Do NOT show 'No Charge' products in the default 'All' or regular stage views.
+        // Do NOT show 'No Charge' or 'Hold' products in the default 'All' or regular stage views.
         // They only appear when:
-        // 1. User specifically selects the 'No Charge' filter, OR
+        // 1. User specifically selects their filter ('No Charge' or 'Hold'), OR
         // 2. User searches in the search bar, OR
         // 3. User clicks on a Group button (handled above via ACTIVE_FAMILY_FILTER)
         if (item.status === 'No Charge') {
             if (filter !== 'No Charge' && !search) {
+                return false;
+            }
+        }
+        if (item.status === 'Hold') {
+            if (filter !== 'Hold' && !search) {
                 return false;
             }
         }
@@ -347,10 +352,15 @@ function getSortedFiltered(data){
     });
 
     result.sort(function(a, b){
-        // No Charge products ALWAYS remain at the end of listings (bottom zone)
-        var aNoCharge = (a.status === 'No Charge') ? 1 : 0;
-        var bNoCharge = (b.status === 'No Charge') ? 1 : 0;
-        if(aNoCharge !== bNoCharge) return aNoCharge - bNoCharge;
+        // Inactive / Parked products (Hold & No Charge) ALWAYS remain at the end of listings (bottom zone)
+        var getParkedRank = function(t){
+            if (t.status === 'No Charge') return 2;
+            if (t.status === 'Hold') return 1;
+            return 0;
+        };
+        var aRank = getParkedRank(a);
+        var bRank = getParkedRank(b);
+        if(aRank !== bRank) return aRank - bRank;
 
         var aUrgent = (a.is_urgent > 0 && a.work_status !== 'Work Done') ? parseInt(a.is_urgent) : 999;
         var bUrgent = (b.is_urgent > 0 && b.work_status !== 'Work Done') ? parseInt(b.is_urgent) : 999;

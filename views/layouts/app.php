@@ -2060,7 +2060,7 @@ try {
 </div>
 
 <!-- ── JS Modules ── -->
-<?php $v = '2.9.5'; ?>
+<?php $v = '2.9.6'; ?>
 <script src="<?= $publicUrl ?>/js/core.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/tasks.js?v=3.4.6"></script>
 <script src="<?= $publicUrl ?>/js/admin.js?v=<?= $v ?>"></script>
