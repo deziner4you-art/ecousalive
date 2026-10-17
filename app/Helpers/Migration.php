@@ -214,7 +214,22 @@ function runMigrations(): void {
                i.status, COALESCE(i.created_at, NOW()), i.paid_at
         FROM eco_invoice_items ii
         JOIN eco_invoices i ON i.id = ii.invoice_id
-        WHERE ii.aplus_price > 0"); }catch(Exception $e){}
+        WHERE ii.aplus_price > 0
+        UNION ALL
+        SELECT ii.task_id,
+               CASE
+                   WHEN t.product_type = 'Infographics' THEN 'info'
+                   WHEN t.product_type IN ('A+', 'A Plus') THEN 'aplus'
+                   ELSE 'info'
+               END,
+               ii.invoice_id, i.invoice_no, ii.item_price,
+               i.status, COALESCE(i.created_at, NOW()), i.paid_at
+        FROM eco_invoice_items ii
+        JOIN eco_invoices i ON i.id = ii.invoice_id
+        LEFT JOIN wp_eco_aplus_tasks t ON t.id = ii.task_id
+        WHERE (ii.info_price IS NULL OR ii.info_price = 0)
+          AND (ii.aplus_price IS NULL OR ii.aplus_price = 0)
+          AND ii.item_price > 0"); }catch(Exception $e){}
 
     /* ── Worker Rates ───────────────────────────────── */
     try{ db()->exec("

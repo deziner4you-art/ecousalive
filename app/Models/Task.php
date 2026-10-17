@@ -48,7 +48,13 @@ class Task {
                 SELECT GROUP_CONCAT(DISTINCT sc.invoice_no ORDER BY sc.id DESC SEPARATOR ', ')
                 FROM eco_task_service_charges sc
                 WHERE sc.task_id = t.id AND sc.service_type = 'aplus'
-            ) AS aplus_invoice_numbers
+            ) AS aplus_invoice_numbers,
+            (
+                SELECT GROUP_CONCAT(DISTINCT i.invoice_no ORDER BY i.id DESC SEPARATOR ', ')
+                FROM eco_invoice_items ii
+                JOIN eco_invoices i ON i.id = ii.invoice_id
+                WHERE ii.task_id = t.id
+            ) AS invoice_numbers
         ";
 
         $uname = strtolower($user['username'] ?? '');

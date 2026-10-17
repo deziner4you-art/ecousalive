@@ -1355,30 +1355,38 @@ function buildCard(item){
                 invBadge = '';
             }
         } else {
+            var infoNums  = item.info_invoice_numbers || item.invoice_numbers || '';
+            var aplusNums = item.aplus_invoice_numbers || item.invoice_numbers || '';
+            var genNums   = item.invoice_numbers || item.info_invoice_numbers || item.aplus_invoice_numbers || '';
+
+            var infoRef  = infoNums  ? '<small style="display:block;font-size:9px;font-weight:600;opacity:.85;white-space:nowrap;">Inv. No: '+escapeHtmlContent(infoNums)+'</small>' : '';
+            var aplusRef = aplusNums ? '<small style="display:block;font-size:9px;font-weight:600;opacity:.85;white-space:nowrap;">Inv. No: '+escapeHtmlContent(aplusNums)+'</small>' : '';
+            var genRef   = genNums   ? '<small style="display:block;font-size:9px;font-weight:600;opacity:.85;white-space:nowrap;">Inv. No: '+escapeHtmlContent(genNums)+'</small>' : '';
+
             if(isInfoPlusAplus){
                 var infoInvStatus  = item.info_invoice_status || (!item.aplus_invoice_status ? item.invoice_status : '');
                 var aplusInvStatus = item.aplus_invoice_status;
                 if(infoInvStatus || aplusInvStatus){
-                    var infoRef = item.info_invoice_numbers ? '<small style="display:block;font-size:9px;font-weight:600;opacity:.85;white-space:nowrap;">Inv. No: '+escapeHtmlContent(item.info_invoice_numbers)+'</small>' : '';
-                    var aplusRef = item.aplus_invoice_numbers ? '<small style="display:block;font-size:9px;font-weight:600;opacity:.85;white-space:nowrap;">Inv. No: '+escapeHtmlContent(item.aplus_invoice_numbers)+'</small>' : '';
                     var iBadge = (infoInvStatus === 'Paid')     ? '<span class="inv-badge-paid" style="margin-right:4px;display:inline-flex;flex-direction:column;align-items:flex-start;line-height:1.25;">✅ Info Paid'+infoRef+'</span>'
                                : (infoInvStatus === 'Invoiced') ? '<span class="inv-badge-invoiced" style="margin-right:4px;display:inline-flex;flex-direction:column;align-items:flex-start;line-height:1.25;">🧾 Info Invoiced'+infoRef+'</span>' : '';
                     var aBadge = (aplusInvStatus === 'Paid')    ? '<span class="inv-badge-paid" style="margin-right:12px;display:inline-flex;flex-direction:column;align-items:flex-start;line-height:1.25;">✅ A+ Paid'+aplusRef+'</span>'
                                : (aplusInvStatus === 'Invoiced')? '<span class="inv-badge-invoiced" style="margin-right:12px;display:inline-flex;flex-direction:column;align-items:flex-start;line-height:1.25;">🧾 A+ Invoiced'+aplusRef+'</span>' : '';
                     invBadge = iBadge + aBadge;
                 } else if(item.invoice_status){
-                    invBadge = (item.invoice_status === 'Invoiced') ? '<span class="inv-badge-invoiced" style="margin-right:12px;">🧾 Invoiced</span>'
-                             : (item.invoice_status === 'Paid')     ? '<span class="inv-badge-paid" style="margin-right:12px;">✅ Paid</span>' : '';
+                    invBadge = (item.invoice_status === 'Invoiced') ? '<span class="inv-badge-invoiced" style="margin-right:12px;display:inline-flex;flex-direction:column;align-items:flex-start;line-height:1.25;">🧾 Invoiced'+genRef+'</span>'
+                             : (item.invoice_status === 'Paid')     ? '<span class="inv-badge-paid" style="margin-right:12px;display:inline-flex;flex-direction:column;align-items:flex-start;line-height:1.25;">✅ Paid'+genRef+'</span>' : '';
                 }
             } else if(item.product_type === 'Infographics'){
-                invBadge = (item.info_invoice_status === 'Invoiced' || item.invoice_status === 'Invoiced') ? '<span class="inv-badge-invoiced" style="margin-right:12px;">🧾 Invoiced</span>'
-                         : (item.info_invoice_status === 'Paid'     || item.invoice_status === 'Paid')     ? '<span class="inv-badge-paid" style="margin-right:12px;">✅ Paid</span>' : '';
-            } else if(item.product_type === 'A+'){
-                invBadge = (item.aplus_invoice_status === 'Invoiced' || item.invoice_status === 'Invoiced') ? '<span class="inv-badge-invoiced" style="margin-right:12px;">🧾 Invoiced</span>'
-                         : (item.aplus_invoice_status === 'Paid'     || item.invoice_status === 'Paid')     ? '<span class="inv-badge-paid" style="margin-right:12px;">✅ Paid</span>' : '';
+                var infoStatus = item.info_invoice_status || item.invoice_status;
+                invBadge = (infoStatus === 'Invoiced') ? '<span class="inv-badge-invoiced" style="margin-right:12px;display:inline-flex;flex-direction:column;align-items:flex-start;line-height:1.25;">🧾 Invoiced'+infoRef+'</span>'
+                         : (infoStatus === 'Paid')     ? '<span class="inv-badge-paid" style="margin-right:12px;display:inline-flex;flex-direction:column;align-items:flex-start;line-height:1.25;">✅ Paid'+infoRef+'</span>' : '';
+            } else if(item.product_type === 'A+' || item.product_type === 'A Plus'){
+                var aplusStatus = item.aplus_invoice_status || item.invoice_status;
+                invBadge = (aplusStatus === 'Invoiced') ? '<span class="inv-badge-invoiced" style="margin-right:12px;display:inline-flex;flex-direction:column;align-items:flex-start;line-height:1.25;">🧾 Invoiced'+aplusRef+'</span>'
+                         : (aplusStatus === 'Paid')     ? '<span class="inv-badge-paid" style="margin-right:12px;display:inline-flex;flex-direction:column;align-items:flex-start;line-height:1.25;">✅ Paid'+aplusRef+'</span>' : '';
             } else {
-                invBadge = (item.invoice_status === 'Invoiced') ? '<span class="inv-badge-invoiced" style="margin-right:12px;">🧾 Invoiced</span>'
-                         : (item.invoice_status === 'Paid')     ? '<span class="inv-badge-paid" style="margin-right:12px;">✅ Paid</span>' : '';
+                invBadge = (item.invoice_status === 'Invoiced') ? '<span class="inv-badge-invoiced" style="margin-right:12px;display:inline-flex;flex-direction:column;align-items:flex-start;line-height:1.25;">🧾 Invoiced'+genRef+'</span>'
+                         : (item.invoice_status === 'Paid')     ? '<span class="inv-badge-paid" style="margin-right:12px;display:inline-flex;flex-direction:column;align-items:flex-start;line-height:1.25;">✅ Paid'+genRef+'</span>' : '';
             }
         }
     }
