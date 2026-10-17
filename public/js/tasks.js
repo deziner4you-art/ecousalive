@@ -1719,7 +1719,6 @@ ${item.published_link ? `<a href="${item.published_link}" target="_blank" rel="n
 </div>
 <div class="title" style="flex:1 1 auto; max-width:none; min-width:180px; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 12px; box-sizing:border-box; overflow:hidden;">
     <span class="title-text" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; font-size:14px; font-weight:600;" title="${item.title ? item.title.replace(/"/g, '&quot;') : ''}">${item.title}</span>
-    ${canRename ? `<button type="button" onclick="event.stopPropagation(); openRenameProductModal(${item.id})" class="adminbtn" style="background:#1e293b; border:1px solid #3b82f6; color:#93c5fd; font-size:11px; font-weight:600; padding:2px 8px; border-radius:4px; cursor:pointer; flex-shrink:0; display:inline-flex; align-items:center; gap:4px; transition:all 0.15s;" title="Rename Product Number or Title">✏️ Rename</button>` : ''}
     <span class="research-link-slot" style="flex-shrink:0; display:inline-flex; align-items:center; justify-content:flex-end; width:155px; min-width:155px;">
         ${linkIcon || ''}
     </span>
