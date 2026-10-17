@@ -1359,10 +1359,12 @@ function buildCard(item){
                 var infoInvStatus  = item.info_invoice_status || (!item.aplus_invoice_status ? item.invoice_status : '');
                 var aplusInvStatus = item.aplus_invoice_status;
                 if(infoInvStatus || aplusInvStatus){
-                    var iBadge = (infoInvStatus === 'Paid')     ? '<span class="inv-badge-paid" style="margin-right:4px;">✅ Info Paid</span>'
-                               : (infoInvStatus === 'Invoiced') ? '<span class="inv-badge-invoiced" style="margin-right:4px;">🧾 Info Invoiced</span>' : '';
-                    var aBadge = (aplusInvStatus === 'Paid')    ? '<span class="inv-badge-paid" style="margin-right:12px;">✅ A+ Paid</span>'
-                               : (aplusInvStatus === 'Invoiced')? '<span class="inv-badge-invoiced" style="margin-right:12px;">🧾 A+ Invoiced</span>' : '';
+                    var infoRef = item.info_invoice_numbers ? '<small style="display:block;font-size:9px;font-weight:600;opacity:.85;white-space:nowrap;">Inv. No: '+escapeHtmlContent(item.info_invoice_numbers)+'</small>' : '';
+                    var aplusRef = item.aplus_invoice_numbers ? '<small style="display:block;font-size:9px;font-weight:600;opacity:.85;white-space:nowrap;">Inv. No: '+escapeHtmlContent(item.aplus_invoice_numbers)+'</small>' : '';
+                    var iBadge = (infoInvStatus === 'Paid')     ? '<span class="inv-badge-paid" style="margin-right:4px;display:inline-flex;flex-direction:column;align-items:flex-start;line-height:1.25;">✅ Info Paid'+infoRef+'</span>'
+                               : (infoInvStatus === 'Invoiced') ? '<span class="inv-badge-invoiced" style="margin-right:4px;display:inline-flex;flex-direction:column;align-items:flex-start;line-height:1.25;">🧾 Info Invoiced'+infoRef+'</span>' : '';
+                    var aBadge = (aplusInvStatus === 'Paid')    ? '<span class="inv-badge-paid" style="margin-right:12px;display:inline-flex;flex-direction:column;align-items:flex-start;line-height:1.25;">✅ A+ Paid'+aplusRef+'</span>'
+                               : (aplusInvStatus === 'Invoiced')? '<span class="inv-badge-invoiced" style="margin-right:12px;display:inline-flex;flex-direction:column;align-items:flex-start;line-height:1.25;">🧾 A+ Invoiced'+aplusRef+'</span>' : '';
                     invBadge = iBadge + aBadge;
                 } else if(item.invoice_status){
                     invBadge = (item.invoice_status === 'Invoiced') ? '<span class="inv-badge-invoiced" style="margin-right:12px;">🧾 Invoiced</span>'
@@ -4028,6 +4030,7 @@ function renderVendorManagementList() {
         html +=   '</div>';
 
         html +=   '<div style="display:flex; align-items:center; gap:8px;">';
+        html +=   '<button type="button" onclick="renameVendor(' + v.id + ')" style="background:#0f4c81; color:#bae6fd; border:1px solid #0369a1; padding:4px 10px; border-radius:4px; font-size:11px; font-weight:bold; cursor:pointer;" title="Rename Vendor">✏ Rename</button>';
         if (isDef) {
             html +=   '<span style="background:#065f46; color:#a7f3d0; font-size:10px; font-weight:bold; padding:2px 8px; border-radius:12px; border:1px solid #059669;">DEFAULT</span>';
         } else {
@@ -4105,6 +4108,41 @@ function deleteVendor(vendorId, vendorName) {
             })
             .catch(function(err){ alert('Request failed: ' + err.message); });
     });
+}
+
+function renameVendor(vendorId) {
+    var vendors = window.ALL_VENDORS || [];
+    var vendor = vendors.find(function(v){ return String(v.id) === String(vendorId); });
+    if (!vendor) return;
+
+    var newName = window.prompt('New vendor name:', vendor.name || '');
+    if (newName === null) return;
+    newName = newName.trim();
+    if (!newName) {
+        alert('Vendor name zaroori hai.');
+        return;
+    }
+    if (newName.toLowerCase() === String(vendor.name || '').trim().toLowerCase()) return;
+
+    var fd = new FormData();
+    fd.append('action', 'save_vendor');
+    fd.append('id', vendorId);
+    fd.append('name', newName);
+    fd.append('color', vendor.color || '#0284c7');
+    if(typeof CSRF_TOKEN !== 'undefined') fd.append('csrf_token', CSRF_TOKEN);
+
+    fetch('index.php', { method: 'POST', body: fd })
+        .then(function(r){ return r.json(); })
+        .then(function(r){
+            if (r.success) {
+                loadVendorsAndRenderTabs();
+                loadTasks();
+                setTimeout(function(){ renderVendorManagementList(); }, 400);
+            } else {
+                alert('Vendor rename failed: ' + (r.message || 'Error'));
+            }
+        })
+        .catch(function(err){ alert('Request failed: ' + err.message); });
 }
 
 // Initial render of vendor tabs on load

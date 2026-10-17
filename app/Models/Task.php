@@ -38,7 +38,17 @@ class Task {
                 WHERE pi.task_id = t.id
                 ORDER BY p.id DESC
                 LIMIT 1
-            ) AS payslip_status
+            ) AS payslip_status,
+            (
+                SELECT GROUP_CONCAT(DISTINCT sc.invoice_no ORDER BY sc.id DESC SEPARATOR ', ')
+                FROM eco_task_service_charges sc
+                WHERE sc.task_id = t.id AND sc.service_type = 'info'
+            ) AS info_invoice_numbers,
+            (
+                SELECT GROUP_CONCAT(DISTINCT sc.invoice_no ORDER BY sc.id DESC SEPARATOR ', ')
+                FROM eco_task_service_charges sc
+                WHERE sc.task_id = t.id AND sc.service_type = 'aplus'
+            ) AS aplus_invoice_numbers
         ";
 
         $uname = strtolower($user['username'] ?? '');

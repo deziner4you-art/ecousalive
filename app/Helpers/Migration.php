@@ -180,6 +180,42 @@ function runMigrations(): void {
     try{ db()->exec("ALTER TABLE eco_invoice_items ADD COLUMN info_price DECIMAL(10,2) DEFAULT 0.00"); }catch(Exception $e){}
     try{ db()->exec("ALTER TABLE eco_invoice_items ADD COLUMN aplus_price DECIMAL(10,2) DEFAULT 0.00"); }catch(Exception $e){}
 
+    /* ── Permanent service-charge ledger ─────────────────
+       A service may be invoiced only once per product. This ledger is
+       intentionally retained even if an invoice is later removed, so a
+       mistaken old invoice can never make the same service chargeable again.
+    */
+    try{ db()->exec("CREATE TABLE IF NOT EXISTS eco_task_service_charges (
+        id            INT AUTO_INCREMENT PRIMARY KEY,
+        task_id       INT NOT NULL,
+        service_type  VARCHAR(20) NOT NULL,
+        invoice_id    INT NULL,
+        invoice_no    VARCHAR(40) NOT NULL,
+        amount        DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+        invoice_status VARCHAR(20) NOT NULL DEFAULT 'Invoiced',
+        charged_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        paid_at       DATETIME NULL,
+        UNIQUE KEY uq_task_service (task_id, service_type),
+        KEY idx_service_invoice (invoice_id),
+        KEY idx_service_task (task_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"); }catch(Exception $e){}
+
+    /* Backfill the ledger from invoices that already exist. Existing invoice
+       history is preserved; INSERT IGNORE keeps this safe on every page load. */
+    try{ db()->exec("INSERT IGNORE INTO eco_task_service_charges
+        (task_id, service_type, invoice_id, invoice_no, amount, invoice_status, charged_at, paid_at)
+        SELECT ii.task_id, 'info', ii.invoice_id, i.invoice_no, ii.info_price,
+               i.status, COALESCE(i.created_at, NOW()), i.paid_at
+        FROM eco_invoice_items ii
+        JOIN eco_invoices i ON i.id = ii.invoice_id
+        WHERE ii.info_price > 0
+        UNION ALL
+        SELECT ii.task_id, 'aplus', ii.invoice_id, i.invoice_no, ii.aplus_price,
+               i.status, COALESCE(i.created_at, NOW()), i.paid_at
+        FROM eco_invoice_items ii
+        JOIN eco_invoices i ON i.id = ii.invoice_id
+        WHERE ii.aplus_price > 0"); }catch(Exception $e){}
+
     /* ── Worker Rates ───────────────────────────────── */
     try{ db()->exec("
     CREATE TABLE IF NOT EXISTS eco_worker_rates (

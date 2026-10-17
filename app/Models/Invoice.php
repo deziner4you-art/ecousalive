@@ -45,7 +45,15 @@ class Invoice {
     public static function getUninvoiced(): array {
         return db()->query("
             SELECT t.id, t.product_no, t.title, t.work_status, t.product_type,
-                   t.invoice_status, t.info_invoice_status, t.aplus_invoice_status, t.published_at
+                   t.invoice_status, t.info_invoice_status, t.aplus_invoice_status,
+                   t.media_link, t.seo_doc_link, t.aplus_worker_id, t.seo_submitted_by,
+                   EXISTS(SELECT 1 FROM eco_task_service_charges sc WHERE sc.task_id=t.id AND sc.service_type='info') AS info_service_charged,
+                   EXISTS(SELECT 1 FROM eco_task_service_charges sc WHERE sc.task_id=t.id AND sc.service_type='aplus') AS aplus_service_charged,
+                   (SELECT GROUP_CONCAT(DISTINCT sc.invoice_no ORDER BY sc.id DESC SEPARATOR ', ')
+                    FROM eco_task_service_charges sc WHERE sc.task_id=t.id AND sc.service_type='info') AS info_invoice_numbers,
+                   (SELECT GROUP_CONCAT(DISTINCT sc.invoice_no ORDER BY sc.id DESC SEPARATOR ', ')
+                    FROM eco_task_service_charges sc WHERE sc.task_id=t.id AND sc.service_type='aplus') AS aplus_invoice_numbers,
+                   t.published_at
             FROM wp_eco_aplus_tasks t
             WHERE t.deleted_at IS NULL AND t.status <> 'No Charge'
             ORDER BY t.id DESC
@@ -55,67 +63,101 @@ class Invoice {
     public static function create(int $clientId, string $notes, array $items): array {
         if(!$clientId || empty($items)) return ['ok'=>false,'message'=>'Client and at least one product required'];
 
-        /* Server-side protection: No Charge products must never enter an invoice,
-           even if a stale browser submits an old cart. Validate before creating
-           the invoice so a mixed cart cannot leave a partial invoice behind. */
-        foreach($items as $it){
-            $tid = intval($it['task_id'] ?? 0);
-            $price = floatval($it['price'] ?? 0);
-            if(!$tid || $price <= 0) continue;
-            $chargeCheck = db()->prepare("SELECT status FROM wp_eco_aplus_tasks WHERE id=? AND deleted_at IS NULL");
-            $chargeCheck->execute([$tid]);
-            if ($chargeCheck->fetchColumn() === 'No Charge') {
-                return ['ok'=>false,'message'=>'No Charge product invoice mein add nahi ho sakta: #' . $tid];
+        $db = db();
+        $validated = [];
+        $seenServices = [];
+
+        try {
+            $db->beginTransaction();
+
+            /* Validate against the current database row, not the browser's
+               product_type/status values. FOR UPDATE also prevents two
+               simultaneous invoices from charging the same service. */
+            foreach($items as $it){
+                $tid        = intval($it['task_id'] ?? 0);
+                $postedPrice = floatval($it['price'] ?? 0);
+                $infoPrice  = max(0, floatval($it['info_price'] ?? 0));
+                $aplusPrice = max(0, floatval($it['aplus_price'] ?? 0));
+                if(!$tid || $postedPrice <= 0) continue;
+                if($infoPrice <= 0 && $aplusPrice <= 0) continue;
+
+                $taskStmt = $db->prepare("SELECT * FROM wp_eco_aplus_tasks WHERE id=? AND deleted_at IS NULL FOR UPDATE");
+                $taskStmt->execute([$tid]);
+                $task = $taskStmt->fetch(PDO::FETCH_ASSOC);
+                if(!$task) throw new RuntimeException('Product not found or deleted: #' . $tid);
+                if(($task['status'] ?? '') === 'No Charge') {
+                    throw new RuntimeException('No Charge product invoice mein add nahi ho sakta: #' . $tid);
+                }
+
+                $ptype = trim($task['product_type'] ?? '');
+                if($infoPrice > 0){
+                    if(!self::canInvoiceInfo($task)){
+                        throw new RuntimeException('Info service abhi billable nahi hai: #' . ($task['product_no'] ?? $tid));
+                    }
+                    self::assertServiceNotCharged($db, $tid, 'info', $task['product_no'] ?? $tid);
+                    $serviceKey = $tid . '|info';
+                    if(isset($seenServices[$serviceKey])) throw new RuntimeException('Same Info service do baar select hui hai: #' . ($task['product_no'] ?? $tid));
+                    $seenServices[$serviceKey] = true;
+                }
+                if($aplusPrice > 0){
+                    if(!self::canInvoiceAplus($task)){
+                        throw new RuntimeException('A+ service sirf Work Done + SEO complete hone ke baad billable hai: #' . ($task['product_no'] ?? $tid));
+                    }
+                    self::assertServiceNotCharged($db, $tid, 'aplus', $task['product_no'] ?? $tid);
+                    $serviceKey = $tid . '|aplus';
+                    if(isset($seenServices[$serviceKey])) throw new RuntimeException('Same A+ service do baar select hui hai: #' . ($task['product_no'] ?? $tid));
+                    $seenServices[$serviceKey] = true;
+                }
+
+                $price = ($infoPrice > 0 || $aplusPrice > 0) ? ($infoPrice + $aplusPrice) : $postedPrice;
+                if($price <= 0) continue;
+                $validated[] = [
+                    'id' => $tid,
+                    'product_type' => $ptype,
+                    'price' => $price,
+                    'info_price' => $infoPrice,
+                    'aplus_price' => $aplusPrice
+                ];
             }
-        }
 
-        $year     = date('Y');
-        $count    = db()->query("SELECT COUNT(*) FROM eco_invoices WHERE YEAR(created_at)=$year")->fetchColumn();
-        $invoiceNo = 'INV-'.$year.'-'.str_pad($count+1, 4, '0', STR_PAD_LEFT);
+            if(empty($validated)) throw new RuntimeException('No valid items');
 
-        $shareToken = bin2hex(random_bytes(16));
-        $stmt = db()->prepare("INSERT INTO eco_invoices (invoice_no,client_id,status,notes,share_token) VALUES(?,?,?,?,?)");
-        $stmt->execute([$invoiceNo, $clientId, 'Pending', $notes, $shareToken]);
-        $invoiceId = (int) db()->lastInsertId();
+            $year      = date('Y');
+            $count     = $db->query("SELECT COUNT(*) FROM eco_invoices WHERE YEAR(created_at)=$year")->fetchColumn();
+            $invoiceNo = 'INV-'.$year.'-'.str_pad($count+1, 4, '0', STR_PAD_LEFT);
+            $shareToken = bin2hex(random_bytes(16));
 
-        $total = 0;
-        $taskIds = [];
-        $iStmt = db()->prepare("INSERT IGNORE INTO eco_invoice_items (invoice_id,task_id,item_price,info_price,aplus_price) VALUES(?,?,?,?,?)");
+            $stmt = $db->prepare("INSERT INTO eco_invoices (invoice_no,client_id,status,notes,share_token) VALUES(?,?,?,?,?)");
+            $stmt->execute([$invoiceNo, $clientId, 'Pending', $notes, $shareToken]);
+            $invoiceId = (int) $db->lastInsertId();
 
-        foreach($items as $it){
-            $tid        = intval($it['task_id']    ?? 0);
-            $price      = floatval($it['price']      ?? 0);
-            $infoPrice  = floatval($it['info_price']  ?? 0);
-            $aplusPrice = floatval($it['aplus_price'] ?? 0);
-            $ptype      = trim($it['product_type']  ?? '');
-            if(!$tid || $price <= 0) continue;
+            $total = 0;
+            $taskIds = [];
+            $iStmt = $db->prepare("INSERT INTO eco_invoice_items (invoice_id,task_id,item_price,info_price,aplus_price) VALUES(?,?,?,?,?)");
+            $ledgerStmt = $db->prepare("INSERT INTO eco_task_service_charges (task_id,service_type,invoice_id,invoice_no,amount,invoice_status,charged_at) VALUES(?,?,?,?,?,'Invoiced',NOW())");
 
-            $chargeCheck = db()->prepare("SELECT status FROM wp_eco_aplus_tasks WHERE id=? AND deleted_at IS NULL");
-            $chargeCheck->execute([$tid]);
-            $taskStatus = $chargeCheck->fetchColumn();
-            if ($taskStatus === 'No Charge') {
-                return ['ok'=>false,'message'=>'No Charge product invoice mein add nahi ho sakta: #' . $tid];
+            foreach($validated as $it){
+                $iStmt->execute([$invoiceId, $it['id'], $it['price'], $it['info_price'], $it['aplus_price']]);
+                if($it['info_price'] > 0) $ledgerStmt->execute([$it['id'], 'info', $invoiceId, $invoiceNo, $it['info_price']]);
+                if($it['aplus_price'] > 0) $ledgerStmt->execute([$it['id'], 'aplus', $invoiceId, $invoiceNo, $it['aplus_price']]);
+                $total += $it['price'];
+                $taskIds[] = ['id'=>$it['id'],'product_type'=>$it['product_type'],'info_price'=>$it['info_price'],'aplus_price'=>$it['aplus_price']];
             }
-            $iStmt->execute([$invoiceId, $tid, $price, $infoPrice, $aplusPrice]);
-            $total += $price;
-            $taskIds[] = ['id'=>$tid,'product_type'=>$ptype,'info_price'=>$infoPrice,'aplus_price'=>$aplusPrice];
+
+            $db->prepare("UPDATE eco_invoices SET total_amount=? WHERE id=?")->execute([$total, $invoiceId]);
+            self::updateTaskInvoiceStatus($taskIds, 'Invoiced');
+            $db->commit();
+            return ['ok'=>true,'invoice_no'=>$invoiceNo];
+        } catch(Throwable $e) {
+            if($db->inTransaction()) $db->rollBack();
+            return ['ok'=>false,'message'=>$e->getMessage() ?: 'Invoice create failed'];
         }
-
-        if(empty($taskIds)){
-            db()->prepare("DELETE FROM eco_invoices WHERE id=?")->execute([$invoiceId]);
-            return ['ok'=>false,'message'=>'No valid items'];
-        }
-
-        db()->prepare("UPDATE eco_invoices SET total_amount=? WHERE id=?")->execute([$total, $invoiceId]);
-
-        /* Update invoice_status on tasks */
-        self::updateTaskInvoiceStatus($taskIds, 'Invoiced');
-
-        return ['ok'=>true,'invoice_no'=>$invoiceNo];
     }
 
     public static function markPaid(int $id): void {
         db()->prepare("UPDATE eco_invoices SET status='Paid', paid_at=NOW() WHERE id=?")->execute([$id]);
+        db()->prepare("UPDATE eco_task_service_charges SET invoice_status='Paid', paid_at=NOW() WHERE invoice_id=?")
+            ->execute([$id]);
         $rows = db()->prepare("SELECT ii.task_id, ii.info_price, ii.aplus_price, t.product_type FROM eco_invoice_items ii JOIN wp_eco_aplus_tasks t ON t.id=ii.task_id WHERE ii.invoice_id=?");
         $rows->execute([$id]);
         self::updateTaskInvoiceStatus($rows->fetchAll(), 'Paid');
@@ -150,6 +192,29 @@ class Invoice {
     }
 
     /* ── Private helper ──────────────────────────── */
+    private static function canInvoiceInfo(array $task): bool {
+        $ptype = $task['product_type'] ?? '';
+        return in_array($ptype, ['Infographics', 'Info + A Plus'], true)
+            && in_array($task['work_status'] ?? '', ['Info Done', 'Work Done'], true);
+    }
+
+    private static function canInvoiceAplus(array $task): bool {
+        $ptype = $task['product_type'] ?? '';
+        return in_array($ptype, ['A+', 'A Plus', 'Info + A Plus'], true)
+            && ($task['work_status'] ?? '') === 'Work Done'
+            && !empty(trim((string)($task['seo_doc_link'] ?? '')))
+            && !empty($task['seo_submitted_by']);
+    }
+
+    private static function assertServiceNotCharged(PDO $db, int $taskId, string $serviceType, $productNo): void {
+        $stmt = $db->prepare("SELECT invoice_no, invoice_status FROM eco_task_service_charges WHERE task_id=? AND service_type=? LIMIT 1");
+        $stmt->execute([$taskId, $serviceType]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if($row){
+            throw new RuntimeException(ucfirst($serviceType) . ' service pehle hi invoice ho chuki hai (' . ($row['invoice_no'] ?? 'old invoice') . '): #' . $productNo);
+        }
+    }
+
     private static function updateTaskInvoiceStatus(array $taskIds, ?string $status): void {
         $updInfo  = db()->prepare("UPDATE wp_eco_aplus_tasks SET info_invoice_status=?  WHERE id=?");
         $updAplus = db()->prepare("UPDATE wp_eco_aplus_tasks SET aplus_invoice_status=? WHERE id=?");

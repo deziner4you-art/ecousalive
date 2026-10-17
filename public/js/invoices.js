@@ -68,8 +68,10 @@ function renderInvTable(){
         var isIA   = t.product_type === 'Info + A Plus' || (t.aplus_worker_id && (t.info_worker_id || t.product_type === 'Infographics'));
         var isInfo = !isIA && t.product_type === 'Infographics';
         var isAplus = !isIA && !isInfo;
-        var infoInvd  = !!(t.info_invoice_status  && t.info_invoice_status  !== '') || (!t.aplus_invoice_status && !!(t.invoice_status && t.invoice_status !== ''));
-        var aplusInvd = !!(t.aplus_invoice_status && t.aplus_invoice_status !== '');
+        var infoInvd  = !!t.info_service_charged || !!(t.info_invoice_status  && t.info_invoice_status  !== '') || (!t.aplus_invoice_status && !!(t.invoice_status && t.invoice_status !== ''));
+        var aplusInvd = !!t.aplus_service_charged || !!(t.aplus_invoice_status && t.aplus_invoice_status !== '');
+        var infoReady = (isInfo || isIA) && (t.work_status === 'Info Done' || t.work_status === 'Work Done');
+        var aplusReady = (isAplus || isIA) && t.work_status === 'Work Done' && !!(t.seo_doc_link || '').trim() && !!t.seo_submitted_by;
         var isFullyInvoiced = isIA ? (infoInvd&&aplusInvd)
                             : (isInfo ? (infoInvd || !!(t.invoice_status && t.invoice_status !== ''))
                             : (isAplus ? (aplusInvd || !!(t.invoice_status && t.invoice_status !== ''))
@@ -103,13 +105,15 @@ function renderInvTable(){
         var isInfo = !isIA && t.product_type === 'Infographics';
         var isAplus = !isIA && !isInfo;
         var isSelectableStatus = t.work_status==='Work Done' || t.work_status==='Info Done' || !!t.published_at;
-        var infoInvd  = !!(t.info_invoice_status  && t.info_invoice_status  !== '') || (!t.aplus_invoice_status && !!(t.invoice_status && t.invoice_status !== ''));
-        var aplusInvd = !!(t.aplus_invoice_status && t.aplus_invoice_status !== '');
+        var infoInvd  = !!t.info_service_charged || !!(t.info_invoice_status  && t.info_invoice_status  !== '') || (!t.aplus_invoice_status && !!(t.invoice_status && t.invoice_status !== ''));
+        var aplusInvd = !!t.aplus_service_charged || !!(t.aplus_invoice_status && t.aplus_invoice_status !== '');
+        var infoReady = (isInfo || isIA) && (t.work_status === 'Info Done' || t.work_status === 'Work Done');
+        var aplusReady = (isAplus || isIA) && t.work_status === 'Work Done' && !!(t.seo_doc_link || '').trim() && !!t.seo_submitted_by;
         var isFullyInvoiced = isIA ? (infoInvd&&aplusInvd)
                             : (isInfo ? (infoInvd || !!(t.invoice_status && t.invoice_status !== ''))
                             : (isAplus ? (aplusInvd || !!(t.invoice_status && t.invoice_status !== ''))
                             : !!(t.invoice_status && t.invoice_status !== '')));
-        var canSelect = isSelectableStatus && !isFullyInvoiced;
+        var canSelect = isSelectableStatus && !isFullyInvoiced && (infoReady || aplusReady || (!isIA && !isInfo));
 
         if(inCart){
             var ci = _invCart[t.id];
@@ -120,7 +124,7 @@ function renderInvTable(){
                 if(isIA){
                     var iStatus = t.info_invoice_status || t.invoice_status || 'Paid';
                     var aStatus = t.aplus_invoice_status || 'Paid';
-                    lockLabel='<span style="font-size:10px;color:#4ade80;margin-left:5px;">'+(infoInvd?'✅ Info '+iStatus:'')+'</span><span style="font-size:10px;color:#4ade80;margin-left:3px;">'+(aplusInvd?'✅ A+ '+aStatus:'')+'</span>';
+                    lockLabel='<span style="font-size:10px;color:#4ade80;margin-left:5px;">'+(infoInvd?'✅ Info '+iStatus+(t.info_invoice_numbers?' · Inv. '+t.info_invoice_numbers:''):'')+'</span><span style="font-size:10px;color:#4ade80;margin-left:3px;">'+(aplusInvd?'✅ A+ '+aStatus+(t.aplus_invoice_numbers?' · Inv. '+t.aplus_invoice_numbers:''):'')+'</span>';
                 } else if(isInfo){
                     var st = t.info_invoice_status || t.invoice_status;
                     lockLabel='<span style="font-size:10px;color:'+(st==='Paid'?'#4ade80':'#93c5fd')+';margin-left:5px;">'+(st==='Paid'?'✅ Paid':'🧾 Invoiced')+'</span>';
@@ -137,15 +141,23 @@ function renderInvTable(){
             var aplusHtml = '-';
             
             if (isIA || isInfo) {
-                var infoDisabled = infoInvd ? 'disabled style="opacity:0.35;cursor:not-allowed;background:#0a0f1a;"' : '';
-                var infoVal = infoInvd ? `placeholder="(${t.info_invoice_status || t.invoice_status})"` : 'placeholder="0.00"';
-                infoHtml = `<input type="number" class="inv-ia-info" id="inv-info-${t.id}" data-id="${t.id}" min="0" step="0.01" ${infoVal} style="width:90px;" oninput="applyInfoAplusPrice('${t.id}','info',this.value)" ${infoDisabled}>`;
+                if(!infoReady){
+                    infoHtml = '<span style="font-size:10px;color:#475569;">🔒 Info not ready</span>';
+                } else {
+                    var infoDisabled = infoInvd ? 'disabled style="opacity:0.35;cursor:not-allowed;background:#0a0f1a;"' : '';
+                    var infoVal = infoInvd ? `placeholder="(${t.info_invoice_status || t.info_invoice_numbers || t.invoice_status || 'Already charged'})"` : 'placeholder="0.00"';
+                    infoHtml = `<input type="number" class="inv-ia-info" id="inv-info-${t.id}" data-id="${t.id}" min="0" step="0.01" ${infoVal} style="width:90px;" oninput="applyInfoAplusPrice('${t.id}','info',this.value)" ${infoDisabled}>`;
+                }
             }
             
             if (isIA || isAplus) {
-                var aplusDisabled = aplusInvd ? 'disabled style="opacity:0.35;cursor:not-allowed;background:#0a0f1a;"' : '';
-                var aplusVal = aplusInvd ? `placeholder="(${t.aplus_invoice_status})"` : 'placeholder="0.00"';
-                aplusHtml = `<input type="number" class="inv-ia-aplus" id="inv-aplus-${t.id}" data-id="${t.id}" min="0" step="0.01" ${aplusVal} style="width:90px;" oninput="applyInfoAplusPrice('${t.id}','aplus',this.value)" ${aplusDisabled}>`;
+                if(!aplusReady){
+                    aplusHtml = '<span style="font-size:10px;color:#475569;">🔒 A+ only after Work Done + SEO</span>';
+                } else {
+                    var aplusDisabled = aplusInvd ? 'disabled style="opacity:0.35;cursor:not-allowed;background:#0a0f1a;"' : '';
+                    var aplusVal = aplusInvd ? `placeholder="(${t.aplus_invoice_status || t.aplus_invoice_numbers || 'Already charged'})"` : 'placeholder="0.00"';
+                    aplusHtml = `<input type="number" class="inv-ia-aplus" id="inv-aplus-${t.id}" data-id="${t.id}" min="0" step="0.01" ${aplusVal} style="width:90px;" oninput="applyInfoAplusPrice('${t.id}','aplus',this.value)" ${aplusDisabled}>`;
+                }
             }
             
             html += `<tr><td><input type="checkbox" class="inv-chk" data-id="${t.id}" onchange="syncInvSelectAll();calcInvTotal()"></td><td style="white-space:nowrap;">${t.product_no}</td><td style="white-space:nowrap;font-size:11px;color:#94a3b8;">${t.work_status||'-'}</td><td style="white-space:normal;word-break:break-word;">${t.title}</td><td>${infoHtml}</td><td>${aplusHtml}</td><td style="text-align:right;"><span id="inv-ia-sum-${t.id}" style="color:#4ade80;font-size:13px;font-weight:bold;">0.00</span></td></tr>`;
