@@ -59,12 +59,12 @@ class Task {
             COALESCE(
                 CASE WHEN infow.role = 'worker' THEN infow.username END,
                 CASE WHEN cw.role = 'worker' AND (t.product_type = 'Infographics' OR t.product_type = 'Info + A Plus') THEN cw.username END,
-                CASE WHEN aw.role = 'worker' AND (t.product_type = 'Infographics' OR (t.product_type = 'Info + A Plus' AND t.work_status != 'Info Done')) THEN aw.username END
+                CASE WHEN aw.role = 'worker' AND (t.product_type = 'Infographics' OR (t.product_type = 'Info + A Plus' AND t.status != 'A Plus')) THEN aw.username END
             ) AS info_worker_name,
             COALESCE(
                 CASE WHEN aplusw.role = 'worker' THEN aplusw.username END,
-                CASE WHEN cw.role = 'worker' AND t.product_type = 'A Plus' THEN cw.username END,
-                CASE WHEN aw.role = 'worker' AND (t.product_type = 'A Plus' OR (t.product_type = 'Info + A Plus' AND (t.status = 'A Plus' OR t.work_status = 'Info Done'))) THEN aw.username END
+                CASE WHEN (t.product_type = 'A Plus' OR t.product_type = 'A+') AND cw.role = 'worker' THEN cw.username END,
+                CASE WHEN (t.product_type = 'A Plus' OR t.product_type = 'A+') AND aw.role = 'worker' THEN aw.username END
             ) AS aplus_worker_name,
             t.work_status, t.work_started_at, t.work_completed_at,
             t.work_paused_at, t.work_total_seconds,
