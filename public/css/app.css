@@ -242,7 +242,7 @@ background:#16a34a;
 }
 
 .InfoDone{
-background:#0284c7;
+background:#16a34a;
 }
 
 .Published{
@@ -1933,9 +1933,9 @@ padding:8px;
         color: #4edea3 !important;
     }
     .InfoDone {
-        background: rgba(2, 132, 199, 0.15) !important;
-        border-color: #0284c7 !important;
-        color: #7dd3fc !important;
+        background: rgba(22, 163, 74, 0.15) !important;
+        border-color: #16a34a !important;
+        color: #86efac !important;
     }
     .Published {
         background: rgba(77, 142, 255, 0.15) !important;

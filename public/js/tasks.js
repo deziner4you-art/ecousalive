@@ -1852,14 +1852,14 @@ function buildQABoxes(item, isAdmin, isQa){
 
     if(isAdmin && item.work_status === 'In QA'){
         if(isInfoOnly){
-            html += `<div class="qa-submit-box" style="grid-template-columns:110px 1fr;"><div class="qa-labels"><label>${mediaLabelText}</label>${qaLabelHtml}</div><div class="qa-fields">${mediaInputHtml}</div><div style="grid-column:1/-1;display:flex;gap:8px;"><button class="qa-submit-btn" style="flex:1;background:#0284c7;" onclick="submitQA(${item.id})">✅ Info Done</button></div></div>`;
+            html += `<div class="qa-submit-box" style="grid-template-columns:110px 1fr;"><div class="qa-labels"><label>${mediaLabelText}</label>${qaLabelHtml}</div><div class="qa-fields">${mediaInputHtml}</div><div style="grid-column:1/-1;display:flex;gap:8px;"><button class="qa-submit-btn" style="flex:1;background:#16a34a;" onclick="submitQA(${item.id})">✅ Info Done</button></div></div>`;
         } else {
             html += `<div class="qa-submit-box" style="grid-template-columns:110px 1fr;"><div class="qa-labels"><label>Media Link</label>${qaLabelHtml}</div><div class="qa-fields">${mediaInputHtml}</div><div style="grid-column:1/-1;display:flex;gap:8px;"><button class="qa-submit-btn" style="flex:1;background:#7c3aed;" onclick="sendForSEO(${item.id})">Send for SEO</button></div></div>`;
         }
     }
     if(isQa && item.work_status === 'In QA'){
         if(isInfoOnly){
-            html += `<div class="qa-submit-box"><div class="qa-labels"><label>${mediaLabelText}</label>${qaLabelHtml}</div><div class="qa-fields">${mediaInputHtml}</div><button class="qa-submit-btn" style="align-self:start; padding:12px 18px; min-height:45px; background:#0284c7;" onclick="submitQA(${item.id})">✅ Info Done</button></div>`;
+            html += `<div class="qa-submit-box"><div class="qa-labels"><label>${mediaLabelText}</label>${qaLabelHtml}</div><div class="qa-fields">${mediaInputHtml}</div><button class="qa-submit-btn" style="align-self:start; padding:12px 18px; min-height:45px; background:#16a34a;" onclick="submitQA(${item.id})">✅ Info Done</button></div>`;
         } else {
             html += `<div class="qa-submit-box"><div class="qa-labels"><label>Media Link</label>${qaLabelHtml}</div><div class="qa-fields">${mediaInputHtml}</div><button class="qa-submit-btn" style="align-self:start; padding:12px 0; min-height:45px; background:#7c3aed;" onclick="sendForSEO(${item.id})">Send for SEO</button></div>`;
         }
@@ -1871,7 +1871,7 @@ function buildQABoxes(item, isAdmin, isQa){
         html += `<div class="qa-submit-box" style="grid-template-columns:110px 1fr;"><div class="qa-labels"><label>Media Link</label>${qaLabelHtml}</div><div class="qa-fields"><input type="url" id="admin-media-${item.id}" value="${linkVal}" placeholder="A+ Media Link"></div><div class="qa-labels"><label>SEO Doc.</label></div><div class="qa-fields"><input type="url" id="seo-doc-${item.id}" value="${item.seo_doc_link||''}" placeholder="SEO Doc."></div><div style="grid-column:1/-1;display:flex;gap:8px;"><button class="qa-submit-btn" style="flex:1;background:#7c3aed; min-height:45px;" onclick="adminSubmitSEO(${item.id})">Submit SEO</button></div></div>`;
     }
     if(isAdmin && (item.work_status === 'Work Done' || item.work_status === 'Info Done')){
-        html += `<div class="qa-submit-box"><div class="qa-labels"><label>${mediaLabelText}</label>${qaLabelHtml}</div><div class="qa-fields">${mediaInputHtmlA}</div><button class="qa-submit-btn" style="align-self:start; padding:12px 15px; min-height:45px; ${item.work_status==='Info Done'?'background:#0284c7;':''}" onclick="saveFinalLinks(${item.id})">Save Links</button></div>`;
+        html += `<div class="qa-submit-box"><div class="qa-labels"><label>${mediaLabelText}</label>${qaLabelHtml}</div><div class="qa-fields">${mediaInputHtmlA}</div><button class="qa-submit-btn" style="align-self:start; padding:12px 15px; min-height:45px; ${item.work_status==='Info Done'?'background:#16a34a;':''}" onclick="saveFinalLinks(${item.id})">Save Links</button></div>`;
     }
     return html;
 }
