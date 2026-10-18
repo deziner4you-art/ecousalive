@@ -56,8 +56,16 @@ class Task {
             cw.username AS work_completed_worker_name,
             pu.username AS published_by_name,
             aiw.username AS ai_worked_by_name,
-            infow.username AS info_worker_name,
-            aplusw.username AS aplus_worker_name,
+            COALESCE(
+                CASE WHEN infow.role = 'worker' THEN infow.username END,
+                CASE WHEN cw.role = 'worker' AND (t.product_type = 'Infographics' OR t.product_type = 'Info + A Plus') THEN cw.username END,
+                CASE WHEN aw.role = 'worker' AND (t.product_type = 'Infographics' OR (t.product_type = 'Info + A Plus' AND t.work_status != 'Info Done')) THEN aw.username END
+            ) AS info_worker_name,
+            COALESCE(
+                CASE WHEN aplusw.role = 'worker' THEN aplusw.username END,
+                CASE WHEN cw.role = 'worker' AND t.product_type = 'A Plus' THEN cw.username END,
+                CASE WHEN aw.role = 'worker' AND (t.product_type = 'A Plus' OR (t.product_type = 'Info + A Plus' AND (t.status = 'A Plus' OR t.work_status = 'Info Done'))) THEN aw.username END
+            ) AS aplus_worker_name,
             t.work_status, t.work_started_at, t.work_completed_at,
             t.work_paused_at, t.work_total_seconds,
             (
@@ -93,6 +101,7 @@ class Task {
             FROM wp_eco_aplus_tasks t
             LEFT JOIN eco_vendors v ON v.id = t.vendor_id
             LEFT JOIN eco_tool_assignments a ON a.task_id = t.id
+            LEFT JOIN eco_tool_users aw ON aw.id = a.worker_id
             LEFT JOIN eco_tool_users q  ON q.id  = t.qa_submitted_by
             LEFT JOIN eco_tool_users cw ON cw.id = t.work_completed_by_worker_id
             LEFT JOIN eco_tool_users pu ON pu.id = t.published_by
@@ -113,6 +122,7 @@ class Task {
                 FROM wp_eco_aplus_tasks t
                 LEFT JOIN eco_vendors v ON v.id = t.vendor_id
                 LEFT JOIN eco_tool_assignments a ON a.task_id = t.id
+                LEFT JOIN eco_tool_users aw ON aw.id = a.worker_id
                 LEFT JOIN eco_tool_users q  ON q.id  = t.qa_submitted_by
                 LEFT JOIN eco_tool_users cw ON cw.id = t.work_completed_by_worker_id
                 LEFT JOIN eco_tool_users pu ON pu.id = t.published_by
@@ -137,6 +147,7 @@ class Task {
                 FROM wp_eco_aplus_tasks t
                 LEFT JOIN eco_vendors v ON v.id = t.vendor_id
                 LEFT JOIN eco_tool_assignments a ON a.task_id = t.id
+                LEFT JOIN eco_tool_users aw ON aw.id = a.worker_id
                 LEFT JOIN eco_tool_users q  ON q.id  = t.qa_submitted_by
                 LEFT JOIN eco_tool_users cw ON cw.id = t.work_completed_by_worker_id
                 LEFT JOIN eco_tool_users pu ON pu.id = t.published_by
@@ -169,6 +180,7 @@ class Task {
                 FROM wp_eco_aplus_tasks t
                 LEFT JOIN eco_vendors v ON v.id = t.vendor_id
                 LEFT JOIN eco_tool_assignments a ON a.task_id = t.id
+                LEFT JOIN eco_tool_users aw ON aw.id = a.worker_id
                 LEFT JOIN eco_tool_users q  ON q.id  = t.qa_submitted_by
                 LEFT JOIN eco_tool_users cw ON cw.id = t.work_completed_by_worker_id
                 LEFT JOIN eco_tool_users pu ON pu.id = t.published_by
@@ -205,6 +217,7 @@ class Task {
                 FROM wp_eco_aplus_tasks t
                 LEFT JOIN eco_vendors v ON v.id = t.vendor_id
                 LEFT JOIN eco_tool_assignments a ON a.task_id = t.id
+                LEFT JOIN eco_tool_users aw ON aw.id = a.worker_id
                 LEFT JOIN eco_tool_users q  ON q.id  = t.qa_submitted_by
                 LEFT JOIN eco_tool_users cw ON cw.id = t.work_completed_by_worker_id
                 LEFT JOIN eco_tool_users pu ON pu.id = t.published_by
@@ -222,6 +235,7 @@ class Task {
                 FROM wp_eco_aplus_tasks t
                 LEFT JOIN eco_vendors v ON v.id = t.vendor_id
                 LEFT JOIN eco_tool_assignments a ON a.task_id = t.id
+                LEFT JOIN eco_tool_users aw ON aw.id = a.worker_id
                 LEFT JOIN eco_tool_users q  ON q.id  = t.qa_submitted_by
                 LEFT JOIN eco_tool_users cw ON cw.id = t.work_completed_by_worker_id
                 LEFT JOIN eco_tool_users pu ON pu.id = t.published_by
@@ -240,6 +254,7 @@ class Task {
                 FROM wp_eco_aplus_tasks t
                 LEFT JOIN eco_vendors v ON v.id = t.vendor_id
                 LEFT JOIN eco_tool_assignments a ON a.task_id = t.id
+                LEFT JOIN eco_tool_users aw ON aw.id = a.worker_id
                 LEFT JOIN eco_tool_users q  ON q.id  = t.qa_submitted_by
                 LEFT JOIN eco_tool_users cw ON cw.id = t.work_completed_by_worker_id
                 LEFT JOIN eco_tool_users pu ON pu.id = t.published_by
@@ -334,7 +349,7 @@ class Task {
                     $extraSql .= ", aplus_worker_id = ?";
                     $extraParams[] = $completedBy;
                 } else {
-                    $extraSql .= ", info_worker_id = COALESCE(info_worker_id, ?)";
+                    $extraSql .= ", info_worker_id = ?";
                     $extraParams[] = $completedBy;
                 }
             }
@@ -425,18 +440,34 @@ class Task {
 
         if ($isInfoStage && ($task['work_status'] ?? '') === 'In QA') {
             $workerId = $task['info_worker_id'] ?? null;
+            if ($workerId) {
+                $chkRole = db()->prepare("SELECT role FROM eco_tool_users WHERE id=?");
+                $chkRole->execute([$workerId]);
+                $r = $chkRole->fetch();
+                if ($r && $r['role'] !== 'worker') {
+                    $workerId = null;
+                }
+            }
             if (!$workerId) {
                 $assignRow = db()->prepare("SELECT worker_id FROM eco_tool_assignments WHERE task_id=?");
                 $assignRow->execute([$taskId]);
                 $assign = $assignRow->fetch();
-                $workerId = $assign['worker_id'] ?? $task['work_completed_by_worker_id'] ?? null;
+                $candId = $assign['worker_id'] ?? $task['work_completed_by_worker_id'] ?? null;
+                if ($candId) {
+                    $chkRole = db()->prepare("SELECT role FROM eco_tool_users WHERE id=?");
+                    $chkRole->execute([$candId]);
+                    $r = $chkRole->fetch();
+                    if ($r && $r['role'] === 'worker') {
+                        $workerId = $candId;
+                    }
+                }
             }
 
             $stmt = db()->prepare("
                 UPDATE wp_eco_aplus_tasks
                 SET media_link=?, work_status='Info Done',
-                    info_worker_id=COALESCE(info_worker_id, ?),
-                    work_completed_by_worker_id=COALESCE(work_completed_by_worker_id, ?),
+                    info_worker_id=COALESCE(?, info_worker_id),
+                    work_completed_by_worker_id=COALESCE(?, work_completed_by_worker_id),
                     qa_submitted_at=NOW(), qa_submitted_by=?, is_urgent=0, active_revision_type=NULL, last_activity_at=NOW()
                 WHERE id=? AND work_status='In QA'
             ");
@@ -627,7 +658,18 @@ class Task {
                 $awRow->execute([$taskId]);
                 $awFetch = $awRow->fetch();
                 $wcwId = $awFetch ? $awFetch['worker_id'] : null;
-                db()->prepare("UPDATE wp_eco_aplus_tasks SET work_status='Info Done', work_completed_at=NOW(), work_completed_by_worker_id=COALESCE(work_completed_by_worker_id, ?), info_worker_id=COALESCE(info_worker_id, ?), is_urgent=0, active_revision_type=NULL, last_activity_at=NOW() WHERE id=?")->execute([$wcwId, $wcwId, $taskId]);
+                $isHumanWorker = false;
+                if ($wcwId) {
+                    $wRoleStmt = db()->prepare("SELECT role FROM eco_tool_users WHERE id=?");
+                    $wRoleStmt->execute([$wcwId]);
+                    $r = $wRoleStmt->fetch();
+                    $isHumanWorker = ($r && $r['role'] === 'worker');
+                }
+                $workerUpdateSql = $isHumanWorker ? ", info_worker_id = ?" : "";
+                $workerParams = [$wcwId];
+                if ($isHumanWorker) $workerParams[] = $wcwId;
+                $workerParams[] = $taskId;
+                db()->prepare("UPDATE wp_eco_aplus_tasks SET work_status='Info Done', work_completed_at=NOW(), work_completed_by_worker_id=COALESCE(work_completed_by_worker_id, ?) $workerUpdateSql, is_urgent=0, active_revision_type=NULL, last_activity_at=NOW() WHERE id=?")->execute($workerParams);
                 break;
 
             case 'Republish':
@@ -773,11 +815,9 @@ class Task {
                 /* Assigning an A+ worker must not activate A+ on a product
                    whose Infographics phase is still active. */
                 if ($pt === 'A Plus' || $pt === 'A+' || ($st === 'A Plus' && (!$isInfoPlusAplus || $infoComplete))) {
-                    db()->prepare("UPDATE wp_eco_aplus_tasks SET aplus_worker_id = COALESCE(aplus_worker_id, ?) WHERE id=?")->execute([$workerId, $taskId]);
-                } elseif ($isInfoPlusAplus && !$infoComplete) {
-                    db()->prepare("UPDATE wp_eco_aplus_tasks SET last_activity_at=NOW() WHERE id=?")->execute([$taskId]);
-                } elseif ($pt === 'Infographics' || empty($tRow['info_worker_id'])) {
-                    db()->prepare("UPDATE wp_eco_aplus_tasks SET info_worker_id = COALESCE(info_worker_id, ?) WHERE id=?")->execute([$workerId, $taskId]);
+                    db()->prepare("UPDATE wp_eco_aplus_tasks SET aplus_worker_id = ?, last_activity_at=NOW() WHERE id=?")->execute([$workerId, $taskId]);
+                } else {
+                    db()->prepare("UPDATE wp_eco_aplus_tasks SET info_worker_id = ?, last_activity_at=NOW() WHERE id=?")->execute([$workerId, $taskId]);
                 }
             }
         }
@@ -809,11 +849,29 @@ class Task {
         // If product originally had Infographics (via product_type, existing worker, or existing subtasks)
         // and A+ Banners is being added or assigned, ensure Infographics remains preserved so it shifts to 'Info + A Plus'
         $prevSubtasks = array_map('trim', explode(',', $task['info_subtasks'] ?? ''));
-        $hadInfo = ($task['product_type'] === 'Infographics' || $task['product_type'] === 'Info + A Plus' || !empty($task['info_worker_id']) || !empty($task['work_completed_by_worker_id']) || in_array('Infographics', $prevSubtasks));
+        $existingInfoWorker = $task['info_worker_id'] ?? null;
+        if ($existingInfoWorker) {
+            $chk = db()->prepare("SELECT role FROM eco_tool_users WHERE id=?");
+            $chk->execute([$existingInfoWorker]);
+            $r = $chk->fetch();
+            if ($r && $r['role'] !== 'worker') {
+                $existingInfoWorker = null;
+            }
+        }
+        $existingCompWorker = $task['work_completed_by_worker_id'] ?? null;
+        if ($existingCompWorker) {
+            $chk = db()->prepare("SELECT role FROM eco_tool_users WHERE id=?");
+            $chk->execute([$existingCompWorker]);
+            $r = $chk->fetch();
+            if ($r && $r['role'] !== 'worker') {
+                $existingCompWorker = null;
+            }
+        }
+        $hadInfo = ($task['product_type'] === 'Infographics' || $task['product_type'] === 'Info + A Plus' || !empty($existingInfoWorker) || !empty($existingCompWorker) || in_array('Infographics', $prevSubtasks));
         if ($hadInfo && ($hasAplus || $infoWorkerId || in_array('Infographics', $services))) {
             $hasInfo = true;
             if (!$infoWorkerId) {
-                $infoWorkerId = $task['info_worker_id'] ?: $task['work_completed_by_worker_id'] ?: null;
+                $infoWorkerId = $existingInfoWorker ?: $existingCompWorker ?: null;
             }
         }
 

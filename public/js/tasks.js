@@ -2320,18 +2320,28 @@ function openEditServices(taskId){
     selAplus.innerHTML = '<option value="">(None / Unassigned)</option>';
 
     workerList.forEach(function(w){
-        var roleLabel = w.role === 'ai_work' ? ' [AI]' : (w.role === 'worker' ? ' [Worker]' : '');
-        var opt = '<option value="' + w.id + '">' + w.username + roleLabel + '</option>';
-        selAi.innerHTML += opt;
-        selInfo.innerHTML += opt;
-        selAplus.innerHTML += opt;
+        var opt = '<option value="' + w.id + '">' + w.username + '</option>';
+        if(w.role === 'ai_work'){
+            selAi.innerHTML += opt;
+        } else if(w.role === 'worker'){
+            selInfo.innerHTML += opt;
+            selAplus.innerHTML += opt;
+        }
     });
 
     if(task.ai_worked_by) selAi.value = String(task.ai_worked_by);
-    if(task.info_worker_id) selInfo.value = String(task.info_worker_id);
-    else if(task.assigned_worker_id && hasInfo && !hasAplus) selInfo.value = String(task.assigned_worker_id);
+    if(task.info_worker_id){
+        var _infW = workerList.find(function(w){ return String(w.id) === String(task.info_worker_id); });
+        if(_infW && _infW.role === 'worker') selInfo.value = String(task.info_worker_id);
+    } else if(task.assigned_worker_id && hasInfo && !hasAplus) {
+        var _asW = workerList.find(function(w){ return String(w.id) === String(task.assigned_worker_id); });
+        if(_asW && _asW.role === 'worker') selInfo.value = String(task.assigned_worker_id);
+    }
     
-    if(task.aplus_worker_id) selAplus.value = String(task.aplus_worker_id);
+    if(task.aplus_worker_id){
+        var _apW = workerList.find(function(w){ return String(w.id) === String(task.aplus_worker_id); });
+        if(_apW && _apW.role === 'worker') selAplus.value = String(task.aplus_worker_id);
+    }
 
     // Event listeners to ensure selecting a worker or stage enables that service
     selAi.onchange = function(){ if(this.value) document.getElementById('es-chk-ai').checked = true; };

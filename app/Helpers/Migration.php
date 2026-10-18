@@ -71,9 +71,14 @@ function runMigrations(): void {
     }
 
     try {
-        db()->exec("UPDATE wp_eco_aplus_tasks SET info_worker_id = work_completed_by_worker_id WHERE (info_worker_id IS NULL OR info_worker_id = 0) AND (product_type = 'Infographics' OR info_subtasks LIKE '%Infographics%') AND work_completed_by_worker_id IS NOT NULL");
-        db()->exec("UPDATE wp_eco_aplus_tasks t JOIN eco_tool_assignments a ON a.task_id = t.id SET t.info_worker_id = a.worker_id WHERE (t.info_worker_id IS NULL OR t.info_worker_id = 0) AND (t.product_type = 'Infographics' OR t.info_subtasks LIKE '%Infographics%')");
-        db()->exec("UPDATE wp_eco_aplus_tasks SET aplus_worker_id = work_completed_by_worker_id WHERE (aplus_worker_id IS NULL OR aplus_worker_id = 0) AND product_type = 'A+' AND work_completed_by_worker_id IS NOT NULL");
+        // Clear any AI users erroneously set as info_worker_id or aplus_worker_id
+        db()->exec("UPDATE wp_eco_aplus_tasks t JOIN eco_tool_users u ON u.id = t.info_worker_id SET t.info_worker_id = NULL WHERE u.role = 'ai_work'");
+        db()->exec("UPDATE wp_eco_aplus_tasks t JOIN eco_tool_users u ON u.id = t.aplus_worker_id SET t.aplus_worker_id = NULL WHERE u.role = 'ai_work'");
+
+        // Populate info_worker_id and aplus_worker_id from completed workers or active assignments (human workers only)
+        db()->exec("UPDATE wp_eco_aplus_tasks t JOIN eco_tool_users u ON u.id = t.work_completed_by_worker_id SET t.info_worker_id = t.work_completed_by_worker_id WHERE (t.info_worker_id IS NULL OR t.info_worker_id = 0) AND (t.product_type = 'Infographics' OR t.product_type = 'Info + A Plus' OR t.info_subtasks LIKE '%Infographics%') AND u.role = 'worker'");
+        db()->exec("UPDATE wp_eco_aplus_tasks t JOIN eco_tool_assignments a ON a.task_id = t.id JOIN eco_tool_users u ON u.id = a.worker_id SET t.info_worker_id = a.worker_id WHERE (t.info_worker_id IS NULL OR t.info_worker_id = 0) AND (t.product_type = 'Infographics' OR t.product_type = 'Info + A Plus' OR t.info_subtasks LIKE '%Infographics%') AND u.role = 'worker'");
+        db()->exec("UPDATE wp_eco_aplus_tasks t JOIN eco_tool_users u ON u.id = t.work_completed_by_worker_id SET t.aplus_worker_id = t.work_completed_by_worker_id WHERE (t.aplus_worker_id IS NULL OR t.aplus_worker_id = 0) AND t.product_type = 'A+' AND u.role = 'worker'");
         
         // Auto-heal tasks that have both Infographics and A+ Banners assigned to 'Info + A Plus' tag
         db()->exec("UPDATE wp_eco_aplus_tasks
