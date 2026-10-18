@@ -4,11 +4,44 @@
 =====================================================
 TASK MODEL
 All task-related SQL queries extracted from monolith
-DB schema is NOT changed — same tables/columns
 =====================================================
 */
 
 class Task {
+
+    /**
+     * Service helpers keep the two workflows separate while retaining the
+     * existing task columns for backwards compatibility.
+     */
+    public static function isAplusService(array $task): bool {
+        if (($task['work_status'] ?? '') === 'Info Done') {
+            return false;
+        }
+        $pt = $task['product_type'] ?? '';
+        $st = $task['status'] ?? '';
+        $ws = $task['work_status'] ?? '';
+        if ($pt === 'Infographics') {
+            return false;
+        }
+        if ($pt === 'A+' || $pt === 'A Plus') {
+            return true;
+        }
+        if ($ws === 'SEO Review' || ($ws === 'Work Done' && !empty($task['seo_doc_link']))) {
+            return true;
+        }
+        if ($st === 'A Plus') {
+            return true;
+        }
+        $subtasks = !empty($task['info_subtasks']) ? array_map('trim', explode(',', $task['info_subtasks'])) : [];
+        if (in_array('A+ Banners', $subtasks) || in_array('aplus', $subtasks)) {
+            return ($st === 'A Plus' || !empty($task['content_approved_at']) || !empty($task['content_updated_at']) || $ws === 'SEO Review');
+        }
+        return false;
+    }
+
+    public static function isInfoService(array $task): bool {
+        return !self::isAplusService($task);
+    }
 
     /*
     ──────────────────────────────────────────────────
@@ -281,7 +314,7 @@ class Task {
 
         if($status === 'In QA'){
 
-            $row = db()->prepare("SELECT status, product_type, work_started_at, work_paused_at, work_total_seconds, info_worker_id, aplus_worker_id FROM wp_eco_aplus_tasks WHERE id=?");
+            $row = db()->prepare("SELECT status, product_type, work_status, info_subtasks, content_approved_at, content_updated_at, seo_doc_link, work_started_at, work_paused_at, work_total_seconds, info_worker_id, aplus_worker_id FROM wp_eco_aplus_tasks WHERE id=?");
             $row->execute([$taskId]);
             $t = $row->fetch();
 
@@ -301,9 +334,7 @@ class Task {
             $extraSql = "";
             $extraParams = [];
             if($completedBy){
-                $pt = $t['product_type'] ?? '';
-                $st = $t['status'] ?? '';
-                if($pt === 'A Plus' || $st === 'A Plus' || ($pt === 'Info + A Plus' && !empty($t['info_worker_id']) && empty($t['aplus_worker_id']))){
+                if(self::isAplusService($t ?: [])){
                     $extraSql .= ", aplus_worker_id = ?";
                     $extraParams[] = $completedBy;
                 } else {
@@ -390,16 +421,13 @@ class Task {
     */
     public static function submitQA(int $taskId, string $mediaLink, string $seoLink, array $user): bool {
 
-        $taskRow = db()->prepare("SELECT product_type, status, content_approved_at, content_updated_at, info_worker_id, work_completed_by_worker_id FROM wp_eco_aplus_tasks WHERE id=?");
+        $taskRow = db()->prepare("SELECT product_type, status, work_status, content_approved_at, content_updated_at, info_subtasks, seo_doc_link, info_worker_id, work_completed_by_worker_id, media_link FROM wp_eco_aplus_tasks WHERE id=?");
         $taskRow->execute([$taskId]);
         $task = $taskRow->fetch();
 
-        $isInfoStage = ($task && (
-            ($task['product_type'] ?? '') === 'Infographics' ||
-            (($task['product_type'] ?? '') === 'Info + A Plus' && in_array($task['status'] ?? '', ['Pending', 'AI DONE', 'Infographics']) && empty($task['content_approved_at']) && empty($task['content_updated_at']))
-        ));
+        $isInfoStage = $task && self::isInfoService($task);
 
-        if ($isInfoStage) {
+        if ($isInfoStage && ($task['work_status'] ?? '') === 'In QA') {
             $workerId = $task['info_worker_id'] ?? null;
             if (!$workerId) {
                 $assignRow = db()->prepare("SELECT worker_id FROM eco_tool_assignments WHERE task_id=?");
@@ -420,25 +448,28 @@ class Task {
             return $stmt->rowCount() > 0;
         }
 
-        $fromStatus = ($user['role'] === 'seo_manager') ? 'SEO Review' : 'In QA';
-
-        if($user['role'] === 'seo_manager'){
+        if(($task['work_status'] ?? '') === 'In QA' && self::isAplusService($task)){
+            /* A+ QA only records/checks the media link. SEO is a separate step. */
+            if($user['role'] === 'seo_manager') return false;
             $stmt = db()->prepare("
                 UPDATE wp_eco_aplus_tasks
-                SET media_link=?, seo_doc_link=?, work_status='Work Done',
+                SET media_link=?, last_activity_at=NOW()
+                WHERE id=? AND work_status='In QA'
+            ");
+            $stmt->execute([$mediaLink, $taskId]);
+            return $stmt->rowCount() > 0;
+        }
+
+        /* SEO manager or administrator may complete SEO Review. Admin needs
+           the same emergency-override ability as the other workflow stages. */
+        if(!in_array($user['role'] ?? '', ['seo_manager', 'administrator'], true) || ($task['work_status'] ?? '') !== 'SEO Review' || trim($seoLink) === '') return false;
+        $stmt = db()->prepare("
+                UPDATE wp_eco_aplus_tasks
+                SET media_link=COALESCE(NULLIF(?, ''), media_link), seo_doc_link=?, work_status='Work Done',
                     qa_submitted_at=NOW(), seo_submitted_by=?, is_urgent=0, active_revision_type=NULL, last_activity_at=NOW()
                 WHERE id=? AND work_status='SEO Review'
             ");
-            $stmt->execute([$mediaLink, $seoLink, $user['id'], $taskId]);
-        } else {
-            $stmt = db()->prepare("
-                UPDATE wp_eco_aplus_tasks
-                SET media_link=?, seo_doc_link=?, work_status='Work Done',
-                    qa_submitted_at=NOW(), qa_submitted_by=?, is_urgent=0, active_revision_type=NULL, last_activity_at=NOW()
-                WHERE id=? AND work_status='In QA'
-            ");
-            $stmt->execute([$mediaLink, $seoLink, $user['id'], $taskId]);
-        }
+        $stmt->execute([$mediaLink, $seoLink, $user['id'], $taskId]);
 
         return $stmt->rowCount() > 0;
 
@@ -449,9 +480,14 @@ class Task {
     sendForSEO()
     ──────────────────────────────────────────────────
     */
-    public static function sendForSEO(int $taskId, int $userId): bool {
-        $stmt = db()->prepare("UPDATE wp_eco_aplus_tasks SET work_status='SEO Review', qa_submitted_by=?, last_activity_at=NOW() WHERE id=? AND work_status='In QA'");
-        $stmt->execute([$userId, $taskId]);
+    public static function sendForSEO(int $taskId, int $userId, string $mediaLink = ''): bool {
+        $row = db()->prepare("SELECT product_type, status, work_status, info_subtasks, content_approved_at, content_updated_at, seo_doc_link, media_link FROM wp_eco_aplus_tasks WHERE id=?");
+        $row->execute([$taskId]);
+        $task = $row->fetch();
+        $effectiveMedia = trim($mediaLink) !== '' ? trim($mediaLink) : trim((string)($task['media_link'] ?? ''));
+        if(!$task || !self::isAplusService($task) || ($task['work_status'] ?? '') !== 'In QA' || $effectiveMedia === '') return false;
+        $stmt = db()->prepare("UPDATE wp_eco_aplus_tasks SET media_link=?, work_status='SEO Review', qa_submitted_by=?, last_activity_at=NOW() WHERE id=? AND work_status='In QA'");
+        $stmt->execute([$effectiveMedia, $userId, $taskId]);
         return $stmt->rowCount() > 0;
     }
 
@@ -461,14 +497,15 @@ class Task {
     ──────────────────────────────────────────────────
     */
     public static function saveFinalLinks(int $taskId, string $mediaLink, string $seoLink): void {
-        $cur = db()->prepare("SELECT work_status FROM wp_eco_aplus_tasks WHERE id=?");
+        $cur = db()->prepare("SELECT product_type, status, work_status, info_subtasks, content_approved_at, content_updated_at, seo_doc_link FROM wp_eco_aplus_tasks WHERE id=?");
         $cur->execute([$taskId]);
         $cRow = $cur->fetch();
-        $targetStatus = ($cRow && $cRow['work_status'] === 'Info Done') ? 'Info Done' : 'Work Done';
+        $isInfo = $cRow && self::isInfoService($cRow);
+        $targetStatus = $isInfo ? 'Info Done' : 'Work Done';
 
         db()->prepare("
             UPDATE wp_eco_aplus_tasks
-            SET media_link=?, seo_doc_link=?, work_status=?, is_urgent=0, active_revision_type=NULL, last_activity_at=NOW()
+            SET media_link=?, seo_doc_link=COALESCE(NULLIF(?, ''), seo_doc_link), work_status=?, is_urgent=0, active_revision_type=NULL, last_activity_at=NOW()
             WHERE id=?
         ")->execute([$mediaLink, $seoLink, $targetStatus, $taskId]);
     }
@@ -726,7 +763,7 @@ class Task {
         if ($wRow && $wRow['role'] === 'ai_work') {
             db()->prepare("UPDATE wp_eco_aplus_tasks SET status='AI Work', work_status='Pending', ai_worked_by=?, last_activity_at=NOW() WHERE id=?")->execute([$workerId, $taskId]);
         } elseif ($wRow && $wRow['role'] === 'worker') {
-            $tStmt = db()->prepare("SELECT status, product_type, info_worker_id, aplus_worker_id FROM wp_eco_aplus_tasks WHERE id=?");
+            $tStmt = db()->prepare("SELECT status, product_type, work_status, info_worker_id, aplus_worker_id FROM wp_eco_aplus_tasks WHERE id=?");
             $tStmt->execute([$taskId]);
             $tRow = $tStmt->fetch();
             if ($tRow && $tRow['status'] === 'AI DONE') {
@@ -735,8 +772,14 @@ class Task {
             if ($tRow) {
                 $pt = $tRow['product_type'] ?? '';
                 $st = $tRow['status'] ?? '';
-                if ($pt === 'A Plus' || $st === 'A Plus') {
+                $infoComplete = ($tRow['work_status'] ?? '') === 'Info Done';
+                $isInfoPlusAplus = $pt === 'Info + A Plus';
+                /* Assigning an A+ worker must not activate A+ on a product
+                   whose Infographics phase is still active. */
+                if ($pt === 'A Plus' || $pt === 'A+' || ($st === 'A Plus' && (!$isInfoPlusAplus || $infoComplete))) {
                     db()->prepare("UPDATE wp_eco_aplus_tasks SET aplus_worker_id = COALESCE(aplus_worker_id, ?) WHERE id=?")->execute([$workerId, $taskId]);
+                } elseif ($isInfoPlusAplus && !$infoComplete) {
+                    db()->prepare("UPDATE wp_eco_aplus_tasks SET last_activity_at=NOW() WHERE id=?")->execute([$taskId]);
                 } elseif ($pt === 'Infographics' || empty($tRow['info_worker_id'])) {
                     db()->prepare("UPDATE wp_eco_aplus_tasks SET info_worker_id = COALESCE(info_worker_id, ?) WHERE id=?")->execute([$workerId, $taskId]);
                 }
@@ -828,8 +871,12 @@ class Task {
         } elseif($activeAssign === 'aplus' && $aplusWorkerId){
             db()->prepare("DELETE FROM eco_tool_assignments WHERE task_id=?")->execute([$taskId]);
             db()->prepare("INSERT INTO eco_tool_assignments (worker_id, task_id) VALUES(?, ?)")->execute([$aplusWorkerId, $taskId]);
-            if(!in_array($task['status'], ['Approved', 'Updated', 'Work Done'])){
+            $infoComplete = ($task['work_status'] ?? '') === 'Info Done';
+            $canActivateAplus = !$hasInfo || $infoComplete;
+            if($canActivateAplus && !in_array($task['status'], ['Approved', 'Updated', 'Work Done'])){
                 db()->prepare("UPDATE wp_eco_aplus_tasks SET status='A Plus', work_status='Pending', last_activity_at=NOW() WHERE id=?")->execute([$taskId]);
+            } elseif(!$canActivateAplus){
+                db()->prepare("UPDATE wp_eco_aplus_tasks SET last_activity_at=NOW() WHERE id=?")->execute([$taskId]);
             }
         } elseif($activeAssign === 'start_aplus_content'){
             self::startAplusWorkflow($taskId);
@@ -873,6 +920,9 @@ class Task {
             $stmt->execute([$taskId]);
             $task = $stmt->fetch();
             if(!$task) return ['ok'=>false, 'message'=>'Task not found'];
+            if(!self::isInfoService($task) || ($task['work_status'] ?? '') !== 'Info Done'){
+                return ['ok'=>false, 'message'=>'A+ Banners sirf Info Done ke baad start ho sakte hain'];
+            }
 
             // Add 'A+ Banners' to info_subtasks if not already present
             $subtasks = [];
@@ -902,7 +952,7 @@ class Task {
             // Transition to standard A+ content generation workflow
             db()->prepare("
                 UPDATE wp_eco_aplus_tasks
-                SET product_type='Info + A Plus',
+                    SET product_type='Info + A Plus',
                     info_subtasks=?,
                     info_invoice_status=COALESCE(info_invoice_status, invoice_status),
                     status='A Plus',
@@ -1206,6 +1256,9 @@ class Task {
     }
 
     public static function sendForContent(int $taskId, array $user): array {
+        if(!in_array($user['role'] ?? '', ['administrator','d4u_writer','seo_manager'], true)){
+            return ['ok'=>false,'message'=>'Content generation sirf admin ya content writer ke liye hai'];
+        }
         if($user['role'] !== 'administrator'){
             $s = db()->prepare("SELECT id FROM eco_tool_assignments WHERE task_id=? AND worker_id=?");
             $s->execute([$taskId, $user['id']]);

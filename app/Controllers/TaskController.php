@@ -189,16 +189,17 @@ class TaskController {
         $media    = trim($_POST['media_link']    ?? '');
         $seoDoc   = trim($_POST['seo_doc_link']  ?? '');
 
-        if(!$taskId || !$media) json_error('Media / Drive link required');
+        if(!$taskId) json_error('Task required');
 
-        $row = db()->prepare("SELECT product_type, status, content_approved_at, content_updated_at FROM wp_eco_aplus_tasks WHERE id=?");
+        $row = db()->prepare("SELECT product_type, status, work_status, content_approved_at, content_updated_at, info_subtasks, seo_doc_link, media_link FROM wp_eco_aplus_tasks WHERE id=?");
         $row->execute([$taskId]); $row = $row->fetch();
-        $isInfoStage = ($row && (
-            ($row['product_type'] ?? '') === 'Infographics' ||
-            (($row['product_type'] ?? '') === 'Info + A Plus' && in_array($row['status'] ?? '', ['Pending', 'AI DONE', 'Infographics']) && empty($row['content_approved_at']) && empty($row['content_updated_at']))
-        ));
+        if(!$row) json_error('Task not found', 404);
+        $isInfoStage = Task::isInfoService($row);
+        $isAplusQA = !$isInfoStage && ($row['work_status'] ?? '') === 'In QA';
+        $isSeoReview = ($row['work_status'] ?? '') === 'SEO Review';
 
-        if(!$isInfoStage && !$seoDoc && !isset($_POST['has_seo_content'])) json_error('Both links are required');
+        if(($isInfoStage || $isAplusQA) && !$media) json_error('Media / Drive link required');
+        if($isSeoReview && !$seoDoc && !isset($_POST['has_seo_content'])) json_error('SEO Doc link required');
 
         $ok = Task::submitQA($taskId, $media, $seoDoc, $user);
         if($ok) json_success(); else json_error('Update failed — check work status');
@@ -211,15 +212,13 @@ class TaskController {
         verify_csrf();
 
         $taskId = intval($_POST['task_id'] ?? 0);
-        $row = db()->prepare("SELECT product_type, status, content_approved_at, content_updated_at FROM wp_eco_aplus_tasks WHERE id=?");
+        $media  = trim($_POST['media_link'] ?? '');
+        $row = db()->prepare("SELECT product_type, status, work_status, info_subtasks, content_approved_at, content_updated_at, seo_doc_link, media_link FROM wp_eco_aplus_tasks WHERE id=?");
         $row->execute([$taskId]); $row = $row->fetch();
-        $isInfoStage = ($row && (
-            ($row['product_type'] ?? '') === 'Infographics' ||
-            (($row['product_type'] ?? '') === 'Info + A Plus' && in_array($row['status'] ?? '', ['Pending', 'AI DONE', 'Infographics']) && empty($row['content_approved_at']) && empty($row['content_updated_at']))
-        ));
-        if($isInfoStage) json_error('Infographics stage products cannot be sent for SEO');
+        if(!$row || !Task::isAplusService($row) || ($row['work_status'] ?? '') !== 'In QA') json_error('Sirf A+ QA stage product SEO ko bheja ja sakta hai');
+        if(!$media && !$row['media_link']) json_error('A+ Media Link required');
 
-        $ok     = Task::sendForSEO($taskId, $user['id']);
+        $ok     = Task::sendForSEO($taskId, $user['id'], $media);
         if($ok) json_success(); else json_error('Status update failed');
     }
 
@@ -234,10 +233,10 @@ class TaskController {
 
         if(!$taskId || !$media) json_error('Media link required');
 
-        $row = db()->prepare("SELECT product_type FROM wp_eco_aplus_tasks WHERE id=?");
+        $row = db()->prepare("SELECT product_type, work_status, seo_doc_link FROM wp_eco_aplus_tasks WHERE id=?");
         $row->execute([$taskId]); $row = $row->fetch();
-        $isInfoOnly = ($row && ($row['product_type'] ?? '') === 'Infographics');
-        if(!$isInfoOnly && !$seoDoc && !isset($_POST['has_seo_content'])) json_error('Both links are required');
+        $isInfoOnly = ($row && ($row['work_status'] ?? '') === 'Info Done');
+        if(!$isInfoOnly && ($row['work_status'] ?? '') !== 'Work Done' && !$seoDoc && !isset($_POST['has_seo_content'])) json_error('Both links are required');
 
         Task::saveFinalLinks($taskId, $media, $seoDoc);
         json_success();

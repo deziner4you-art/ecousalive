@@ -222,11 +222,11 @@ background:#15803d;
 }
 
 .Working{
-background:#ea580c;
+background:#16a34a;
 }
 
 .Paused{
-background:#b45309;
+background:#2563eb;
 }
 
 .WorkDone{
@@ -250,7 +250,7 @@ background:#1d4ed8;
 }
 
 .InfoWork{
-background:#c2410c;
+background:#16a34a;
 }
 
 .ContentPending{
@@ -1918,14 +1918,14 @@ padding:8px;
         color: #4edea3 !important;
     }
     .Working, .Changing {
-        background: rgba(236, 106, 6, 0.15) !important;
-        border-color: #ec6a06 !important;
-        color: #ffb690 !important;
+        background: rgba(22, 163, 74, 0.15) !important;
+        border-color: #16a34a !important;
+        color: #86efac !important;
     }
     .Paused {
-        background: rgba(180, 83, 9, 0.15) !important;
-        border-color: #b45309 !important;
-        color: #ffb690 !important;
+        background: rgba(37, 99, 235, 0.15) !important;
+        border-color: #2563eb !important;
+        color: #93c5fd !important;
     }
     .WorkDone {
         background: rgba(0, 165, 114, 0.15) !important;
@@ -1943,9 +1943,9 @@ padding:8px;
         color: #adc6ff !important;
     }
     .InfoWork {
-        background: rgba(194, 65, 12, 0.15) !important;
-        border-color: #c2410c !important;
-        color: #ffb690 !important;
+        background: rgba(22, 163, 74, 0.15) !important;
+        border-color: #16a34a !important;
+        color: #86efac !important;
     }
     .ContentPending {
         background: rgba(109, 40, 217, 0.15) !important;

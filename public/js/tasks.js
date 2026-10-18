@@ -315,27 +315,42 @@ function renderSmart(data){
 }
 
 /* ── Status label/class helper ───────────────── */
+function isAplusWorkflow(item){
+    return !!item && (
+        (item.work_status !== 'Info Done' && item.status === 'A Plus') ||
+        item.work_status === 'SEO Review' ||
+        (item.work_status === 'Work Done' && !!item.seo_doc_link && !!item.seo_submitted_by)
+    );
+}
+
+function isInfoWorkflow(item){
+    return !!item && !isAplusWorkflow(item);
+}
+
 function getDisplayStatus(item){
     if(item.status === 'No Charge')                            return {cls:'NoCharge',      label:'No Charge'};
     if(item.status === 'Hold')                                 return {cls:'Hold',          label:'Hold'};
     if(item.status === 'AI Work')                              return {cls:'AIWork',        label:'AI Work'};
     if(item.status === 'All Generated')                        return {cls:'AllGenerated',  label:'All Generated'};
-    if(item.status === 'A Plus')                                 return {cls:'Pending',       label:'A+ Banners'};
+    /* Info Done is the completed Infographics phase. It must win over a
+       stale legacy status='A Plus' value until A+ is explicitly started. */
+    if(item.work_status === 'Info Done')                       return {cls:'InfoDone',      label:'Info Done'};
+    if(item.status === 'A Plus' && !['Working','Paused','In QA','SEO Review'].includes(item.work_status)) return {cls:'Pending', label:'A+ Banners'};
     if(item.status === 'Generate info Content' || item.status === 'Generate Info Content') return {cls:'Pending', label:'Generate Info Content'};
     if(item.status === 'AI DONE' && (!item.assigned_worker_id || item.assigned_worker_id == 0) && (!item.work_status || item.work_status === 'Pending')) return {cls:'AIDone', label:'AI DONE'};
     if(item.work_status === 'Changes')                         return {cls:'Changes',       label:'Changes in Design'};
     if(item.work_status === 'Changes in Content')              return {cls:'ChangesInContent',label:'Changes in Content'};
     if(item.work_status === 'Changing')                        return {cls:'Changing',      label:'Changing'};
     if(item.work_status === 'Republish')                       return {cls:'Republish',     label:'Republish'};
-    if(item.work_status === 'Info Work')                       return {cls:'InfoWork',      label:'Info Work'};
+    if(item.work_status === 'Info Work')                       return {cls:'InfoWork',      label:'Info Working'};
     if(item.work_status === 'Content Pending')                 return {cls:'ContentPending',label:'Content Pending'};
-    if(item.work_status === 'Working')                         return {cls:'Working',       label:'Working'};
-    if(item.work_status === 'Paused')                          return {cls:'Paused',        label:'Paused'};
-    if(item.work_status === 'In QA')                           return {cls:'InQA',          label:'In QA'};
+    if(item.work_status === 'Working')                         return {cls:'Working',       label:isAplusWorkflow(item) ? 'A+ Working' : 'Info Working'};
+    if(item.work_status === 'Paused')                          return {cls:'Paused',        label:isAplusWorkflow(item) ? 'A+ Paused' : 'Info Paused'};
+    if(item.work_status === 'In QA')                           return {cls:'InQA',          label:isAplusWorkflow(item) ? 'A+ In QA' : 'Info In QA'};
     if(item.work_status === 'SEO Review')                      return {cls:'SEOReview',     label:'SEO Review'};
     if(item.work_status === 'Work Done' && item.published_at)  return {cls:'Published',     label:'Published'};
-    if(item.work_status === 'Work Done')                       return {cls:'WorkDone',      label:'Work Done'};
-    if(item.work_status === 'Info Done')                       return {cls:'InfoDone',      label:'Info Done'};
+    if(item.work_status === 'Work Done' && isAplusWorkflow(item)) return {cls:'WorkDone',  label:'Work Done'};
+    if(item.work_status === 'Work Done')                       return {cls:'InfoDone',      label:'Info Done'};
     if((item.product_type === 'Infographics' || item.product_type === 'Info + A Plus') && (item.status === 'AI DONE' || item.status === 'Pending') && item.assigned_worker_id > 0 && (item.work_status === 'Pending' || !item.work_status)){
         return {cls: 'Pending', label: 'Infographics'};
     }
@@ -775,7 +790,19 @@ function getTaskContentToSave(id){
 }
 
 function clientContentGridChanged(id){
+    updateAplusDraftAction(id);
     clientEditorChanged(id);
+}
+
+function updateAplusDraftAction(id){
+    var saveBtn = document.getElementById('aplus-save-' + id);
+    var generateBtn = document.getElementById('aplus-generate-' + id);
+    if(!saveBtn && !generateBtn) return;
+    var content = getTaskContentToSave(id);
+    var parsed = parseTaskContent(content, 'Info + A Plus');
+    var hasDraft = !!(parsed && parsed.aplus && ['b1','b2','b3','b4','extra'].some(function(k){ return String(parsed.aplus[k] || '').trim() !== ''; }));
+    if(saveBtn) saveBtn.style.display = hasDraft ? 'inline-flex' : 'none';
+    if(generateBtn) generateBtn.style.display = hasDraft ? 'none' : 'inline-flex';
 }
 
 function buildProductContentSection(item, canEdit, lock, isWorker, isQa, originalForDiff){
@@ -809,7 +836,7 @@ function buildProductContentSection(item, canEdit, lock, isWorker, isQa, origina
         }
     }
     if(isBothProd){
-        if(item.status === 'A Plus' || item.aplus_worker_name || hasAplusContent || (item.work_status === 'Info Done' && item.status === 'Pending') || (item.product_type === 'Info + A Plus' && item.work_completed_worker_name) || item.status === 'All Generated'){
+        if(item.work_status !== 'Info Done' && (item.status === 'A Plus' || item.aplus_worker_name || hasAplusContent || (item.product_type === 'Info + A Plus' && item.work_completed_worker_name) || item.status === 'All Generated')){
             aplusStarted = true;
         }
     }
@@ -1295,8 +1322,7 @@ function applyQuickPaste(taskId){
 /* ── Build card HTML ─────────────────────────── */
 function buildCard(item){
     var lock         = item.status === 'Approved' || item.status === 'Updated';
-    var isInfoStage  = (item.product_type === 'Infographics')
-                    || (item.product_type === 'Info + A Plus' && (item.status === 'Pending' || item.status === 'AI DONE' || item.status === 'Infographics') && !item.content_approved_at && !item.content_updated_at);
+    var isInfoStage  = isInfoWorkflow(item);
     var isWorker     = ROLE === 'worker';
     var isQa         = ROLE === 'qa';
     var isAdmin      = ROLE === 'administrator';
@@ -1650,7 +1676,7 @@ ${publishedRow ? `<div style="flex:100%;margin-top:6px;">${publishedRow}</div>` 
     }
 
     /* QA send-for-SEO button */
-    var qaSendSEO = (ROLE === 'qa' && item.work_status === 'In QA' && item.active_revision_type !== 'design' && !isInfoStage && item.product_type !== 'Infographics')
+    var qaSendSEO = (ROLE === 'qa' && item.work_status === 'In QA' && item.active_revision_type !== 'design' && isAplusWorkflow(item))
         ? `<button class="status" style="background:#0891b2;cursor:pointer;border:none;width:auto;padding:6px 12px;" onclick="event.stopPropagation();sendForSEO(${item.id})">Send for SEO</button>` : '';
 
     var ds = getDisplayStatus(item);
@@ -1798,9 +1824,8 @@ ${linksBox}
 /* ── QA submit boxes ─────────────────────────── */
 function buildQABoxes(item, isAdmin, isQa){
     var html = '';
-    var isInfoStage = (item.product_type === 'Infographics' && item.work_status !== 'Content Pending' && item.status !== 'Generated' && item.status !== 'All Generated' && item.status !== 'Approved' && item.status !== 'Updated' && !item.content_approved_at && !item.content_updated_at)
-                   || (item.product_type === 'Info + A Plus' && !item.work_completed_worker_name && (item.status === 'Pending' || item.status === 'AI DONE' || item.status === 'Infographics') && item.work_status !== 'Content Pending' && item.status !== 'Generated' && item.status !== 'All Generated' && !item.content_approved_at && !item.content_updated_at);
-    var isInfoOnly = isInfoStage || item.product_type === 'Infographics';
+    var isAplusStage = isAplusWorkflow(item);
+    var isInfoOnly = !isAplusStage;
     
     var qaLabelHtml = '';
     if((item.work_status === 'Work Done' || item.work_status === 'Info Done') && item.qa_user_name) {
@@ -1826,24 +1851,24 @@ function buildQABoxes(item, isAdmin, isQa){
         if(isInfoOnly){
             html += `<div class="qa-submit-box" style="grid-template-columns:110px 1fr;"><div class="qa-labels"><label>${mediaLabelText}</label>${qaLabelHtml}</div><div class="qa-fields">${mediaInputHtml}</div><div style="grid-column:1/-1;display:flex;gap:8px;"><button class="qa-submit-btn" style="flex:1;background:#0284c7;" onclick="submitQA(${item.id})">✅ Info Done</button></div></div>`;
         } else {
-            html += `<div class="qa-submit-box" style="grid-template-columns:110px 1fr;"><div class="qa-labels"><label>${mediaLabelText}</label>${qaLabelHtml}${seoLabel}</div><div class="qa-fields">${mediaInputHtml}${seoInput}</div><div style="grid-column:1/-1;display:flex;gap:8px;"><button class="qa-submit-btn" style="flex:1;" onclick="submitQA(${item.id})">Submit</button><button class="qa-submit-btn" style="flex:1;background:#7c3aed;" onclick="sendForSEO(${item.id})">Send for SEO</button></div></div>`;
+            html += `<div class="qa-submit-box" style="grid-template-columns:110px 1fr;"><div class="qa-labels"><label>Media Link</label>${qaLabelHtml}</div><div class="qa-fields">${mediaInputHtml}</div><div style="grid-column:1/-1;display:flex;gap:8px;"><button class="qa-submit-btn" style="flex:1;background:#7c3aed;" onclick="sendForSEO(${item.id})">Send for SEO</button></div></div>`;
         }
     }
     if(isQa && item.work_status === 'In QA'){
         if(isInfoOnly){
             html += `<div class="qa-submit-box"><div class="qa-labels"><label>${mediaLabelText}</label>${qaLabelHtml}</div><div class="qa-fields">${mediaInputHtml}</div><button class="qa-submit-btn" style="align-self:start; padding:12px 18px; min-height:45px; background:#0284c7;" onclick="submitQA(${item.id})">✅ Info Done</button></div>`;
         } else {
-            html += `<div class="qa-submit-box"><div class="qa-labels"><label>${mediaLabelText}</label>${qaLabelHtml}${seoLabel}</div><div class="qa-fields">${mediaInputHtml}${seoInput}</div><button class="qa-submit-btn" style="align-self:start; padding:12px 0; min-height:45px;" onclick="submitQA(${item.id})">Submit</button></div>`;
+            html += `<div class="qa-submit-box"><div class="qa-labels"><label>Media Link</label>${qaLabelHtml}</div><div class="qa-fields">${mediaInputHtml}</div><button class="qa-submit-btn" style="align-self:start; padding:12px 0; min-height:45px; background:#7c3aed;" onclick="sendForSEO(${item.id})">Send for SEO</button></div>`;
         }
     }
     if(ROLE === 'seo_manager' && item.work_status === 'SEO Review'){
-        html += `<div class="qa-submit-box"><div class="qa-labels"><label>Media</label>${qaLabelHtml}${seoLabel}</div><div class="qa-fields">${mediaInputHtml}${seoInput}</div><button class="qa-submit-btn" style="align-self:start; padding:12px 0; min-height:45px;" onclick="submitQA(${item.id})">Submit</button></div>`;
+        html += `<div class="qa-submit-box" style="grid-template-columns:110px 1fr;"><div class="qa-labels"><label>Media Link</label>${qaLabelHtml}</div><div class="qa-fields"><input type="url" id="media-${item.id}" value="${linkVal}" placeholder="A+ Media Link"></div><div class="qa-labels"><label>SEO Doc.</label></div><div class="qa-fields"><input type="url" id="seo-${item.id}" value="${item.seo_doc_link||''}" placeholder="SEO Doc."></div><div style="grid-column:1/-1;display:flex;gap:8px;"><button class="qa-submit-btn" style="flex:1;min-height:45px;" onclick="submitQA(${item.id})">Submit SEO</button></div></div>`;
     }
     if(isAdmin && item.work_status === 'SEO Review'){
-        html += `<div class="qa-submit-box"><div class="qa-labels"><label>Media</label>${qaLabelHtml}${seoLabelD}</div><div class="qa-fields">${mediaInputHtmlD}${seoInputD}</div><div style="display:flex;gap:8px;flex-wrap:wrap;align-self:start;"><button class="qa-submit-btn" style="background:#7c3aed; padding:12px 15px; min-height:45px;" onclick="adminSubmitSEO(${item.id})">Submit SEO</button></div></div>`;
+        html += `<div class="qa-submit-box" style="grid-template-columns:110px 1fr;"><div class="qa-labels"><label>Media Link</label>${qaLabelHtml}</div><div class="qa-fields"><input type="url" id="admin-media-${item.id}" value="${linkVal}" placeholder="A+ Media Link"></div><div class="qa-labels"><label>SEO Doc.</label></div><div class="qa-fields"><input type="url" id="seo-doc-${item.id}" value="${item.seo_doc_link||''}" placeholder="SEO Doc."></div><div style="grid-column:1/-1;display:flex;gap:8px;"><button class="qa-submit-btn" style="flex:1;background:#7c3aed; min-height:45px;" onclick="adminSubmitSEO(${item.id})">Submit SEO</button></div></div>`;
     }
     if(isAdmin && (item.work_status === 'Work Done' || item.work_status === 'Info Done')){
-        html += `<div class="qa-submit-box"><div class="qa-labels"><label>${mediaLabelText}</label>${qaLabelHtml}${seoLabelA}</div><div class="qa-fields">${mediaInputHtmlA}${seoInputA}</div><button class="qa-submit-btn" style="align-self:start; padding:12px 15px; min-height:45px; ${item.work_status==='Info Done'?'background:#0284c7;':''}" onclick="saveFinalLinks(${item.id})">Save Links</button></div>`;
+        html += `<div class="qa-submit-box"><div class="qa-labels"><label>${mediaLabelText}</label>${qaLabelHtml}</div><div class="qa-fields">${mediaInputHtmlA}</div><button class="qa-submit-btn" style="align-self:start; padding:12px 15px; min-height:45px; ${item.work_status==='Info Done'?'background:#0284c7;':''}" onclick="saveFinalLinks(${item.id})">Save Links</button></div>`;
     }
     return html;
 }
@@ -1912,19 +1937,13 @@ function buildActionButtons(item, isAdmin, isWorker, isQa, isListing, isUrgent, 
         if(!isAssignedToCurrentWorker) return '';
 
         var isDesignRev = item.active_revision_type === 'design';
-        var isInfoStage = (item.status === 'Generate info Content' || item.status === 'Generate Info Content')
-                       || (item.product_type === 'Infographics')
-                       || (item.product_type === 'Info + A Plus' && !item.work_completed_worker_name && (item.status === 'Pending' || item.status === 'AI DONE' || item.status === 'Infographics' || item.status === 'Generate info Content' || item.status === 'Generate Info Content') && !item.content_approved_at && !item.content_updated_at);
+        var isInfoStage = isInfoWorkflow(item);
         if(item.status === 'A Plus'){
             btns += `<div style="color:#c4b5fd;font-size:12px;padding:8px 0;font-style:italic;">⏳ A+ Content generate hone ka intezaar karein...</div>`;
         } else if(isInfoStage){
             var isContentApproved = item.status === 'Approved' || item.status === 'Updated' || item.content_approved_at || item.content_updated_at;
             if(!isContentApproved) {
-                if(item.work_status === 'Pending' || item.status === 'AI DONE' || item.status === 'Infographics' || item.status === 'Generate info Content' || item.status === 'Generate Info Content') {
-                    btns += `<button class="actionbtn" style="background:#6d28d9;color:#fff;" onclick="sendForContent(${item.id})">📤 Generate Info Content</button>`;
-                } else if(item.work_status === 'Content Pending') {
-                    btns += `<div style="color:#94a3b8;font-size:12px;padding:8px 0;font-style:italic;">⏳ Content generate hone ka intezaar karein...</div>`;
-                }
+                btns += `<div style="color:#94a3b8;font-size:12px;padding:8px 0;font-style:italic;">⏳ Content writer ke content ka intezaar karein...</div>`;
             } else {
                 if(item.work_status !== 'Working' && item.work_status !== 'Changing' && item.work_status !== 'Paused' && item.work_status !== 'In QA' && item.work_status !== 'Work Done' && item.work_status !== 'Info Done'){
                     btns += `<button class="btn1 actionbtn" onclick="updateWorkStatus(${item.id},'Working')">▶ Info Working</button>`;
@@ -1935,7 +1954,7 @@ function buildActionButtons(item, isAdmin, isWorker, isQa, isListing, isUrgent, 
                     btns += `<button class="btn2 actionbtn" onclick="updateWorkStatus(${item.id},'In QA')">📤 Ready for QA</button>`;
                 }
             }
-        } else if(item.product_type === 'Info + A Plus'){
+        } else if(isAplusWorkflow(item)){
             if(item.work_status === 'Pending')         btns += `<button class="actionbtn" style="background:#c2410c;color:#fff;" onclick="updateWorkStatus(${item.id},'Info Work')">▶ Info Work</button>`;
             if(item.work_status === 'Info Work')       btns += `<button class="btn2 actionbtn" onclick="updateWorkStatus(${item.id},'In QA')">📤 Send for QA</button>`;
             if(item.work_status === 'Content Pending') btns += `<div style="color:#94a3b8;font-size:12px;padding:8px 0;font-style:italic;">⏳ Content generate hone ka intezaar karein...</div>`;
@@ -1977,11 +1996,14 @@ function buildActionButtons(item, isAdmin, isWorker, isQa, isListing, isUrgent, 
             btns += `<button class="actionbtn" style="background:#dc2626;color:#fff;" onclick="openPriorityPicker(${item.id})" title="Priority level set karein">🚨 Set Priority</button>`;
         }
     }
-    var canStartAplus = (item.work_status === 'Info Done') || (item.product_type === 'Info + A Plus' && (item.work_status === 'Info Done' || item.work_status === 'Work Done'));
+    var canStartAplus = item.work_status === 'Info Done' && isInfoWorkflow(item);
     if(canStartAplus && (isClientAct || isListing)){
         btns += `<button class="actionbtn" style="background:#7c3aed;color:#fff;font-weight:700;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 6px rgba(124,58,237,0.35);" onclick="startAplusWorkflow(${item.id})" title="Start A+ Banner Content & Design Workflow">🎨 Start A+ Banners</button>`;
     }
-    if((ROLE === 'd4u_writer' || ROLE === 'seo_manager') && item.status === 'A Plus') btns += `<button class="btn-writer-save actionbtn" style="background:#7c3aed;color:#fff;" onclick="focusAplusContent(${item.id})">✍ Generate A+ Content</button>`;
+    if((ROLE === 'd4u_writer' || ROLE === 'seo_manager') && item.status === 'A Plus'){
+        btns += `<button id="aplus-generate-${item.id}" class="btn-writer-save actionbtn" style="background:#7c3aed;color:#fff;" onclick="focusAplusContent(${item.id})">✍ Generate A+ Content</button>`;
+        btns += `<button id="aplus-save-${item.id}" class="btn-writer-save actionbtn" style="background:#16a34a;color:#fff;display:none;" onclick="writerSave(${item.id})">💾 Save Draft</button>`;
+    }
     if((ROLE === 'd4u_writer' || ROLE === 'seo_manager') && (item.status === 'Pending' || item.status === 'A Plus' || item.status === 'All Generated')) btns += `<button class="btn-writer-save actionbtn" onclick="writerSave(${item.id})">💾 Save Draft</button>`;
     if(ROLE === 'ai_work' && item.status === 'AI Work') btns += `<button class="btn2 actionbtn" style="background:#16a34a;color:#fff;" onclick="updateWorkStatus(${item.id},'AI DONE')">🤖 AI Done</button>`;
     if(isListing && item.work_status === 'Work Done' && !item.published_at) {
@@ -1997,19 +2019,24 @@ function buildActionButtons(item, isAdmin, isWorker, isQa, isListing, isUrgent, 
 
 function buildAdminButtons(item, isUrgent, lock){
     var approvedDisabled = lock || (item.status !== 'Generated' && item.status !== 'All Generated');
-    var isInfoStage = (item.status === 'Generate info Content' || item.status === 'Generate Info Content')
-                   || ((item.product_type === 'Infographics' || !item.product_type) && !item.content_approved_at && !item.content_updated_at && item.status !== 'Approved' && item.status !== 'Updated')
-                   || (item.product_type === 'Info + A Plus' && item.status !== 'All Generated' && !item.work_completed_worker_name && (item.status === 'Pending' || item.status === 'AI DONE' || item.status === 'Infographics' || item.status === 'Generate info Content' || item.status === 'Generate Info Content') && !item.content_approved_at && !item.content_updated_at);
+    var isInfoStage = isInfoWorkflow(item);
     var btns = '';
     if(item.status === 'AI Work'){
         btns += `<button class="btn2 actionbtn" style="background:#16a34a;color:#fff;" onclick="updateWorkStatus(${item.id},'AI DONE')">🤖 AI Done</button>`;
+    }
+
+    /* Admin must always be able to review generated content, including A+ content. */
+    if(['Generated','All Generated'].includes(item.status) && item.work_status !== 'Work Done' && item.work_status !== 'Info Done'){
+        btns += `<button class="btn1 actionbtn" id="u-${item.id}" disabled onclick="save(${item.id},'Updated')">UPDATED</button>`;
+        btns += `<button class="btn2 actionbtn" id="a-${item.id}" onclick="save(${item.id},'Approved')">APPROVED</button>`;
     }
     
     // New Feature Buttons for Admin
     if(isInfoStage){
         var isContentApproved = item.status === 'Approved' || item.status === 'Updated' || item.content_approved_at || item.content_updated_at;
         if(!isContentApproved) {
-            if(item.work_status === 'Pending' || item.status === 'AI DONE' || item.status === 'Infographics' || item.status === 'Generate info Content' || item.status === 'Generate Info Content') {
+            if(item.work_status !== 'In QA' && item.work_status !== 'Info Done' && item.work_status !== 'Work Done'
+                && (item.work_status === 'Pending' || item.status === 'AI DONE' || item.status === 'Infographics' || item.status === 'Generate info Content' || item.status === 'Generate Info Content')) {
                 btns += `<button class="actionbtn" style="background:#6d28d9;color:#fff;" onclick="sendForContent(${item.id})">📤 Generate Info Content</button>`;
             } else if(item.work_status === 'Content Pending') {
                 btns += `<div style="color:#94a3b8;font-size:12px;padding:8px 0;font-style:italic;">⏳ Content generate hone ka intezaar karein...</div>`;
@@ -2037,10 +2064,30 @@ function buildAdminButtons(item, isUrgent, lock){
         }
     }
 
-    if(item.status === 'A Plus') btns += `<button class="actionbtn" style="background:#7c3aed;color:#fff;font-weight:700;" onclick="focusAplusContent(${item.id})">✍ Generate A+ Content</button>`;
-    if(item.work_status !== 'Work Done' && item.work_status !== 'Info Done' && !isInfoStage && item.status !== 'A Plus'){
-        btns += `<button class="btn1 actionbtn" id="u-${item.id}" disabled onclick="save(${item.id},'Updated')">UPDATED</button>`;
-        btns += `<button class="btn2 actionbtn" id="a-${item.id}" ${approvedDisabled?'disabled':''} onclick="save(${item.id},'Approved')">APPROVED</button>`;
+    if(item.status === 'A Plus'){
+        var aplusParsed = parseTaskContent(item.content || '', item.product_type);
+        var aplusHasDraft = !!(aplusParsed && aplusParsed.aplus && ['b1','b2','b3','b4','extra'].some(function(k){ return String(aplusParsed.aplus[k] || '').trim() !== ''; }));
+        btns += `<button id="aplus-generate-${item.id}" class="actionbtn" style="background:#7c3aed;color:#fff;font-weight:700;display:${aplusHasDraft ? 'none' : 'inline-flex'};" onclick="focusAplusContent(${item.id})">✍ Generate A+ Content</button>`;
+        btns += `<button id="aplus-save-${item.id}" class="actionbtn" style="background:#16a34a;color:#fff;font-weight:700;display:${aplusHasDraft ? 'inline-flex' : 'none'};" onclick="writerSave(${item.id})">💾 Save Draft</button>`;
+    }
+
+    /* Admin can perform the same worker controls when a worker is unavailable. */
+    var serviceWork = isAplusWorkflow(item) ? 'A+ ' : 'Info ';
+    var adminWorkStatus = item.work_status || 'Pending';
+    var normalizedContentStatus = String(item.status || '').toLowerCase();
+    var contentApproved = ['approved','updated'].includes(normalizedContentStatus) || item.content_approved_at || item.content_updated_at;
+    if(contentApproved && !['In QA','SEO Review','Work Done','Info Done'].includes(adminWorkStatus)){
+        if(adminWorkStatus === 'Pending' || adminWorkStatus === 'Content Pending'){
+            btns += `<button class="btn1 actionbtn" onclick="updateWorkStatus(${item.id},'Working')">▶ ${serviceWork}Working</button>`;
+        }
+        if(adminWorkStatus === 'Working' || adminWorkStatus === 'Changing'){
+            btns += `<button class="actionbtn" style="background:#2563eb;color:#fff;" onclick="pauseWork(${item.id})">⏸ ${serviceWork}Pause</button>`;
+            btns += `<button class="btn2 actionbtn" onclick="updateWorkStatus(${item.id},'In QA')">📤 Send for QA</button>`;
+        }
+        if(adminWorkStatus === 'Paused'){
+            btns += `<button class="btn1 actionbtn" onclick="resumeWork(${item.id})">▶ ${serviceWork}Resume</button>`;
+            btns += `<button class="btn2 actionbtn" onclick="updateWorkStatus(${item.id},'In QA')">📤 Send for QA</button>`;
+        }
     }
     if((typeof CAN_MODIFY_URGENT !== 'undefined' ? CAN_MODIFY_URGENT : true) && item.work_status !== 'Work Done' && !item.published_at){
         if(isUrgent){
@@ -2050,7 +2097,7 @@ function buildAdminButtons(item, isUrgent, lock){
             btns += `<button class="actionbtn" style="background:#dc2626;color:#fff;" onclick="openPriorityPicker(${item.id})" title="Priority level set karein">🚨 Set Priority</button>`;
         }
     }
-    var canStartAplus = (item.work_status === 'Info Done') || (item.product_type === 'Info + A Plus' && (item.work_status === 'Info Done' || item.work_status === 'Work Done'));
+    var canStartAplus = item.work_status === 'Info Done' && isInfoWorkflow(item);
     if(canStartAplus){
         btns += `<button class="actionbtn" style="background:#7c3aed;color:#fff;font-weight:700;display:inline-flex;align-items:center;gap:6px;box-shadow:0 2px 6px rgba(124,58,237,0.35);" onclick="startAplusWorkflow(${item.id})" title="Start A+ Banner Content & Design Workflow">🎨 Start A+ Banners</button>`;
     }
@@ -2545,7 +2592,7 @@ function headTouch(e, id){
 function save(id, status){
     var content = getTaskContentToSave(id);
     var readable = contentToReadableText(content);
-    if(readable.trim() === '') return;
+    if(readable.trim() === '' && ROLE !== 'administrator') return;
     var fd = new FormData();
     fd.append('action', 'save_task'); fd.append('id', id);
     fd.append('content', content);   fd.append('status', status);
@@ -2559,7 +2606,7 @@ function save(id, status){
 function writerSave(id, targetStatus){
     var content = getTaskContentToSave(id);
     var readable = contentToReadableText(content);
-    if(readable.trim() === ''){ alert('Content khali hai!'); return; }
+    if(readable.trim() === '' && ROLE !== 'administrator'){ alert('Content khali hai!'); return; }
 
     var task = (typeof ALL_TASKS !== 'undefined') ? ALL_TASKS.find(function(t){ return t.id == id; }) : null;
     var pType = task ? task.product_type : '';
@@ -2574,7 +2621,9 @@ function writerSave(id, targetStatus){
 
     var statusToSave = targetStatus;
     if(!statusToSave){
-        if(pType === 'Info + A Plus' && hasInfo && hasAplus){
+        if(task && isAplusWorkflow(task)){
+            statusToSave = task.status === 'All Generated' ? 'All Generated' : 'Generated';
+        } else if(pType === 'Info + A Plus' && hasInfo && hasAplus){
             statusToSave = 'All Generated';
         } else if(task && task.status === 'All Generated'){
             statusToSave = 'All Generated';
@@ -2651,20 +2700,17 @@ function _hasSeoContent(id) {
 function submitQA(id){
     var media = document.getElementById('media-' + id);
     var seo   = document.getElementById('seo-' + id);
-    if(!media) return;
-    
-    if(!media.value.trim()){ alert('Media / Google Drive link zaroori hai'); return; }
-    
     var taskItem = ALL_TASKS.find(function(t){ return t.id == id; });
-    var isInfoStage = taskItem && ((taskItem.product_type === 'Infographics')
-                   || (taskItem.product_type === 'Info + A Plus' && !taskItem.work_completed_worker_name && (taskItem.status === 'Pending' || taskItem.status === 'AI DONE' || taskItem.status === 'Infographics') && !taskItem.content_approved_at && !taskItem.content_updated_at));
-    var isInfoOnly = isInfoStage || (taskItem && taskItem.product_type === 'Infographics');
+    if(!taskItem) return;
+    var isSeoStage = taskItem.work_status === 'SEO Review';
+    var mediaVal = media ? media.value.trim() : '';
+    if(!isSeoStage && !mediaVal){ alert('Media / Google Drive link zaroori hai'); return; }
     var seoVal = seo ? seo.value.trim() : '';
-    if(!isInfoOnly && !seoVal && !_hasSeoContent(id)){ alert('SEO Doc. link ya SEO Content Form mein data zaroori hai'); return; }
+    if(isSeoStage && !seoVal && !_hasSeoContent(id)){ alert('SEO Doc. link ya SEO Content Form mein data zaroori hai'); return; }
     
     var fd = new FormData();
     fd.append('action', 'submit_qa'); fd.append('task_id', id);
-    fd.append('media_link', media.value.trim()); fd.append('seo_doc_link', seoVal);
+    fd.append('media_link', mediaVal); fd.append('seo_doc_link', seoVal);
     if(typeof CSRF_TOKEN !== 'undefined') fd.append('_csrf', CSRF_TOKEN);
     
     document.body.style.cursor = 'wait';
@@ -2682,6 +2728,8 @@ function sendForSEO(id){
     _confirm('Is product ko SEO Manager k paas bhejein?', function(){
         var fd = new FormData();
         fd.append('action', 'send_for_seo'); fd.append('task_id', id);
+        var media = document.getElementById('media-' + id) || document.getElementById('seo-media-' + id);
+        if(media) fd.append('media_link', media.value.trim());
         if(typeof CSRF_TOKEN !== 'undefined') fd.append('_csrf', CSRF_TOKEN);
         fetch('index.php', {method:'POST', body:fd})
             .then(function(r){ return r.json(); })
@@ -2690,22 +2738,16 @@ function sendForSEO(id){
 }
 
 function adminSubmitSEO(id){
-    var media = document.getElementById('seo-media-' + id);
     var seo   = document.getElementById('seo-doc-' + id);
-    if(!media) return;
-    
-    if(!media.value.trim()){ alert('Media / Google Drive link zaroori hai'); return; }
-    
+    var media = document.getElementById('admin-media-' + id);
     var taskItem = ALL_TASKS.find(function(t){ return t.id == id; });
-    var isInfoStage = taskItem && ((taskItem.product_type === 'Infographics')
-                   || (taskItem.product_type === 'Info + A Plus' && !taskItem.work_completed_worker_name && (taskItem.status === 'Pending' || taskItem.status === 'AI DONE' || taskItem.status === 'Infographics') && !taskItem.content_approved_at && !taskItem.content_updated_at));
-    var isInfoOnly = isInfoStage || (taskItem && taskItem.product_type === 'Infographics');
+    if(!taskItem || !seo) return;
     var seoVal = seo ? seo.value.trim() : '';
-    if(!isInfoOnly && !seoVal && !_hasSeoContent(id)){ alert('SEO Doc. link ya SEO Content Form mein data zaroori hai'); return; }
+    if(!seoVal && !_hasSeoContent(id)){ alert('SEO Doc. link ya SEO Content Form mein data zaroori hai'); return; }
     
     var fd = new FormData();
     fd.append('action', 'submit_qa'); fd.append('task_id', id);
-    fd.append('media_link', media.value.trim()); fd.append('seo_doc_link', seoVal);
+    fd.append('media_link', media ? media.value.trim() : ''); fd.append('seo_doc_link', seoVal);
     if(typeof CSRF_TOKEN !== 'undefined') fd.append('_csrf', CSRF_TOKEN);
     
     document.body.style.cursor = 'wait';
@@ -2726,11 +2768,7 @@ function saveFinalLinks(id){
     if(!media.value.trim()){ alert('Media / Google Drive link zaroori hai'); return; }
     
     var taskItem = ALL_TASKS.find(function(t){ return t.id == id; });
-    var isInfoStage = taskItem && ((taskItem.product_type === 'Infographics')
-                   || (taskItem.product_type === 'Info + A Plus' && !taskItem.work_completed_worker_name && (taskItem.status === 'Pending' || taskItem.status === 'AI DONE' || taskItem.status === 'Infographics') && !taskItem.content_approved_at && !taskItem.content_updated_at));
-    var isInfoOnly = isInfoStage || (taskItem && taskItem.product_type === 'Infographics');
     var seoVal = seo ? seo.value.trim() : '';
-    if(!isInfoOnly && !seoVal && !_hasSeoContent(id)){ alert('SEO Doc. link ya SEO Content Form mein data zaroori hai'); return; }
     
     var fd = new FormData();
     fd.append('action', 'save_final_links'); fd.append('task_id', id);

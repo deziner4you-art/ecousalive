@@ -213,7 +213,79 @@ function buildSeoForm(taskId, data, readonly){
   <span id="seo-save-msg-${taskId}" style="font-size:12px;"></span>
 </div>`;
 
-    return section1 + section2 + section3 + msgRow;
+    var pasteTools = readonly ? '' : `
+<div class="seo-wrap" style="margin-bottom:10px;">
+  <div class="seo-head-dark"><span>📋 PASTE SEO CONTENT</span><button class="seo-save-green" onclick="applySeoPaste(${taskId})">AUTO FILL FIELDS</button></div>
+  <div style="padding:8px 12px;background:#071428;">
+    <textarea class="seo-inp seo-textarea" id="seo-paste-${taskId}" rows="4" placeholder="Paste labeled SEO content or JSON here. Example: Banner 1 Alt Text: ...  |  Banner 2 Heading: ...  |  Page 1: ..."></textarea>
+    <div style="color:#64748b;font-size:10px;margin-top:5px;">Recognized labels: Banner 1–4 Image Link, Alt Text, Sub Heading, Heading, Body Text; Page 1–8; Backend Search Terms.</div>
+  </div>
+</div>`;
+
+    return pasteTools + section1 + section2 + section3 + msgRow;
+}
+
+/* Apply a structured AI/text paste to the existing SEO fields. JSON is also
+   accepted when the generator returns the same shape used by saveSeoContent. */
+function applySeoPaste(taskId){
+    var source = document.getElementById('seo-paste-' + taskId);
+    if(!source || !source.value.trim()){ alert('SEO content paste karein'); return; }
+    var raw = source.value.trim();
+    var applied = 0;
+
+    function put(id, value){
+        var el = document.getElementById(id);
+        if(el && value !== undefined && value !== null && String(value).trim() !== ''){
+            el.value = String(value).trim();
+            el.dispatchEvent(new Event('input', {bubbles:true}));
+            applied++;
+        }
+    }
+    function applyStructured(data){
+        if(!data || typeof data !== 'object') return;
+        (data.banners || []).forEach(function(b, i){
+            var idx = i;
+            put('seo-b'+idx+'-link-'+taskId, b.image_link);
+            put('seo-b'+idx+'-desktop-'+taskId, b.desktop);
+            put('seo-b'+idx+'-subheading-'+taskId, b.sub_heading);
+            put('seo-b'+idx+'-heading-'+taskId, b.heading);
+            put('seo-b'+idx+'-body-'+taskId, b.body_text);
+        });
+        (data.infographics || []).forEach(function(p, i){ put('seo-info'+i+'-'+taskId, p.content); put('seo-info'+i+'-link-'+taskId, p.image_link); });
+        put('seo-bst-'+taskId, data.backend_search_terms);
+    }
+    try {
+        var parsed = JSON.parse(raw);
+        applyStructured(parsed);
+    } catch(e) {
+        var lines = raw.split(/\r?\n/);
+        var current = null, buffer = [];
+        function flush(){
+            if(!current) return;
+            var value = buffer.join('\n').trim();
+            if(current.type === 'banner') put('seo-b'+(current.index-1)+'-'+current.field+'-'+taskId, value);
+            if(current.type === 'info') put('seo-info'+(current.index-1)+'-'+taskId, value);
+            if(current.type === 'bst') put('seo-bst-'+taskId, value);
+            current = null; buffer = [];
+        }
+        lines.forEach(function(line){
+            var m = line.match(/^\s*Banner\s*([1-4])\s*(?:Image\s*Link|Image|Alt\s*Text|Sub\s*Heading|Heading|Body\s*Text)?\s*[:\-]\s*(.*)$/i);
+            var p = line.match(/^\s*(?:Page|Infographic)\s*([1-8])\s*[:\-]\s*(.*)$/i);
+            var s = line.match(/^\s*(?:Backend\s*Search\s*Terms|Search\s*Terms)\s*[:\-]\s*(.*)$/i);
+            if(m){
+                flush();
+                var label = (line.match(/Banner\s*[1-4]\s*(.*?)(?:\s*[:\-]\s*)/i)||[])[1] || '';
+                label = label.toLowerCase().replace(/[^a-z]/g,'');
+                var field = label.indexOf('imagelink') >= 0 || label === 'image' ? 'link' : label.indexOf('subheading') >= 0 ? 'subheading' : label.indexOf('heading') >= 0 ? 'heading' : label.indexOf('bodytext') >= 0 ? 'body' : 'desktop';
+                current = {type:'banner', index:parseInt(m[1],10), field:field}; buffer = [m[2]];
+            } else if(p){ flush(); current={type:'info',index:parseInt(p[1],10)}; buffer=[p[2]]; }
+            else if(s){ flush(); current={type:'bst'}; buffer=[s[1]]; }
+            else if(current && line.trim()) buffer.push(line);
+        });
+        flush();
+    }
+    if(applied) alert(applied + ' SEO field(s) auto filled. Ab SAVE press karein.');
+    else alert('Recognized labels nahi milay. Example format use karein: Banner 1 Alt Text: ...');
 }
 
 /* ── Save ────────────────────────────────────── */
