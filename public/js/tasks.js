@@ -316,8 +316,11 @@ function renderSmart(data){
 
 /* ── Status label/class helper ───────────────── */
 function isAplusWorkflow(item){
-    return !!item && (
-        (item.work_status !== 'Info Done' && item.status === 'A Plus') ||
+    if(!item || item.work_status === 'Info Done' || item.product_type === 'Infographics') return false;
+    return (
+        item.status === 'A Plus' ||
+        item.product_type === 'A+' ||
+        item.product_type === 'A Plus' ||
         item.work_status === 'SEO Review' ||
         (item.work_status === 'Work Done' && !!item.seo_doc_link && !!item.seo_submitted_by)
     );

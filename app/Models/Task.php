@@ -14,27 +14,23 @@ class Task {
      * existing task columns for backwards compatibility.
      */
     public static function isAplusService(array $task): bool {
-        if (($task['work_status'] ?? '') === 'Info Done') {
+        $ws = $task['work_status'] ?? '';
+        if ($ws === 'Info Done') {
             return false;
         }
         $pt = $task['product_type'] ?? '';
         $st = $task['status'] ?? '';
-        $ws = $task['work_status'] ?? '';
         if ($pt === 'Infographics') {
             return false;
         }
-        if ($pt === 'A+' || $pt === 'A Plus') {
-            return true;
-        }
-        if ($ws === 'SEO Review' || ($ws === 'Work Done' && !empty($task['seo_doc_link']))) {
+        if ($ws === 'SEO Review' || ($ws === 'Work Done' && !empty($task['seo_doc_link']) && !empty($task['seo_submitted_by']))) {
             return true;
         }
         if ($st === 'A Plus') {
             return true;
         }
-        $subtasks = !empty($task['info_subtasks']) ? array_map('trim', explode(',', $task['info_subtasks'])) : [];
-        if (in_array('A+ Banners', $subtasks) || in_array('aplus', $subtasks)) {
-            return ($st === 'A Plus' || !empty($task['content_approved_at']) || !empty($task['content_updated_at']) || $ws === 'SEO Review');
+        if ($pt === 'A+' || $pt === 'A Plus') {
+            return true;
         }
         return false;
     }
