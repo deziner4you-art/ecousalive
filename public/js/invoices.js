@@ -64,14 +64,14 @@ function renderInvTable(){
     var anyChecked = fAll||fWD||fID||fIA;
 
     var filtered = _invTasks.filter(function(t){
-        if(t.status === 'No Charge') return false;
-        var isIA   = t.product_type === 'Info + A Plus' || (t.aplus_worker_id && (t.info_worker_id || t.product_type === 'Infographics'));
+        if(t.status === 'No Charge' || t.work_status === 'No Charge' || !!t.no_charge_at || !!t.no_charge_reason) return false;
+        var isIA   = t.product_type === 'Info + A Plus' || !!t.info_phase_status || !!t.aplus_phase_status;
         var isInfo = !isIA && t.product_type === 'Infographics';
         var isAplus = !isIA && !isInfo;
         var infoInvd  = !!t.info_service_charged || !!(t.info_invoice_status  && t.info_invoice_status  !== '') || (!t.aplus_invoice_status && !!(t.invoice_status && t.invoice_status !== ''));
         var aplusInvd = !!t.aplus_service_charged || !!(t.aplus_invoice_status && t.aplus_invoice_status !== '');
-        var infoReady = (isInfo || isIA) && (t.work_status === 'Info Done' || t.work_status === 'Work Done');
-        var aplusReady = (isAplus || isIA) && t.work_status === 'Work Done' && !!(t.seo_doc_link || '').trim() && !!t.seo_submitted_by;
+        var infoReady = (isInfo || isIA) && (t.info_completed == 1 || t.info_phase_status === 'Done' || t.work_status === 'Info Done');
+        var aplusReady = (isAplus || isIA) && (t.aplus_completed == 1 || t.aplus_phase_status === 'Done') && !!(t.seo_doc_link || '').trim() && !!t.seo_submitted_by;
         var isFullyInvoiced = isIA ? (infoInvd&&aplusInvd)
                             : (isInfo ? (infoInvd || !!(t.invoice_status && t.invoice_status !== ''))
                             : (isAplus ? (aplusInvd || !!(t.invoice_status && t.invoice_status !== ''))
@@ -81,8 +81,8 @@ function renderInvTable(){
         if(anyChecked){
             var match=false;
             if(fAll) match=true;
-            if(!match&&fWD&&t.work_status==='Work Done') match=true;
-            if(!match&&fID&&t.work_status==='Info Done') match=true;
+            if(!match&&fWD&&aplusReady) match=true;
+            if(!match&&fID&&infoReady) match=true;
             if(!match&&fIA&&(t.product_type==='Info + A Plus' || isIA)) match=true;
             if(!match) return false;
         }
@@ -101,14 +101,14 @@ function renderInvTable(){
 
     filtered.forEach(function(t){
         var inCart = !!_invCart[t.id];
-        var isIA   = t.product_type === 'Info + A Plus' || (t.aplus_worker_id && (t.info_worker_id || t.product_type === 'Infographics'));
+        var isIA   = t.product_type === 'Info + A Plus' || !!t.info_phase_status || !!t.aplus_phase_status;
         var isInfo = !isIA && t.product_type === 'Infographics';
         var isAplus = !isIA && !isInfo;
-        var isSelectableStatus = t.work_status==='Work Done' || t.work_status==='Info Done' || !!t.published_at;
+        var isSelectableStatus = !!t.published_at || t.info_completed == 1 || t.aplus_completed == 1 || t.work_status==='Work Done' || t.work_status==='Info Done';
         var infoInvd  = !!t.info_service_charged || !!(t.info_invoice_status  && t.info_invoice_status  !== '') || (!t.aplus_invoice_status && !!(t.invoice_status && t.invoice_status !== ''));
         var aplusInvd = !!t.aplus_service_charged || !!(t.aplus_invoice_status && t.aplus_invoice_status !== '');
-        var infoReady = (isInfo || isIA) && (t.work_status === 'Info Done' || t.work_status === 'Work Done');
-        var aplusReady = (isAplus || isIA) && t.work_status === 'Work Done' && !!(t.seo_doc_link || '').trim() && !!t.seo_submitted_by;
+        var infoReady = (isInfo || isIA) && (t.info_completed == 1 || t.info_phase_status === 'Done' || t.work_status === 'Info Done');
+        var aplusReady = (isAplus || isIA) && (t.aplus_completed == 1 || t.aplus_phase_status === 'Done') && !!(t.seo_doc_link || '').trim() && !!t.seo_submitted_by;
         var isFullyInvoiced = isIA ? (infoInvd&&aplusInvd)
                             : (isInfo ? (infoInvd || !!(t.invoice_status && t.invoice_status !== ''))
                             : (isAplus ? (aplusInvd || !!(t.invoice_status && t.invoice_status !== ''))

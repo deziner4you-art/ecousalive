@@ -42,6 +42,7 @@ AuthMiddleware::handle($action);
 
 /* ── Load Models ─────────────────────────────────────── */
 
+require_once ROOT.'/app/Models/TaskService.php';
 require_once ROOT.'/app/Models/Task.php';
 require_once ROOT.'/app/Models/User.php';
 require_once ROOT.'/app/Models/Invoice.php';

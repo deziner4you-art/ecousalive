@@ -50,6 +50,7 @@ return [
     'publish_product'    => ['TaskController', 'publishProduct'],
     'unpublish_product'  => ['TaskController', 'unpublishProduct'],
     'request_revision'   => ['TaskController', 'requestRevision'],
+    'request_qa_revision' => ['TaskController', 'requestQARevision'],
     'get_workers'        => ['TaskController', 'getWorkers'],
     'update_product_services' => ['TaskController', 'updateProductServices'],
     'enable_aplus_service' => ['TaskController', 'enableAplusService'],

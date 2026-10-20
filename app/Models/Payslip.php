@@ -16,7 +16,7 @@ class Payslip {
                    COALESCE(r.fine_per_revision,0) AS fine_per_revision, 
                    COALESCE(r.rate_infographics,0) AS rate_infographics, 
                    COALESCE(r.rate_aplus,0) AS rate_aplus,
-                   COALESCE(r.rate_ai_work, r.rate_per_product, r.rate_infographics, 0) AS rate_ai_work
+                   COALESCE(NULLIF(r.rate_ai_work, 0), NULLIF(r.rate_per_product, 0), NULLIF(r.rate_infographics, 0), 0) AS rate_ai_work
             FROM eco_tool_users u
             LEFT JOIN eco_worker_rates r ON r.worker_id=u.id
             WHERE u.role IN ('worker','d4u_writer','qa','seo_manager','ai_work')
@@ -58,7 +58,7 @@ class Payslip {
                 JOIN eco_invoice_items ii ON ii.task_id=t.id
                 JOIN eco_invoices inv ON inv.id=ii.invoice_id AND inv.status='Paid'
                 LEFT JOIN (eco_payslip_items pi JOIN eco_payslips p ON p.id = pi.payslip_id AND p.worker_id = ?) ON pi.task_id=t.id
-                WHERE t.qa_submitted_by=? AND t.status <> 'No Charge' AND (t.invoice_status='Paid' OR t.info_invoice_status='Paid' OR t.aplus_invoice_status='Paid') AND t.deleted_at IS NULL
+                WHERE t.qa_submitted_by=? AND t.status <> 'No Charge' AND t.work_status <> 'No Charge' AND t.no_charge_at IS NULL AND (t.invoice_status='Paid' OR t.info_invoice_status='Paid' OR t.aplus_invoice_status='Paid') AND t.deleted_at IS NULL
                 AND DATE(inv.paid_at) BETWEEN ? AND ? AND pi.id IS NULL
                 GROUP BY t.id
                 ORDER BY t.id ASC
@@ -71,7 +71,7 @@ class Payslip {
                 JOIN eco_invoice_items ii ON ii.task_id=t.id
                 JOIN eco_invoices inv ON inv.id=ii.invoice_id AND inv.status='Paid'
                 LEFT JOIN (eco_payslip_items pi JOIN eco_payslips p ON p.id = pi.payslip_id AND p.worker_id = ?) ON pi.task_id=t.id
-                WHERE (t.written_by_user_id=? OR t.seo_submitted_by=?) AND t.status <> 'No Charge' AND (t.invoice_status='Paid' OR t.info_invoice_status='Paid' OR t.aplus_invoice_status='Paid') AND t.deleted_at IS NULL
+                WHERE (t.written_by_user_id=? OR t.seo_submitted_by=?) AND t.status <> 'No Charge' AND t.work_status <> 'No Charge' AND t.no_charge_at IS NULL AND (t.invoice_status='Paid' OR t.info_invoice_status='Paid' OR t.aplus_invoice_status='Paid') AND t.deleted_at IS NULL
                 AND DATE(inv.paid_at) BETWEEN ? AND ? AND pi.id IS NULL
                 GROUP BY t.id
                 ORDER BY t.id ASC
@@ -82,7 +82,7 @@ class Payslip {
                 SELECT t.id, t.product_no, t.title, NULL AS invoice_no
                 FROM wp_eco_aplus_tasks t
                 LEFT JOIN (eco_payslip_items pi JOIN eco_payslips p ON p.id = pi.payslip_id AND p.worker_id = ?) ON pi.task_id=t.id
-                WHERE t.ai_worked_by=? AND COALESCE(t.status,'') NOT IN ('AI Work','No Charge') AND t.deleted_at IS NULL
+                WHERE t.ai_worked_by=? AND COALESCE(t.status,'') NOT IN ('AI Work','No Charge') AND COALESCE(t.work_status,'') <> 'No Charge' AND t.no_charge_at IS NULL AND t.deleted_at IS NULL
                 AND DATE(COALESCE(t.work_completed_at, t.last_activity_at)) BETWEEN ? AND ? AND pi.id IS NULL
                 GROUP BY t.id
                 ORDER BY t.id ASC
@@ -97,7 +97,7 @@ class Payslip {
                 JOIN eco_invoices inv ON inv.id=ii.invoice_id AND inv.status='Paid'
                 LEFT JOIN (eco_payslip_items pi JOIN eco_payslips p ON p.id = pi.payslip_id AND p.worker_id = ?) ON pi.task_id=t.id
                 WHERE (a.worker_id=? OR t.info_worker_id=? OR t.aplus_worker_id=? OR t.work_completed_by_worker_id=?)
-                AND t.status <> 'No Charge' AND (t.invoice_status='Paid' OR t.info_invoice_status='Paid' OR t.aplus_invoice_status='Paid') AND t.deleted_at IS NULL
+                AND t.status <> 'No Charge' AND t.work_status <> 'No Charge' AND t.no_charge_at IS NULL AND (t.invoice_status='Paid' OR t.info_invoice_status='Paid' OR t.aplus_invoice_status='Paid') AND t.deleted_at IS NULL
                 AND DATE(inv.paid_at) BETWEEN ? AND ? AND pi.id IS NULL
                 GROUP BY t.id
                 ORDER BY t.id ASC
@@ -119,7 +119,7 @@ class Payslip {
             $dateParams = [$dateFrom, $dateTo];
         }
 
-        $baseCond = "t.deleted_at IS NULL AND t.status <> 'No Charge' AND t.work_status NOT IN ('Pending','Working','Paused','In QA','SEO Review','Hold','No Charge') $dateCond AND pi.id IS NULL";
+        $baseCond = "t.deleted_at IS NULL AND t.status <> 'No Charge' AND t.work_status NOT IN ('Pending','Working','Paused','In QA','SEO Review','Hold','No Charge') AND t.no_charge_at IS NULL $dateCond AND pi.id IS NULL";
         $sel = "t.id, t.product_no, t.title, t.status, t.ai_worked_by, t.work_status, t.invoice_status, t.info_invoice_status, t.aplus_invoice_status, t.product_type, t.info_worker_id, t.aplus_worker_id";
 
         if($role === 'qa'){
@@ -129,7 +129,7 @@ class Payslip {
             $sql = "SELECT $sel FROM wp_eco_aplus_tasks t LEFT JOIN (eco_payslip_items pi JOIN eco_payslips p ON p.id = pi.payslip_id AND p.worker_id = ?) ON pi.task_id=t.id WHERE (t.written_by_user_id=? OR t.seo_submitted_by=?) AND $baseCond GROUP BY t.id ORDER BY t.id ASC";
             $params = array_merge([$workerId, $workerId, $workerId], $dateParams);
         } elseif($role === 'ai_work'){
-            $sql = "SELECT $sel, 1 AS ai_payroll_eligible FROM wp_eco_aplus_tasks t LEFT JOIN (eco_payslip_items pi JOIN eco_payslips p ON p.id = pi.payslip_id AND p.worker_id = ?) ON pi.task_id=t.id WHERE t.ai_worked_by=? AND t.deleted_at IS NULL AND COALESCE(t.status,'') NOT IN ('AI Work','No Charge') $dateCond AND pi.id IS NULL GROUP BY t.id ORDER BY t.id ASC";
+            $sql = "SELECT $sel, 1 AS ai_payroll_eligible FROM wp_eco_aplus_tasks t LEFT JOIN (eco_payslip_items pi JOIN eco_payslips p ON p.id = pi.payslip_id AND p.worker_id = ?) ON pi.task_id=t.id WHERE t.ai_worked_by=? AND t.deleted_at IS NULL AND COALESCE(t.status,'') NOT IN ('AI Work','No Charge') AND COALESCE(t.work_status,'') <> 'No Charge' AND t.no_charge_at IS NULL $dateCond AND pi.id IS NULL GROUP BY t.id ORDER BY t.id ASC";
             $params = array_merge([$workerId, $workerId], $dateParams);
         } else {
             $sql = "SELECT $sel FROM wp_eco_aplus_tasks t
@@ -147,17 +147,31 @@ class Payslip {
         return $stmt->fetchAll();
     }
 
-    public static function generate(int $workerId, array $taskIds, string $label, float $prevD4U = 0, float $advD4U = 0, float $loanD4U = 0, float $penaltyDeducted = 0): array {
+    public static function generate(int $workerId, array $taskIds, string $label, float $prevD4U = 0, float $advD4U = 0, float $loanD4U = 0, float $penaltyDeducted = 0, ?float $customRateAi = null, ?float $customRateInfo = null, ?float $customRateAplus = null): array {
         $taskIds = array_values(array_unique(array_filter(array_map('intval', $taskIds))));
         if(empty($taskIds)) return ['ok'=>false,'message'=>'Koi product select nahi kiya'];
 
+        $placeholders = implode(',', array_fill(0, count($taskIds), '?'));
+        $noChargeStmt = db()->prepare("SELECT COUNT(*) FROM wp_eco_aplus_tasks WHERE id IN ($placeholders) AND (status='No Charge' OR work_status='No Charge' OR no_charge_at IS NOT NULL)");
+        $noChargeStmt->execute($taskIds);
+        if ((int)$noChargeStmt->fetchColumn() > 0) {
+            return ['ok'=>false,'message'=>'No Charge product worker payroll mein add nahi ho sakta.'];
+        }
+
         $monthLabel = $label ?: date('Y-m');
-        $ratesRow = db()->prepare("SELECT COALESCE(rate_infographics,0) AS rate_infographics, COALESCE(rate_aplus,0) AS rate_aplus, COALESCE(rate_ai_work, rate_per_product, rate_infographics, 0) AS rate_ai_work FROM eco_worker_rates WHERE worker_id=?");
+        $ratesRow = db()->prepare("SELECT COALESCE(rate_infographics,0) AS rate_infographics, COALESCE(rate_aplus,0) AS rate_aplus, COALESCE(NULLIF(rate_ai_work,0), NULLIF(rate_per_product,0), NULLIF(rate_infographics,0), 0) AS rate_ai_work FROM eco_worker_rates WHERE worker_id=?");
         $ratesRow->execute([$workerId]);
         $ratesRow  = $ratesRow->fetch();
         $rateInfo  = floatval($ratesRow ? $ratesRow['rate_infographics'] : 0);
         $rateAplus = floatval($ratesRow ? $ratesRow['rate_aplus']        : 0);
         $rateAi    = floatval($ratesRow ? ($ratesRow['rate_ai_work'] ?: $ratesRow['rate_per_product'] ?: $ratesRow['rate_infographics']) : 0);
+
+        if($customRateAi !== null && $customRateAi > 0){
+            $rateAi = $customRateAi;
+            self::saveWorkerRate($workerId, $rateInfo ?: $customRateAi, $rateAplus ?: $customRateAi, 0, $customRateAi);
+        }
+        if($customRateInfo !== null && $customRateInfo > 0) $rateInfo = $customRateInfo;
+        if($customRateAplus !== null && $customRateAplus > 0) $rateAplus = $customRateAplus;
 
         $roleStmt = db()->prepare("SELECT role FROM eco_tool_users WHERE id=?");
         $roleStmt->execute([$workerId]);
@@ -166,12 +180,13 @@ class Payslip {
         /* AI work is payable only after AI DONE. It is intentionally independent
            of client invoice payment, because worker payroll is an internal cost. */
         if($workerRole === 'ai_work'){
-            $placeholders = implode(',', array_fill(0, count($taskIds), '?'));
             $eligibleStmt = db()->prepare("SELECT t.id
                 FROM wp_eco_aplus_tasks t
                 WHERE t.id IN ($placeholders)
                   AND t.ai_worked_by=?
                   AND COALESCE(t.status,'') NOT IN ('AI Work','No Charge')
+                  AND COALESCE(t.work_status,'') <> 'No Charge'
+                  AND t.no_charge_at IS NULL
                   AND t.deleted_at IS NULL
                   AND NOT EXISTS (
                       SELECT 1
@@ -187,6 +202,38 @@ class Payslip {
             if($eligibleIds !== $requestedIds){
                 return ['ok'=>false,'message'=>'AI payroll mein sirf AI DONE products select karein. Pending AI Work product payable nahi hai.'];
             }
+        }
+
+        /* A combined product is one row in the old payslip UI, but it can
+           contain two independently payable services. A normal worker must
+           not receive a payroll row unless at least one of their own service
+           phases is actually Done. */
+        if ($workerRole === 'worker') {
+            $eligible = [];
+            foreach ($taskIds as $tid) {
+                $tq = db()->prepare("SELECT product_type, info_worker_id, aplus_worker_id FROM wp_eco_aplus_tasks WHERE id=?");
+                $tq->execute([$tid]);
+                $tr = $tq->fetch(PDO::FETCH_ASSOC);
+                if (!$tr) continue;
+                $isEligible = false;
+                try {
+                    $sq = db()->prepare("SELECT service_code, phase_status, worker_id FROM eco_task_services WHERE task_id=?");
+                    $sq->execute([$tid]);
+                    $rows = $sq->fetchAll(PDO::FETCH_ASSOC);
+                    if ($rows) {
+                        foreach ($rows as $sr) {
+                            if ($sr['phase_status'] === 'Done' && (int)($sr['worker_id'] ?? 0) === $workerId) { $isEligible = true; break; }
+                        }
+                    } else {
+                        $isEligible = ((int)($tr['info_worker_id'] ?? 0) === $workerId || (int)($tr['aplus_worker_id'] ?? 0) === $workerId);
+                    }
+                } catch (Throwable $e) {
+                    $isEligible = true;
+                }
+                if ($isEligible) $eligible[] = $tid;
+            }
+            $taskIds = $eligible;
+            if (empty($taskIds)) return ['ok'=>false,'message'=>'Is worker ke liye koi completed service payroll ke liye eligible nahi hai.'];
         }
 
         try {
@@ -220,21 +267,23 @@ class Payslip {
                 foreach($types as $t){
                     $pt = $t['product_type'] ?? '';
                     if($pt === 'Info + A Plus'){
-                        $isInfo  = (!empty($t['info_worker_id']) && (int)$t['info_worker_id'] === $workerId);
-                        $isAplus = (!empty($t['aplus_worker_id']) && (int)$t['aplus_worker_id'] === $workerId);
-                        if($isInfo && $isAplus){
-                            $earnedAmt += ($rateInfo + $rateAplus);
-                        } elseif($isInfo && empty($t['aplus_worker_id'])){
-                            $earnedAmt += ($rateInfo + $rateAplus);
-                        } elseif($isAplus && empty($t['info_worker_id'])){
-                            $earnedAmt += ($rateInfo + $rateAplus);
-                        } elseif($isInfo){
-                            $earnedAmt += $rateInfo;
-                        } elseif($isAplus){
-                            $earnedAmt += $rateAplus;
+                        $serviceRows = [];
+                        try {
+                            $svc = db()->prepare("SELECT service_code, phase_status, worker_id FROM eco_task_services WHERE task_id=? AND service_code IN ('info','aplus')");
+                            $svc->execute([(int)$t['id']]);
+                            foreach ($svc->fetchAll(PDO::FETCH_ASSOC) as $sr) $serviceRows[$sr['service_code']] = $sr;
+                        } catch (Throwable $e) {}
+
+                        if ($serviceRows) {
+                            if (($serviceRows['info']['phase_status'] ?? '') === 'Done' && (int)($serviceRows['info']['worker_id'] ?? 0) === $workerId) $earnedAmt += $rateInfo;
+                            if (($serviceRows['aplus']['phase_status'] ?? '') === 'Done' && (int)($serviceRows['aplus']['worker_id'] ?? 0) === $workerId) $earnedAmt += $rateAplus;
                         } else {
-                            // If not specifically flagged, fallback to full rate
-                            $earnedAmt += ($rateInfo + $rateAplus);
+                            /* Legacy fallback for products created before the
+                               service ledger existed. */
+                            $isInfo  = (!empty($t['info_worker_id']) && (int)$t['info_worker_id'] === $workerId);
+                            $isAplus = (!empty($t['aplus_worker_id']) && (int)$t['aplus_worker_id'] === $workerId);
+                            if($isInfo)  $earnedAmt += $rateInfo;
+                            if($isAplus) $earnedAmt += $rateAplus;
                         }
                     } elseif($pt === 'Infographics'){
                         $earnedAmt += $rateInfo;
@@ -254,12 +303,6 @@ class Payslip {
         } catch(Exception $e) {
             if(db()->inTransaction()) db()->rollBack();
             return ['ok'=>false,'message'=>$e->getMessage()];
-        }
-
-        $noChargeStmt = db()->prepare("SELECT COUNT(*) FROM wp_eco_aplus_tasks WHERE id IN ($placeholders) AND status='No Charge'");
-        $noChargeStmt->execute($taskIds);
-        if ((int)$noChargeStmt->fetchColumn() > 0) {
-            return ['ok'=>false,'message'=>'No Charge product worker payroll mein add nahi ho sakta.'];
         }
     }
 
@@ -453,7 +496,7 @@ class Payslip {
         $paidStmt = db()->prepare("SELECT COALESCE(SUM(amount),0) FROM eco_worker_ledger WHERE worker_id=?");
         $paidStmt->execute([$workerId]); $totalPaid = floatval($paidStmt->fetchColumn());
 
-        $rateStmt = db()->prepare("SELECT COALESCE(rate_ai_work, rate_per_product, rate_infographics, 0) FROM eco_worker_rates WHERE worker_id=?");
+        $rateStmt = db()->prepare("SELECT COALESCE(NULLIF(rate_ai_work, 0), NULLIF(rate_per_product, 0), NULLIF(rate_infographics, 0), 0) FROM eco_worker_rates WHERE worker_id=?");
         $rateStmt->execute([$workerId]); $rate = floatval($rateStmt->fetchColumn());
 
         return [

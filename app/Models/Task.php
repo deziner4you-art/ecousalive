@@ -14,6 +14,18 @@ class Task {
      * existing task columns for backwards compatibility.
      */
     public static function isAplusService(array $task): bool {
+        /* Service-level state is authoritative for products with separate
+           Info/A+ phases. This prevents a later generic content status such
+           as Approved from changing an A+ task back into an Info task. */
+        if (!empty($task['active_service_code'])) {
+            return $task['active_service_code'] === TaskService::APLUS;
+        }
+        if (!empty($task['id'])) {
+            try {
+                $active = TaskService::activeCode((int)$task['id']);
+                if ($active !== null) return $active === TaskService::APLUS;
+            } catch (Throwable $e) {}
+        }
         $ws = $task['work_status'] ?? '';
         if ($ws === 'Info Done') {
             return false;
@@ -36,7 +48,49 @@ class Task {
     }
 
     public static function isInfoService(array $task): bool {
+        if (!empty($task['active_service_code'])) {
+            return $task['active_service_code'] === TaskService::INFO;
+        }
+        if (!empty($task['id'])) {
+            try {
+                $active = TaskService::activeCode((int)$task['id']);
+                if ($active !== null) return $active === TaskService::INFO;
+            } catch (Throwable $e) {}
+        }
+        if (($task['status'] ?? '') === 'AI Work' || ($task['status'] ?? '') === 'AI DONE' || ($task['work_status'] ?? '') === 'AI In QA') {
+            return false;
+        }
         return !self::isAplusService($task);
+    }
+
+    public static function isAIService(array $task): bool {
+        if (!empty($task['active_service_code'])) {
+            return $task['active_service_code'] === TaskService::AI;
+        }
+        if (!empty($task['id'])) {
+            try {
+                return TaskService::activeCode((int)$task['id']) === TaskService::AI;
+            } catch (Throwable $e) {}
+        }
+        return ($task['status'] ?? '') === 'AI Work'
+            || ($task['status'] ?? '') === 'AI DONE'
+            || ($task['work_status'] ?? '') === 'AI In QA';
+    }
+
+    public static function activeServiceCode(array $task): string {
+        if (!empty($task['active_service_code'])) return (string)$task['active_service_code'];
+        if (!empty($task['id'])) {
+            try { $active = TaskService::activeCode((int)$task['id']); if ($active) return $active; } catch (Throwable $e) {}
+        }
+        return self::isAplusService($task) ? TaskService::APLUS : TaskService::INFO;
+    }
+
+    private static function activeServiceCodeById(int $taskId): string {
+        try { $active = TaskService::activeCode($taskId); if ($active) return $active; } catch (Throwable $e) {}
+        $stmt = db()->prepare("SELECT id, product_type, status, work_status, seo_doc_link, seo_submitted_by FROM wp_eco_aplus_tasks WHERE id=?");
+        $stmt->execute([$taskId]);
+        $task = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        return self::activeServiceCode($task);
     }
 
     /*
@@ -91,7 +145,27 @@ class Task {
                 FROM eco_invoice_items ii
                 JOIN eco_invoices i ON i.id = ii.invoice_id
                 WHERE ii.task_id = t.id
-            ) AS invoice_numbers
+             ) AS invoice_numbers,
+             (
+                 SELECT ts.service_code FROM eco_task_services ts
+                 WHERE ts.task_id=t.id AND ts.phase_status NOT IN ('Done','Cancelled')
+                 ORDER BY CASE WHEN ts.phase_status IN ('Revision','Working','Paused','In QA','SEO Review') THEN 100 ELSE 0 END DESC,
+                          CASE ts.service_code WHEN 'ai' THEN 3 WHEN 'aplus' THEN 2 ELSE 1 END DESC, ts.id DESC LIMIT 1
+             ) AS active_service_code,
+             (SELECT ts.phase_status FROM eco_task_services ts WHERE ts.task_id=t.id AND ts.phase_status NOT IN ('Done','Cancelled') ORDER BY CASE WHEN ts.phase_status IN ('Revision','Working','Paused','In QA','SEO Review') THEN 100 ELSE 0 END DESC, CASE ts.service_code WHEN 'ai' THEN 3 WHEN 'aplus' THEN 2 ELSE 1 END DESC, ts.id DESC LIMIT 1) AS active_service_phase_status,
+             (SELECT ts.content_status FROM eco_task_services ts WHERE ts.task_id=t.id AND ts.phase_status NOT IN ('Done','Cancelled') ORDER BY CASE WHEN ts.phase_status IN ('Revision','Working','Paused','In QA','SEO Review') THEN 100 ELSE 0 END DESC, CASE ts.service_code WHEN 'ai' THEN 3 WHEN 'aplus' THEN 2 ELSE 1 END DESC, ts.id DESC LIMIT 1) AS active_service_content_status,
+             (SELECT ts.phase_status FROM eco_task_services ts WHERE ts.task_id=t.id AND ts.service_code='info' LIMIT 1) AS info_phase_status,
+             (SELECT ts.phase_status FROM eco_task_services ts WHERE ts.task_id=t.id AND ts.service_code='ai' LIMIT 1) AS ai_phase_status,
+             (SELECT ts.phase_status FROM eco_task_services ts WHERE ts.task_id=t.id AND ts.service_code='aplus' LIMIT 1) AS aplus_phase_status,
+             (SELECT ts.content_status FROM eco_task_services ts WHERE ts.task_id=t.id AND ts.service_code='info' LIMIT 1) AS info_content_status,
+             (SELECT ts.content_status FROM eco_task_services ts WHERE ts.task_id=t.id AND ts.service_code='ai' LIMIT 1) AS ai_content_status,
+             (SELECT ts.content_status FROM eco_task_services ts WHERE ts.task_id=t.id AND ts.service_code='aplus' LIMIT 1) AS aplus_content_status,
+             (SELECT ts.worker_id FROM eco_task_services ts WHERE ts.task_id=t.id AND ts.service_code='ai' LIMIT 1) AS ai_service_worker_id,
+             (SELECT ts.media_link FROM eco_task_services ts WHERE ts.task_id=t.id AND ts.service_code='info' LIMIT 1) AS info_media_link,
+             (SELECT ts.media_link FROM eco_task_services ts WHERE ts.task_id=t.id AND ts.service_code='aplus' LIMIT 1) AS aplus_media_link,
+             (SELECT ts.document_link FROM eco_task_services ts WHERE ts.task_id=t.id AND ts.service_code='aplus' LIMIT 1) AS aplus_seo_doc_link,
+             EXISTS(SELECT 1 FROM eco_task_services ts WHERE ts.task_id=t.id AND ts.service_code='info' AND ts.phase_status='Done') AS info_completed,
+             EXISTS(SELECT 1 FROM eco_task_services ts WHERE ts.task_id=t.id AND ts.service_code='aplus' AND ts.phase_status='Done') AS aplus_completed
         ";
 
         $uname = strtolower($user['username'] ?? '');
@@ -156,7 +230,7 @@ class Task {
                 LEFT JOIN eco_tool_users aplusw ON aplusw.id = t.aplus_worker_id
                 WHERE t.deleted_at IS NULL AND t.status NOT IN ('Hold','No Charge')
                   AND (
-                      t.work_status = 'In QA'
+                      t.work_status IN ('In QA','AI In QA')
                       OR t.work_status = 'SEO Review'
                       OR t.work_status = 'Info Done'
                       OR t.qa_submitted_by = ?
@@ -165,7 +239,7 @@ class Task {
                           FROM wp_eco_aplus_tasks t2
                           WHERE t2.family_code IS NOT NULL
                             AND t2.deleted_at IS NULL
-                            AND (t2.work_status = 'In QA' OR t2.work_status = 'SEO Review' OR t2.work_status = 'Info Done' OR t2.qa_submitted_by = ?)
+                            AND (t2.work_status IN ('In QA','AI In QA') OR t2.work_status = 'SEO Review' OR t2.work_status = 'Info Done' OR t2.qa_submitted_by = ?)
                       ))
                   )
                 ORDER BY t.id DESC
@@ -302,32 +376,69 @@ class Task {
                     $aiWorkerId = $s->fetchColumn() ?: null;
                 }
                 db()->prepare("UPDATE wp_eco_aplus_tasks SET status='AI DONE', work_status='Pending', work_paused_at=NULL, work_started_at=NULL, ai_worked_by=?, last_activity_at=NOW() WHERE id=?")->execute([$aiWorkerId, $taskId]);
+                TaskService::ensure($taskId, TaskService::AI, ['worker_id' => $aiWorkerId]);
+                TaskService::setPhase($taskId, TaskService::AI, 'Done', [
+                    'worker_id' => $aiWorkerId,
+                    'completed_by' => $aiWorkerId,
+                    'actor_id' => (int)($user['id'] ?? 0),
+                ]);
                 // Remove assignment so it goes back to pool for next worker
                 db()->prepare("DELETE FROM eco_tool_assignments WHERE task_id=?")->execute([$taskId]);
                 return true;
             }
         }
 
+        /* AI workers now send their work to QA.  AI Done is reserved for QA
+           approval; the assignment remains active until QA accepts it. */
+        if($status === 'AI In QA'){
+            if(!in_array($user['role'] ?? '', ['ai_work', 'administrator'], true)) return false;
+            $row = db()->prepare("SELECT ai_worked_by, work_started_at, work_paused_at, work_total_seconds FROM wp_eco_aplus_tasks WHERE id=?");
+            $row->execute([$taskId]);
+            $t = $row->fetch() ?: [];
+            $totalSecs = intval($t['work_total_seconds'] ?? 0);
+            if(!empty($t['work_started_at']) && empty($t['work_paused_at'])){
+                $totalSecs += max(0, time() - strtotime($t['work_started_at']));
+            }
+            $workerId = (int)($t['ai_worked_by'] ?? $user['id'] ?? 0) ?: null;
+            db()->prepare("UPDATE wp_eco_aplus_tasks SET status='AI Work', work_status='AI In QA', work_completed_at=NOW(), work_total_seconds=?, work_completed_by_worker_id=?, qa_submitted_at=NOW(), qa_submitted_by=NULL, last_activity_at=NOW() WHERE id=?")
+                ->execute([$totalSecs, $workerId, $taskId]);
+            TaskService::ensure($taskId, TaskService::AI, ['worker_id' => $workerId]);
+            TaskService::setPhase($taskId, TaskService::AI, 'In QA', [
+                'worker_id' => $workerId,
+                'completed_by' => $workerId,
+                'work_total_seconds' => $totalSecs,
+                'actor_id' => (int)($user['id'] ?? 0),
+            ]);
+            return true;
+        }
+
         if($status === 'Changing'){
             db()->prepare("UPDATE wp_eco_aplus_tasks SET work_status='Changing', work_started_at=NOW(), work_paused_at=NULL, last_activity_at=NOW() WHERE id=?")->execute([$taskId]);
+            TaskService::setPhase($taskId, self::activeServiceCodeById($taskId), 'Working', ['actor_id'=>(int)($user['id'] ?? 0)]);
             return true;
         }
 
         if($status === 'Info Work'){
             db()->prepare("UPDATE wp_eco_aplus_tasks SET work_status='Info Work', last_activity_at=NOW() WHERE id=?")->execute([$taskId]);
+            TaskService::setPhase($taskId, TaskService::INFO, 'Working', ['actor_id'=>(int)($user['id'] ?? 0)]);
             return true;
         }
 
         if($status === 'Working'){
             db()->prepare("UPDATE wp_eco_aplus_tasks SET work_status='Working', work_started_at=NOW(), work_paused_at=NULL, last_activity_at=NOW() WHERE id=?")->execute([$taskId]);
+            TaskService::setPhase($taskId, self::activeServiceCodeById($taskId), 'Working', ['actor_id'=>(int)($user['id'] ?? 0)]);
             return true;
         }
 
         if($status === 'In QA'){
 
-            $row = db()->prepare("SELECT status, product_type, work_status, info_subtasks, content_approved_at, content_updated_at, seo_doc_link, work_started_at, work_paused_at, work_total_seconds, info_worker_id, aplus_worker_id FROM wp_eco_aplus_tasks WHERE id=?");
+            $row = db()->prepare("SELECT id, status, product_type, work_status, info_subtasks, content_approved_at, content_updated_at, seo_doc_link, work_started_at, work_paused_at, work_total_seconds, info_worker_id, aplus_worker_id FROM wp_eco_aplus_tasks WHERE id=?");
             $row->execute([$taskId]);
             $t = $row->fetch();
+
+            if(self::isAIService($t ?: [])){
+                return self::updateWorkStatus($taskId, 'AI In QA', $user);
+            }
 
             $totalSecs = intval($t['work_total_seconds']);
             if($t['work_started_at'] && !$t['work_paused_at']){
@@ -362,6 +473,13 @@ class Task {
             ";
             $params = array_merge([$totalSecs, $completedBy], $extraParams, [$taskId]);
             db()->prepare($sql)->execute($params);
+            $serviceCode = self::activeServiceCode($t ?: []);
+            TaskService::setPhase($taskId, $serviceCode, 'In QA', [
+                'worker_id' => $completedBy,
+                'completed_by' => $completedBy,
+                'work_total_seconds' => $totalSecs,
+                'actor_id' => (int)($user['id'] ?? 0),
+            ]);
             return true;
         }
 
@@ -397,6 +515,10 @@ class Task {
             SET work_status='Paused', work_paused_at=NOW(), work_total_seconds=?, last_activity_at=NOW()
             WHERE id=?
         ")->execute([$newTotal, $taskId]);
+        TaskService::setPhase($taskId, self::activeServiceCodeById($taskId), 'Paused', [
+            'work_total_seconds' => $newTotal,
+            'actor_id' => (int)($user['id'] ?? 0),
+        ]);
 
         return ['ok' => true, 'total_seconds' => $newTotal];
 
@@ -420,6 +542,7 @@ class Task {
             SET work_status='Working', work_started_at=NOW(), work_paused_at=NULL, last_activity_at=NOW()
             WHERE id=?
         ")->execute([$taskId]);
+        TaskService::setPhase($taskId, self::activeServiceCodeById($taskId), 'Working', ['actor_id'=>(int)($user['id'] ?? 0)]);
 
         return true;
 
@@ -432,9 +555,34 @@ class Task {
     */
     public static function submitQA(int $taskId, string $mediaLink, string $seoLink, array $user): bool {
 
-        $taskRow = db()->prepare("SELECT product_type, status, work_status, content_approved_at, content_updated_at, info_subtasks, seo_doc_link, info_worker_id, work_completed_by_worker_id, media_link FROM wp_eco_aplus_tasks WHERE id=?");
+        $taskRow = db()->prepare("SELECT id, product_type, status, work_status, content_approved_at, content_updated_at, info_subtasks, seo_doc_link, info_worker_id, aplus_worker_id, work_completed_by_worker_id, media_link FROM wp_eco_aplus_tasks WHERE id=?");
         $taskRow->execute([$taskId]);
         $task = $taskRow->fetch();
+
+        /* AI QA has no media-link requirement.  QA approval completes the AI
+           service and only then removes the worker assignment, so payroll and
+           the next service cannot start before QA accepts the work. */
+        if($task && (($task['work_status'] ?? '') === 'AI In QA' || self::isAIService($task))){
+            if(($task['work_status'] ?? '') !== 'AI In QA') return false;
+            $svc = TaskService::get($taskId, TaskService::AI) ?: [];
+            $workerId = (int)($svc['worker_id'] ?? $task['ai_worked_by'] ?? $task['work_completed_by_worker_id'] ?? 0) ?: null;
+            $stmt = db()->prepare("UPDATE wp_eco_aplus_tasks
+                SET status='AI DONE', work_status='Pending', qa_submitted_at=NOW(), qa_submitted_by=?,
+                    active_revision_type=NULL, revision_comment=NULL, last_activity_at=NOW()
+                WHERE id=? AND work_status='AI In QA'");
+            $stmt->execute([$user['id'], $taskId]);
+            if($stmt->rowCount() > 0){
+                TaskService::setPhase($taskId, TaskService::AI, 'Done', [
+                    'worker_id' => $workerId,
+                    'completed_by' => $workerId,
+                    'qa_submitted_by' => (int)$user['id'],
+                    'qa_submitted_at' => date('Y-m-d H:i:s'),
+                    'actor_id' => (int)$user['id'],
+                ]);
+                db()->prepare("DELETE FROM eco_tool_assignments WHERE task_id=?")->execute([$taskId]);
+            }
+            return $stmt->rowCount() > 0;
+        }
 
         $isInfoStage = $task && self::isInfoService($task);
 
@@ -472,6 +620,15 @@ class Task {
                 WHERE id=? AND work_status='In QA'
             ");
             $stmt->execute([$mediaLink, $workerId, $workerId, $user['id'], $taskId]);
+            if ($stmt->rowCount() > 0) {
+                TaskService::setPhase($taskId, TaskService::INFO, 'Done', [
+                    'media_link' => $mediaLink,
+                    'qa_submitted_by' => (int)$user['id'],
+                    'qa_submitted_at' => date('Y-m-d H:i:s'),
+                    'completed_by' => $workerId,
+                    'actor_id' => (int)$user['id'],
+                ]);
+            }
             return $stmt->rowCount() > 0;
         }
 
@@ -484,6 +641,14 @@ class Task {
                 WHERE id=? AND work_status='In QA'
             ");
             $stmt->execute([$mediaLink, $taskId]);
+            if ($stmt->rowCount() > 0) {
+                TaskService::setPhase($taskId, TaskService::APLUS, 'SEO Review', [
+                    'media_link' => $mediaLink,
+                    'qa_submitted_by' => (int)$user['id'],
+                    'qa_submitted_at' => date('Y-m-d H:i:s'),
+                    'actor_id' => (int)$user['id'],
+                ]);
+            }
             return $stmt->rowCount() > 0;
         }
 
@@ -497,6 +662,16 @@ class Task {
                 WHERE id=? AND work_status='SEO Review'
             ");
         $stmt->execute([$mediaLink, $seoLink, $user['id'], $taskId]);
+        if ($stmt->rowCount() > 0) {
+            TaskService::setPhase($taskId, TaskService::APLUS, 'Done', [
+                'media_link' => $mediaLink ?: null,
+                'document_link' => $seoLink,
+                'qa_submitted_by' => (int)$user['id'],
+                'qa_submitted_at' => date('Y-m-d H:i:s'),
+                'completed_by' => (int)($task['aplus_worker_id'] ?? $task['work_completed_by_worker_id'] ?? 0) ?: null,
+                'actor_id' => (int)$user['id'],
+            ]);
+        }
 
         return $stmt->rowCount() > 0;
 
@@ -515,6 +690,14 @@ class Task {
         if(!$task || !self::isAplusService($task) || ($task['work_status'] ?? '') !== 'In QA' || $effectiveMedia === '') return false;
         $stmt = db()->prepare("UPDATE wp_eco_aplus_tasks SET media_link=?, work_status='SEO Review', qa_submitted_by=?, last_activity_at=NOW() WHERE id=? AND work_status='In QA'");
         $stmt->execute([$effectiveMedia, $userId, $taskId]);
+        if ($stmt->rowCount() > 0) {
+            TaskService::setPhase($taskId, TaskService::APLUS, 'SEO Review', [
+                'media_link' => $effectiveMedia,
+                'qa_submitted_by' => $userId,
+                'qa_submitted_at' => date('Y-m-d H:i:s'),
+                'actor_id' => $userId,
+            ]);
+        }
         return $stmt->rowCount() > 0;
     }
 
@@ -535,6 +718,11 @@ class Task {
             SET media_link=?, seo_doc_link=COALESCE(NULLIF(?, ''), seo_doc_link), work_status=?, is_urgent=0, active_revision_type=NULL, last_activity_at=NOW()
             WHERE id=?
         ")->execute([$mediaLink, $seoLink, $targetStatus, $taskId]);
+        if ($isInfo) {
+            TaskService::setPhase($taskId, TaskService::INFO, 'Done', ['media_link'=>$mediaLink, 'actor_id'=>null]);
+        } else {
+            TaskService::setPhase($taskId, TaskService::APLUS, 'Done', ['media_link'=>$mediaLink, 'document_link'=>$seoLink, 'actor_id'=>null]);
+        }
     }
 
     /*
@@ -708,6 +896,35 @@ class Task {
                 break;
         }
 
+        /* Keep the independent service state aligned with admin overrides.
+           Legacy columns are still updated above, but must never become the
+           only source of truth for a multi-service product. */
+        try {
+            $serviceCode = ($stage === 'A Plus') ? TaskService::APLUS : self::activeServiceCodeById($taskId);
+            TaskService::ensure($taskId, $serviceCode);
+            if (in_array($stage, ['Generated','All Generated','Approved','Updated'], true)) {
+                TaskService::setContent($taskId, $serviceCode, $stage);
+                TaskService::setPhase($taskId, $serviceCode, 'Pending');
+            } elseif (in_array($stage, ['Working','Changing'], true)) {
+                TaskService::setPhase($taskId, $serviceCode, 'Working');
+            } elseif ($stage === 'Paused') {
+                TaskService::setPhase($taskId, $serviceCode, 'Paused');
+            } elseif ($stage === 'In QA') {
+                TaskService::setPhase($taskId, $serviceCode, 'In QA');
+            } elseif ($stage === 'SEO Review') {
+                TaskService::setPhase($taskId, TaskService::APLUS, 'SEO Review');
+            } elseif ($stage === 'Work Done') {
+                TaskService::setPhase($taskId, TaskService::APLUS, 'Done');
+            } elseif ($stage === 'Info Done') {
+                TaskService::setPhase($taskId, TaskService::INFO, 'Done');
+            } elseif (in_array($stage, ['Pending','Generate info Content','Generate Info Content'], true)) {
+                TaskService::setPhase($taskId, TaskService::INFO, 'Pending');
+                TaskService::setContent($taskId, TaskService::INFO, 'Pending');
+            }
+        } catch (Throwable $e) {
+            error_log('service state sync failed: ' . $e->getMessage());
+        }
+
     }
 
     public static function holdProduct(int $taskId, int $hold): void {
@@ -748,16 +965,67 @@ class Task {
 
         if ($task['status'] === 'No Charge') return ['ok'=>true];
 
-        $inv = db()->prepare("SELECT COUNT(*) FROM eco_invoice_items WHERE task_id=?");
-        $inv->execute([$taskId]);
-        if ((int)$inv->fetchColumn() > 0) {
-            return ['ok'=>false, 'message'=>'Product invoice mein already maujood hai. Pehle invoice se remove karein.'];
+        // 1. Agar already Paid invoice mein hai to warn karein
+        $paidInv = db()->prepare("
+            SELECT i.invoice_no 
+            FROM eco_invoice_items ii 
+            JOIN eco_invoices i ON i.id = ii.invoice_id 
+            WHERE ii.task_id = ? AND i.status = 'Paid'
+            LIMIT 1
+        ");
+        $paidInv->execute([$taskId]);
+        $paidInvoiceNo = $paidInv->fetchColumn();
+        if ($paidInvoiceNo) {
+            return ['ok'=>false, 'message'=>'Product already Paid invoice #' . $paidInvoiceNo . ' mein shamil hai. Pehle invoice ko adjust karein.'];
         }
-        $ps = db()->prepare("SELECT COUNT(*) FROM eco_payslip_items WHERE task_id=?");
-        $ps->execute([$taskId]);
-        if ((int)$ps->fetchColumn() > 0) {
-            return ['ok'=>false, 'message'=>'Product payslip mein already maujood hai. Pehle payroll record resolve karein.'];
+
+        // 2. Agar already Paid payslip mein hai to warn karein
+        $paidPs = db()->prepare("
+            SELECT p.id 
+            FROM eco_payslip_items pi 
+            JOIN eco_payslips p ON p.id = pi.payslip_id 
+            WHERE pi.task_id = ? AND p.status = 'Paid'
+            LIMIT 1
+        ");
+        $paidPs->execute([$taskId]);
+        if ($paidPs->fetchColumn()) {
+            return ['ok'=>false, 'message'=>'Product already Paid payslip mein shamil hai.'];
         }
+
+        // 3. Unpaid invoice(s) se item remove karein aur invoice ka total amount recalculate karein
+        $unpaidInvs = db()->prepare("
+            SELECT DISTINCT ii.invoice_id 
+            FROM eco_invoice_items ii 
+            JOIN eco_invoices i ON i.id = ii.invoice_id 
+            WHERE ii.task_id = ? AND i.status != 'Paid'
+        ");
+        $unpaidInvs->execute([$taskId]);
+        $invIds = $unpaidInvs->fetchAll(PDO::FETCH_COLUMN);
+
+        db()->prepare("
+            DELETE ii FROM eco_invoice_items ii 
+            JOIN eco_invoices i ON i.id = ii.invoice_id 
+            WHERE ii.task_id = ? AND i.status != 'Paid'
+        ")->execute([$taskId]);
+
+        foreach ($invIds as $invId) {
+            $newTot = (float) db()->query("SELECT COALESCE(SUM(item_price), 0) FROM eco_invoice_items WHERE invoice_id=" . intval($invId))->fetchColumn();
+            db()->prepare("UPDATE eco_invoices SET total_amount=? WHERE id=?")->execute([$newTot, $invId]);
+        }
+
+        // 4. Unpaid task_service_charges remove karein
+        try {
+            db()->prepare("DELETE FROM eco_task_service_charges WHERE task_id=? AND (invoice_status IS NULL OR invoice_status != 'Paid')")->execute([$taskId]);
+        } catch(Throwable $e){}
+
+        // 5. Unpaid payslip items se remove karein
+        try {
+            db()->prepare("
+                DELETE pi FROM eco_payslip_items pi 
+                JOIN eco_payslips p ON p.id = pi.payslip_id 
+                WHERE pi.task_id = ? AND p.status != 'Paid'
+            ")->execute([$taskId]);
+        } catch(Throwable $e){}
 
         $prev = json_encode(['status'=>$task['status'], 'work_status'=>$task['work_status']]);
         $reason = $reason !== '' ? $reason : 'Client ne split products ko single product mein convert kar diya';
@@ -800,6 +1068,9 @@ class Task {
         // Automatically set status to "AI Work" if the worker is "ai_work"
         if ($wRow && $wRow['role'] === 'ai_work') {
             db()->prepare("UPDATE wp_eco_aplus_tasks SET status='AI Work', work_status='Pending', ai_worked_by=?, last_activity_at=NOW() WHERE id=?")->execute([$workerId, $taskId]);
+            TaskService::ensure($taskId, TaskService::AI, ['phase_status'=>'Pending', 'worker_id'=>$workerId]);
+            db()->prepare("UPDATE eco_task_services SET worker_id=?, phase_status='Pending', updated_at=NOW() WHERE task_id=? AND service_code='ai'")
+                ->execute([$workerId, $taskId]);
         } elseif ($wRow && $wRow['role'] === 'worker') {
             $tStmt = db()->prepare("SELECT status, product_type, work_status, info_worker_id, aplus_worker_id FROM wp_eco_aplus_tasks WHERE id=?");
             $tStmt->execute([$taskId]);
@@ -819,6 +1090,15 @@ class Task {
                 } else {
                     db()->prepare("UPDATE wp_eco_aplus_tasks SET info_worker_id = ?, last_activity_at=NOW() WHERE id=?")->execute([$workerId, $taskId]);
                 }
+                try {
+                    $serviceCode = TaskService::activeCode($taskId);
+                    if (!$serviceCode) {
+                        $serviceCode = ($st === 'A Plus' || in_array($pt, ['A+','A Plus'], true)) ? TaskService::APLUS : TaskService::INFO;
+                    }
+                    TaskService::ensure($taskId, $serviceCode, ['worker_id'=>$workerId]);
+                    db()->prepare("UPDATE eco_task_services SET worker_id=?, updated_at=NOW() WHERE task_id=? AND service_code=?")
+                        ->execute([$workerId, $taskId, $serviceCode]);
+                } catch (Throwable $e) { error_log('service assignment sync failed: ' . $e->getMessage()); }
             }
         }
 
@@ -916,6 +1196,9 @@ class Task {
             db()->prepare("DELETE FROM eco_tool_assignments WHERE task_id=?")->execute([$taskId]);
             db()->prepare("INSERT INTO eco_tool_assignments (worker_id, task_id) VALUES(?, ?)")->execute([$aiWorkerId, $taskId]);
             db()->prepare("UPDATE wp_eco_aplus_tasks SET status='AI Work', work_status='Pending', last_activity_at=NOW() WHERE id=?")->execute([$taskId]);
+            TaskService::ensure($taskId, TaskService::AI, ['phase_status'=>'Pending', 'worker_id'=>$aiWorkerId]);
+            db()->prepare("UPDATE eco_task_services SET worker_id=?, phase_status='Pending', updated_at=NOW() WHERE task_id=? AND service_code='ai'")
+                ->execute([$aiWorkerId, $taskId]);
         } elseif($activeAssign === 'info' && $infoWorkerId){
             db()->prepare("DELETE FROM eco_tool_assignments WHERE task_id=?")->execute([$taskId]);
             db()->prepare("INSERT INTO eco_tool_assignments (worker_id, task_id) VALUES(?, ?)")->execute([$infoWorkerId, $taskId]);
@@ -1027,6 +1310,17 @@ class Task {
                 db()->prepare("INSERT INTO eco_tool_assignments (worker_id, task_id) VALUES (?, ?)")->execute([$aplusWorkerId, $taskId]);
             }
 
+            /* A+ is now an independent phase. The Info service row remains
+               Done forever and the new A+ row becomes the active phase. */
+            TaskService::ensure($taskId, TaskService::APLUS, [
+                'phase_status' => 'Pending',
+                'content_status' => 'Pending',
+                'worker_id' => $aplusWorkerId,
+            ]);
+            db()->prepare("UPDATE eco_task_services SET phase_status='Pending', content_status='Pending', media_link=NULL, document_link=NULL, qa_submitted_by=NULL, qa_submitted_at=NULL, work_started_at=NULL, work_paused_at=NULL, work_completed_at=NULL, work_total_seconds=0, completed_by=NULL, completed_at=NULL, worker_id=? WHERE task_id=? AND service_code='aplus'")
+                ->execute([$aplusWorkerId, $taskId]);
+            TaskService::event($taskId, TaskService::APLUS, 'started', null, null, 'Pending');
+
             return ['ok'=>true, 'message'=>'A+ Banner workflow shuru ho gaya. Product writer content generation ke liye Pending ho gaya hai.'];
         } catch (\Throwable $e) {
             error_log('startAplusWorkflow error: ' . $e->getMessage());
@@ -1045,6 +1339,12 @@ class Task {
         }
 
         $role = $user['role'];
+        $serviceCode = self::activeServiceCode($task);
+        if ($serviceCode === TaskService::APLUS) {
+            TaskService::ensure($id, TaskService::APLUS, ['worker_id' => $task['aplus_worker_id'] ?? null]);
+        } elseif (in_array($task['product_type'] ?? '', ['Infographics', 'Info + A Plus'], true)) {
+            TaskService::ensure($id, TaskService::INFO, ['worker_id' => $task['info_worker_id'] ?? null]);
+        }
 
         if(($role === 'd4u_writer' || $role === 'seo_manager' || $role === 'administrator') && in_array($status, ['Generated', 'All Generated'])){
             if(($task['product_type'] ?? '') === 'Info + A Plus'){
@@ -1071,6 +1371,7 @@ class Task {
                 db()->prepare("UPDATE wp_eco_aplus_tasks SET content=?, original_content=?, status=?, work_status='Pending', last_activity_at=NOW() WHERE id=?")
                     ->execute([$content, $content, $status, $id]);
             }
+            TaskService::setContent($id, $serviceCode, $status, (int)($user['id'] ?? 0));
         } elseif($role === 'eco_client' || ($user['username'] ?? '') === 'ilyaeco' || ($role === 'administrator' && in_array($status, ['Approved','Updated']))){
             if(($role === 'eco_client' || ($user['username'] ?? '') === 'ilyaeco') && !in_array($task['status'], ['Generated', 'All Generated'])){
                 return ['ok'=>false,'message'=>'Unauthorized: product is not in a stage relevant to your role (must be Generated or All Generated).'];
@@ -1079,6 +1380,7 @@ class Task {
             $tsUpdated  = ($status === 'Updated')  ? ',content_updated_at=UTC_TIMESTAMP()' : '';
             db()->prepare("UPDATE wp_eco_aplus_tasks SET content=?, status=?, last_activity_at=NOW() $tsApproved $tsUpdated WHERE id=?")
                 ->execute([$content, $status, $id]);
+            TaskService::setContent($id, $serviceCode, $status, (int)($user['id'] ?? 0));
         } else {
             return ['ok'=>false,'message'=>'Unauthorized'];
         }
@@ -1124,6 +1426,8 @@ class Task {
 
     public static function permanentDeleteTask(int $id): void {
         db()->prepare("DELETE FROM eco_tool_assignments WHERE task_id=?")->execute([$id]);
+        db()->prepare("DELETE FROM eco_task_service_events WHERE task_id=?")->execute([$id]);
+        db()->prepare("DELETE FROM eco_task_services WHERE task_id=?")->execute([$id]);
         db()->prepare("DELETE FROM eco_invoice_items WHERE task_id=?")->execute([$id]);
         db()->prepare("DELETE FROM eco_payslip_items WHERE task_id=?")->execute([$id]);
         db()->prepare("DELETE FROM eco_seo_content WHERE task_id=?")->execute([$id]);
@@ -1136,6 +1440,8 @@ class Task {
         if (!empty($ids)) {
             $inQuery = implode(',', array_fill(0, count($ids), '?'));
             db()->prepare("DELETE FROM eco_tool_assignments WHERE task_id IN ($inQuery)")->execute($ids);
+            db()->prepare("DELETE FROM eco_task_service_events WHERE task_id IN ($inQuery)")->execute($ids);
+            db()->prepare("DELETE FROM eco_task_services WHERE task_id IN ($inQuery)")->execute($ids);
             db()->prepare("DELETE FROM eco_invoice_items WHERE task_id IN ($inQuery)")->execute($ids);
             db()->prepare("DELETE FROM eco_payslip_items WHERE task_id IN ($inQuery)")->execute($ids);
             db()->prepare("DELETE FROM eco_seo_content WHERE task_id IN ($inQuery)")->execute($ids);
@@ -1246,6 +1552,91 @@ class Task {
 
     public static function unpublishProduct(int $taskId): void {
         db()->prepare("UPDATE wp_eco_aplus_tasks SET published_at=NULL, published_by=NULL, last_activity_at=NOW() WHERE id=?")->execute([$taskId]);
+    }
+
+    /** Send a QA-failed service back to the same worker with QA comments. */
+    public static function requestQARevision(int $taskId, string $comment, array $qaUser): array {
+        $stmt = db()->prepare("SELECT * FROM wp_eco_aplus_tasks WHERE id=? AND deleted_at IS NULL");
+        $stmt->execute([$taskId]);
+        $task = $stmt->fetch(PDO::FETCH_ASSOC);
+        if(!$task) return ['ok'=>false, 'message'=>'Task not found'];
+        if(!in_array(($task['work_status'] ?? ''), ['In QA','AI In QA'], true)){
+            return ['ok'=>false, 'message'=>'Sirf QA stage ke task ko revise kiya ja sakta hai'];
+        }
+        if(trim($comment) === '') return ['ok'=>false, 'message'=>'QA revision comment required'];
+
+        $serviceCode = ($task['work_status'] ?? '') === 'AI In QA' ? TaskService::AI : null;
+        if(!$serviceCode){
+            try { $serviceCode = TaskService::activeCode($taskId); } catch(Throwable $e) { $serviceCode = null; }
+        }
+        if(!in_array($serviceCode, [TaskService::AI, TaskService::INFO, TaskService::APLUS], true)){
+            $serviceCode = self::isAplusService($task) ? TaskService::APLUS : TaskService::INFO;
+        }
+
+        $service = TaskService::get($taskId, $serviceCode) ?: [];
+        $workerId = (int)($service['worker_id'] ?? 0);
+        if(!$workerId){
+            $workerId = $serviceCode === TaskService::AI
+                ? (int)($task['ai_worked_by'] ?? 0)
+                : ($serviceCode === TaskService::APLUS ? (int)($task['aplus_worker_id'] ?? 0) : (int)($task['info_worker_id'] ?? 0));
+        }
+        if(!$workerId) $workerId = (int)($task['work_completed_by_worker_id'] ?? 0);
+        if(!$workerId){
+            $a = db()->prepare("SELECT worker_id FROM eco_tool_assignments WHERE task_id=? LIMIT 1");
+            $a->execute([$taskId]);
+            $workerId = (int)($a->fetchColumn() ?: 0);
+        }
+        if(!$workerId) return ['ok'=>false, 'message'=>'Is service ka original worker record nahi mila'];
+
+        $w = db()->prepare("SELECT role FROM eco_tool_users WHERE id=?");
+        $w->execute([$workerId]);
+        if(!in_array($w->fetchColumn(), ['worker','ai_work'], true)){
+            return ['ok'=>false, 'message'=>'Original worker valid worker account nahi hai'];
+        }
+
+        $logs = [];
+        try { $logs = json_decode((string)($task['revision_log'] ?? ''), true) ?: []; } catch(Throwable $e) {}
+        $logs[] = [
+            'type' => 'qa', 'service' => $serviceCode, 'comment' => trim($comment),
+            'worker_id' => $workerId, 'qa_user_id' => (int)($qaUser['id'] ?? 0),
+            'at' => date('Y-m-d H:i:s'),
+        ];
+
+        db()->beginTransaction();
+        try {
+            $legacyStatus = $serviceCode === TaskService::AI ? 'AI Work' : ($task['status'] ?? 'Pending');
+            db()->prepare("UPDATE wp_eco_aplus_tasks SET status=?, work_status='Revision',
+                revision_comment=?, active_revision_type='qa', revision_count=COALESCE(revision_count,0)+1,
+                revision_log=?, work_started_at=NULL, work_paused_at=NULL, qa_submitted_by=?, last_activity_at=NOW()
+                WHERE id=? AND work_status IN ('In QA','AI In QA')")
+                ->execute([$legacyStatus, trim($comment), json_encode($logs, JSON_UNESCAPED_UNICODE), (int)($qaUser['id'] ?? 0), $taskId]);
+
+            if($serviceCode === TaskService::AI){
+                db()->prepare("UPDATE wp_eco_aplus_tasks SET ai_worked_by=? WHERE id=?")->execute([$workerId, $taskId]);
+            } elseif($serviceCode === TaskService::INFO){
+                db()->prepare("UPDATE wp_eco_aplus_tasks SET info_worker_id=?, work_completed_by_worker_id=? WHERE id=?")->execute([$workerId, $workerId, $taskId]);
+            } else {
+                db()->prepare("UPDATE wp_eco_aplus_tasks SET aplus_worker_id=?, work_completed_by_worker_id=? WHERE id=?")->execute([$workerId, $workerId, $taskId]);
+            }
+
+            db()->prepare("DELETE FROM eco_tool_assignments WHERE task_id=?")->execute([$taskId]);
+            db()->prepare("INSERT INTO eco_tool_assignments (worker_id, task_id) VALUES (?, ?)")->execute([$workerId, $taskId]);
+
+            TaskService::ensure($taskId, $serviceCode, ['worker_id'=>$workerId]);
+            TaskService::setPhase($taskId, $serviceCode, 'Revision', [
+                'worker_id'=>$workerId,
+                'qa_submitted_by'=>(int)($qaUser['id'] ?? 0),
+                'actor_id'=>(int)($qaUser['id'] ?? 0),
+            ]);
+            TaskService::event($taskId, $serviceCode, 'qa_revision_requested', (int)($qaUser['id'] ?? 0), 'In QA', 'Revision', trim($comment));
+
+            db()->commit();
+            return ['ok'=>true, 'worker_id'=>$workerId, 'service_code'=>$serviceCode];
+        } catch(Throwable $e){
+            if(db()->inTransaction()) db()->rollBack();
+            error_log('requestQARevision error: ' . $e->getMessage());
+            return ['ok'=>false, 'message'=>'Revision request save nahi ho saki'];
+        }
     }
 
     public static function requestRevision(int $taskId, string $revType, string $comment): array {

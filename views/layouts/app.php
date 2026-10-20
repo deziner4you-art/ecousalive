@@ -1777,7 +1777,7 @@ try {
             SELECT t.id, t.product_no, t.title, t.work_status, t.product_type, t.is_urgent
             FROM wp_eco_aplus_tasks t
             LEFT JOIN eco_tool_assignments a ON a.task_id = t.id
-            WHERE t.deleted_at IS NULL AND t.status NOT IN ('Hold','No Charge')
+            WHERE t.deleted_at IS NULL AND t.status NOT IN ('Hold','No Charge') AND t.work_status <> 'No Charge' AND t.no_charge_at IS NULL
               AND t.work_status NOT IN ('Work Done', 'Info Done')
               AND (a.worker_id = ? OR t.info_worker_id = ? OR t.aplus_worker_id = ? OR t.ai_worked_by = ?)
             GROUP BY t.id
@@ -1792,7 +1792,7 @@ try {
         $n_stmt = db()->query("
             SELECT t.id, t.product_no, t.title, t.work_status, t.product_type, t.is_urgent
             FROM wp_eco_aplus_tasks t
-            WHERE t.deleted_at IS NULL AND t.status NOT IN ('Hold','No Charge')
+            WHERE t.deleted_at IS NULL AND t.status NOT IN ('Hold','No Charge') AND t.work_status <> 'No Charge' AND t.no_charge_at IS NULL
               AND t.work_status IN ('Work Done', 'Info Done')
               AND t.published_at IS NULL
             ORDER BY t.is_urgent DESC, t.id DESC
@@ -1805,7 +1805,7 @@ try {
         $n_stmt = db()->query("
             SELECT t.id, t.product_no, t.title, t.work_status, t.product_type, t.is_urgent
             FROM wp_eco_aplus_tasks t
-            WHERE t.deleted_at IS NULL AND t.status NOT IN ('Hold','No Charge')
+            WHERE t.deleted_at IS NULL AND t.status NOT IN ('Hold','No Charge') AND t.work_status <> 'No Charge' AND t.no_charge_at IS NULL
               AND t.work_status = 'In QA'
             ORDER BY t.is_urgent DESC, t.id DESC
             LIMIT 50
@@ -1817,7 +1817,7 @@ try {
         $n_stmt = db()->query("
             SELECT t.id, t.product_no, t.title, t.work_status, t.product_type, t.is_urgent
             FROM wp_eco_aplus_tasks t
-            WHERE t.deleted_at IS NULL AND t.status NOT IN ('Hold','No Charge')
+            WHERE t.deleted_at IS NULL AND t.status NOT IN ('Hold','No Charge') AND t.work_status <> 'No Charge' AND t.no_charge_at IS NULL
               AND (t.work_status = 'SEO Review' OR (t.status = 'Pending' AND t.product_type != 'Infographics'))
             ORDER BY t.is_urgent DESC, t.id DESC
             LIMIT 50
@@ -1829,7 +1829,7 @@ try {
         $n_stmt = db()->query("
             SELECT t.id, t.product_no, t.title, t.work_status, t.product_type, t.is_urgent
             FROM wp_eco_aplus_tasks t
-            WHERE t.deleted_at IS NULL AND t.status NOT IN ('Hold','No Charge')
+            WHERE t.deleted_at IS NULL AND t.status NOT IN ('Hold','No Charge') AND t.work_status <> 'No Charge' AND t.no_charge_at IS NULL
               AND (t.status = 'Generated' OR t.status = 'All Generated') AND t.work_status NOT IN ('Work Done', 'Info Done')
             ORDER BY t.is_urgent DESC, t.id DESC
             LIMIT 50
@@ -1841,7 +1841,7 @@ try {
         $n_stmt = db()->query("
             SELECT t.id, t.product_no, t.title, t.work_status, t.product_type, t.is_urgent
             FROM wp_eco_aplus_tasks t
-            WHERE t.deleted_at IS NULL AND t.status NOT IN ('Hold','No Charge')
+            WHERE t.deleted_at IS NULL AND t.status NOT IN ('Hold','No Charge') AND t.work_status <> 'No Charge' AND t.no_charge_at IS NULL
               AND (t.work_status = 'In QA' OR (t.work_status IN ('Work Done', 'Info Done') AND t.published_at IS NULL))
             ORDER BY t.is_urgent DESC, t.id DESC
             LIMIT 50
@@ -2060,12 +2060,12 @@ try {
 </div>
 
 <!-- ── JS Modules ── -->
-<?php $v = '2.9.6'; ?>
+<?php $v = '2.9.7'; ?>
 <script src="<?= $publicUrl ?>/js/core.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/tasks.js?v=3.4.9"></script>
 <script src="<?= $publicUrl ?>/js/admin.js?v=<?= $v ?>"></script>
-<script src="<?= $publicUrl ?>/js/invoices.js?v=2.9.7"></script>
-<script src="<?= $publicUrl ?>/js/payroll.js?v=2.7.14"></script>
+<script src="<?= $publicUrl ?>/js/invoices.js?v=2.9.8"></script>
+<script src="<?= $publicUrl ?>/js/payroll.js?v=2.7.17"></script>
 <script src="<?= $publicUrl ?>/js/seo.js?v=<?= $v ?>"></script>
 <script src="<?= $publicUrl ?>/js/pwa.js?v=<?= $v ?>"></script>
 

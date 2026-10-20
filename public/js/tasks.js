@@ -204,6 +204,10 @@ function renderSmart(data){
             var _newAI   = item.ai_worked_by_name || '';
             var _newInfo = item.info_worker_name || '';
             var _newAplus = item.aplus_worker_name || '';
+            var _newSvc  = item.active_service_code || '';
+            var _newSvcPhase = item.active_service_phase_status || '';
+            var _newInfoDone = String(item.info_completed || item.info_phase_status || '');
+            var _newAplusDone = String(item.aplus_completed || item.aplus_phase_status || '');
             var _needRebuild = existing.getAttribute('data-work-status') !== _newWS
                             || existing.getAttribute('data-approved-at')  !== _newCA
                             || existing.getAttribute('data-updated-at')   !== _newCU
@@ -211,7 +215,11 @@ function renderSmart(data){
                             || existing.getAttribute('data-family-code')  !== _newFam
                             || existing.getAttribute('data-ai-worker')    !== _newAI
                             || existing.getAttribute('data-info-worker')  !== _newInfo
-                            || existing.getAttribute('data-aplus-worker') !== _newAplus;
+                            || existing.getAttribute('data-aplus-worker') !== _newAplus
+                            || existing.getAttribute('data-active-service') !== _newSvc
+                            || existing.getAttribute('data-active-phase') !== _newSvcPhase
+                            || existing.getAttribute('data-info-done') !== _newInfoDone
+                            || existing.getAttribute('data-aplus-done') !== _newAplusDone;
             if(_needRebuild){
                 existing.setAttribute('data-work-status', _newWS);
                 existing.setAttribute('data-approved-at', _newCA);
@@ -221,6 +229,10 @@ function renderSmart(data){
                 existing.setAttribute('data-ai-worker',   _newAI);
                 existing.setAttribute('data-info-worker', _newInfo);
                 existing.setAttribute('data-aplus-worker',_newAplus);
+                existing.setAttribute('data-active-service', _newSvc);
+                existing.setAttribute('data-active-phase', _newSvcPhase);
+                existing.setAttribute('data-info-done', _newInfoDone);
+                existing.setAttribute('data-aplus-done', _newAplusDone);
                 existing.innerHTML = buildCard(item);
                 if(ROLE === 'administrator' && ALL_WORKERS.length) populateCardWorkerDropdowns();
                 updateButtons(existing, item);
@@ -299,6 +311,10 @@ function renderSmart(data){
         div.setAttribute('data-ai-worker',   item.ai_worked_by_name || '');
         div.setAttribute('data-info-worker', item.info_worker_name || '');
         div.setAttribute('data-aplus-worker',item.aplus_worker_name || '');
+        div.setAttribute('data-active-service', item.active_service_code || '');
+        div.setAttribute('data-active-phase', item.active_service_phase_status || '');
+        div.setAttribute('data-info-done', String(item.info_completed || item.info_phase_status || ''));
+        div.setAttribute('data-aplus-done', String(item.aplus_completed || item.aplus_phase_status || ''));
         div.innerHTML = buildCard(item);
         container.appendChild(div);
 
@@ -316,7 +332,10 @@ function renderSmart(data){
 
 /* ── Status label/class helper ───────────────── */
 function isAplusWorkflow(item){
-    if(!item || item.work_status === 'Info Done' || item.product_type === 'Infographics') return false;
+    if(!item || item.product_type === 'Infographics') return false;
+    if(item.active_service_code) return item.active_service_code === 'aplus';
+    if(item.aplus_phase_status && item.aplus_phase_status !== 'Done' && item.aplus_phase_status !== 'Cancelled') return true;
+    if(item.work_status === 'Info Done') return false;
     return (
         item.status === 'A Plus' ||
         item.product_type === 'A+' ||
@@ -326,14 +345,44 @@ function isAplusWorkflow(item){
     );
 }
 
+function workflowServiceCode(item){
+    if(item && item.active_service_code) return item.active_service_code;
+    if(item && item.ai_phase_status && item.ai_phase_status !== 'Done' && item.ai_phase_status !== 'Cancelled') return 'ai';
+    if(item && item.aplus_phase_status && item.aplus_phase_status !== 'Done' && item.aplus_phase_status !== 'Cancelled') return 'aplus';
+    return isAplusWorkflow(item) ? 'aplus' : 'info';
+}
+
+function workflowServiceLabel(item){
+    var code = workflowServiceCode(item);
+    return code === 'aplus' ? 'A+' : code === 'ai' ? 'AI' : 'Info';
+}
+
 function isInfoWorkflow(item){
-    return !!item && !isAplusWorkflow(item);
+    return !!item && workflowServiceCode(item) === 'info';
 }
 
 function getDisplayStatus(item){
     if(item.status === 'No Charge')                            return {cls:'NoCharge',      label:'No Charge'};
     if(item.status === 'Hold')                                 return {cls:'Hold',          label:'Hold'};
-    if(item.status === 'AI Work')                              return {cls:'AIWork',        label:'AI Work'};
+    var svc = workflowServiceCode(item);
+    var phase = item.active_service_phase_status || (svc === 'aplus' ? item.aplus_phase_status : svc === 'ai' ? item.ai_phase_status : item.info_phase_status) || '';
+    var contentState = item.active_service_content_status || (svc === 'aplus' ? item.aplus_content_status : svc === 'ai' ? item.ai_content_status : item.info_content_status) || item.status;
+    var serviceLabel = svc === 'aplus' ? 'A+ ' : svc === 'ai' ? 'AI ' : 'Info ';
+    if(svc === 'ai' && phase === 'Revision') return {cls:'Changes', label:'AI Revision'};
+    if(svc === 'ai' && phase === 'In QA') return {cls:'InQA', label:'AI In QA'};
+    if(svc === 'ai' && phase === 'Working') return {cls:'Working', label:'AI Working'};
+    if(svc === 'ai' && phase === 'Paused') return {cls:'Paused', label:'AI Paused'};
+    if(item.status === 'AI Work' && (!phase || phase === 'Pending')) return {cls:'AIWork', label:'AI Work'};
+    if(phase === 'Working') return {cls:'Working', label:serviceLabel + 'Working'};
+    if(phase === 'Paused') return {cls:'Paused', label:serviceLabel + 'Paused'};
+    if(phase === 'In QA') return {cls:'InQA', label:serviceLabel + 'In QA'};
+    if(phase === 'SEO Review') return {cls:'SEOReview', label:'SEO Review'};
+    if(phase === 'Done' && svc === 'aplus') return {cls:'WorkDone', label:'Work Done'};
+    if(phase === 'Done' && svc === 'info') return {cls:'InfoDone', label:'Info Done'};
+    if(contentState === 'All Generated') return {cls:'AllGenerated', label:serviceLabel + 'Content Generated'};
+    if(contentState === 'Generated') return {cls:'Generated', label:serviceLabel + 'Content Generated'};
+    if(contentState === 'Approved') return {cls:'Approved', label:serviceLabel + ' Content Approved'};
+    if(contentState === 'Updated') return {cls:'Updated', label:serviceLabel + ' Content Updated'};
     if(item.status === 'All Generated')                        return {cls:'AllGenerated',  label:'All Generated'};
     /* Info Done is the completed Infographics phase. It must win over a
        stale legacy status='A Plus' value until A+ is explicitly started. */
@@ -341,6 +390,7 @@ function getDisplayStatus(item){
     if(item.status === 'A Plus' && !['Working','Paused','In QA','SEO Review'].includes(item.work_status)) return {cls:'Pending', label:'A+ Banners'};
     if(item.status === 'Generate info Content' || item.status === 'Generate Info Content') return {cls:'Pending', label:'Generate Info Content'};
     if(item.status === 'AI DONE' && (!item.assigned_worker_id || item.assigned_worker_id == 0) && (!item.work_status || item.work_status === 'Pending')) return {cls:'AIDone', label:'AI DONE'};
+    if(item.work_status === 'Revision')                        return {cls:'Changes',       label:serviceLabel + 'Revision'};
     if(item.work_status === 'Changes')                         return {cls:'Changes',       label:'Changes in Design'};
     if(item.work_status === 'Changes in Content')              return {cls:'ChangesInContent',label:'Changes in Content'};
     if(item.work_status === 'Changing')                        return {cls:'Changing',      label:'Changing'};
@@ -511,7 +561,7 @@ function isMultiBoxTask(item){
     // from phase 1; treating those as legacy here hides both the saved Info
     // boxes and the new A+ banner boxes. parseTaskContent() safely maps that
     // old content into the appropriate grid fields and preserves it on save.
-    var activeAplus = item.status === 'A Plus';
+    var activeAplus = item.status === 'A Plus' || item.active_service_code === 'aplus' || (item.aplus_phase_status && item.aplus_phase_status !== 'Done');
     var aplusProduct = item.product_type === 'A+' || item.product_type === 'A Plus';
     var infoPlusAplus = item.product_type === 'Info + A Plus';
     if(activeAplus && (aplusProduct || infoPlusAplus)) return true;
@@ -839,7 +889,7 @@ function buildProductContentSection(item, canEdit, lock, isWorker, isQa, origina
         }
     }
     if(isBothProd){
-        if(item.work_status !== 'Info Done' && (item.status === 'A Plus' || item.aplus_worker_name || hasAplusContent || (item.product_type === 'Info + A Plus' && item.work_completed_worker_name) || item.status === 'All Generated')){
+        if(item.active_service_code === 'aplus' || item.status === 'A Plus' || item.aplus_phase_status || item.aplus_worker_name || hasAplusContent || item.status === 'All Generated'){
             aplusStarted = true;
         }
     }
@@ -1338,7 +1388,7 @@ function buildCard(item){
     var approvedDisabled  = lock || (item.status !== 'Generated' && item.status !== 'All Generated');
     var originalForDiff   = item.original_content || item.content || '';
     var workerCanSee = (isWorker || isQa) && (item.status === 'Approved' || item.status === 'Updated')
-                    || (isWorker && (item.work_status === 'Changes' || item.work_status === 'Changing'));
+                    || (isWorker && (item.work_status === 'Revision' || item.work_status === 'Changes' || item.work_status === 'Changing'));
                     /* eco_listing does NOT see product content — only SEO form + Publish */
     var isUrgent  = (item.is_urgent > 0) && item.work_status !== 'Work Done' && !item.published_at;
     var pVal      = isUrgent ? parseInt(item.is_urgent) : 0;
@@ -1429,6 +1479,16 @@ function buildCard(item){
     } else {
         typeBadge = '<span style="' + tbStyle + ' background:#0ea5e9; color:#fff;">A Plus</span>';
     }
+    var phaseBadges = '';
+    if(Number(item.info_completed) === 1 || item.work_status === 'Info Done' || item.info_phase_status === 'Done') {
+        phaseBadges += '<span style="' + tbStyle + ' background:#166534;color:#bbf7d0;border:1px solid #22c55e;margin-left:3px;">✓ Info Done</span>';
+    }
+    if(Number(item.aplus_completed) === 1 || item.aplus_phase_status === 'Done') {
+        phaseBadges += '<span style="' + tbStyle + ' background:#4c1d95;color:#ddd6fe;border:1px solid #8b5cf6;margin-left:3px;">✓ A+ Done</span>';
+    } else if(item.active_service_code === 'aplus' || item.status === 'A Plus') {
+        phaseBadges += '<span style="' + tbStyle + ' background:#312e81;color:#c4b5fd;border:1px solid #7c3aed;margin-left:3px;">A+ Active</span>';
+    }
+    typeBadge += phaseBadges;
 
     var linkIcon = '';
     if(item.product_link && item.product_link.trim() !== ''){
@@ -1450,7 +1510,10 @@ function buildCard(item){
     /* Worker status bar */
     var workerStatusBarClass = 'worker-pending';
     var workerStatusMsg      = '⏳ Waiting for content approval...';
-    if(item.work_status === 'Changes' || item.work_status === 'Changes in Content'){
+    if(item.work_status === 'Revision'){
+        workerStatusBarClass = 'worker-paused';
+        workerStatusMsg = '📝 QA Revision Requested — comments check karein';
+    } else if(item.work_status === 'Changes' || item.work_status === 'Changes in Content'){
         workerStatusBarClass = 'worker-paused';
         workerStatusMsg = '🎨 Revision Requested — Correction notes check karein';
     } else if(item.work_status === 'Changing'){
@@ -1462,6 +1525,14 @@ function buildCard(item){
         else if(item.work_status === 'In QA'){ workerStatusBarClass = 'worker-ready'; workerStatusMsg = '🟣 QA mein hai — Infographics mukammal ho gaya'; }
         else if(item.work_status === 'Work Done' || item.work_status === 'Info Done'){ workerStatusBarClass = 'worker-ready'; workerStatusMsg = '✅ Infographics Mukammal (Info Done) — QA ne approve kar diya'; }
         else { workerStatusBarClass = 'worker-ready'; workerStatusMsg = '🎨 Infographics Ready — Aap kaam shuru kar sakte hain'; }
+    } else if(workflowServiceCode(item) === 'aplus'){
+        var aplusPhase = item.active_service_phase_status || item.aplus_phase_status || item.work_status;
+        if(aplusPhase === 'Working'){ workerStatusBarClass = 'worker-ready'; workerStatusMsg = '🟣 A+ Banners ka kaam jari hai'; }
+        else if(aplusPhase === 'Paused'){ workerStatusBarClass = 'worker-paused'; workerStatusMsg = '⏸ A+ Paused — Resume karein'; }
+        else if(aplusPhase === 'In QA'){ workerStatusBarClass = 'worker-ready'; workerStatusMsg = '🟣 A+ In QA — QA check karega'; }
+        else if(aplusPhase === 'SEO Review'){ workerStatusBarClass = 'worker-ready'; workerStatusMsg = '🔎 SEO Review mein hai'; }
+        else if(aplusPhase === 'Done'){ workerStatusBarClass = 'worker-ready'; workerStatusMsg = '✅ A+ Banners Mukammal'; }
+        else { workerStatusBarClass = 'worker-ready'; workerStatusMsg = '🎨 A+ Banners Ready — Aap kaam shuru kar sakte hain'; }
     } else if(item.work_status === 'Info Work'){
         workerStatusBarClass = 'worker-ready';
         workerStatusMsg = '🔶 Info Work — Infographics/A+ Banner par kaam kar rahe hain';
@@ -1785,15 +1856,15 @@ ${(() => {
         logs = [{ type: item.active_revision_type || 'design', comment: item.revision_comment, at: '' }];
     }
     if(!logs.length) return '';
-    var isActive = item.work_status === 'Changes' || item.work_status === 'Changes in Content';
+    var isActive = item.work_status === 'Revision' || item.work_status === 'Changes' || item.work_status === 'Changes in Content';
     var html = `<div style="margin-bottom:10px;border:2px solid #b91c1c;border-radius:7px;overflow:hidden;">`;
     html += `<div style="background:#7f1d1d;padding:7px 14px;font-size:11px;font-weight:700;color:#fca5a5;letter-spacing:.5px;">`;
     html += isActive ? '🎨 REVISION LOG — CLIENT FEEDBACK' : '📋 REVISION HISTORY';
     html += `</div>`;
     for(var li = logs.length - 1; li >= 0; li--){
         var entry = logs[li];
-        var entryLabel = entry.type === 'content' ? '✍ Changes in Content' : '🎨 Changes in Design';
-        var entryColor = entry.type === 'content' ? '#a78bfa' : '#fb923c';
+        var entryLabel = entry.type === 'qa' ? '↩ QA Revision — ' + (entry.service || '').toUpperCase() : entry.type === 'content' ? '✍ Changes in Content' : '🎨 Changes in Design';
+        var entryColor = entry.type === 'qa' ? '#f87171' : entry.type === 'content' ? '#a78bfa' : '#fb923c';
         var entryNum = li + 1;
         var isLatest = li === logs.length - 1;
         html += `<div style="padding:10px 14px;background:${isLatest ? '#3b0712' : '#1a0505'};border-top:1px solid #7f1d1d;">`;
@@ -1825,8 +1896,13 @@ ${linksBox}
 }
 
 /* ── QA submit boxes ─────────────────────────── */
+function qaRevisionButton(id){
+    return `<button class="qa-submit-btn" style="align-self:start; padding:12px 18px; min-height:45px; background:#dc2626;" onclick="openQARevisionBox(${id})">↩ Revise + Comment</button>`;
+}
+
 function buildQABoxes(item, isAdmin, isQa){
     var html = '';
+    var isAIStage = workflowServiceCode(item) === 'ai' || item.work_status === 'AI In QA';
     var isAplusStage = isAplusWorkflow(item);
     var isInfoOnly = !isAplusStage;
     
@@ -1850,18 +1926,21 @@ function buildQABoxes(item, isAdmin, isQa){
     var mediaInputHtmlA = `<input type="url" id="admin-media-${item.id}" value="${linkVal}" placeholder="${mediaPlaceholder}">`;
     var mediaInputHtmlD = `<input type="url" id="seo-media-${item.id}" value="${linkVal}" placeholder="${mediaPlaceholder}">`;
 
+    if((isAdmin || isQa) && item.work_status === 'AI In QA'){
+        html += `<div class="qa-submit-box"><div class="qa-labels"><label>AI Work QA</label>${qaLabelHtml}</div><div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="qa-submit-btn" style="flex:1;min-width:150px;background:#16a34a;" onclick="submitQA(${item.id})">✅ AI Done</button>${qaRevisionButton(item.id)}</div></div>`;
+    }
     if(isAdmin && item.work_status === 'In QA'){
         if(isInfoOnly){
-            html += `<div class="qa-submit-box" style="grid-template-columns:110px 1fr;"><div class="qa-labels"><label>${mediaLabelText}</label>${qaLabelHtml}</div><div class="qa-fields">${mediaInputHtml}</div><div style="grid-column:1/-1;display:flex;gap:8px;"><button class="qa-submit-btn" style="flex:1;background:#16a34a;" onclick="submitQA(${item.id})">✅ Info Done</button></div></div>`;
+            html += `<div class="qa-submit-box" style="grid-template-columns:110px 1fr;"><div class="qa-labels"><label>${mediaLabelText}</label>${qaLabelHtml}</div><div class="qa-fields">${mediaInputHtml}</div><div style="grid-column:1/-1;display:flex;gap:8px;"><button class="qa-submit-btn" style="flex:1;background:#16a34a;" onclick="submitQA(${item.id})">✅ Info Done</button>${qaRevisionButton(item.id)}</div></div>`;
         } else {
-            html += `<div class="qa-submit-box" style="grid-template-columns:110px 1fr;"><div class="qa-labels"><label>Media Link</label>${qaLabelHtml}</div><div class="qa-fields">${mediaInputHtml}</div><div style="grid-column:1/-1;display:flex;gap:8px;"><button class="qa-submit-btn" style="flex:1;background:#7c3aed;" onclick="sendForSEO(${item.id})">Send for SEO</button></div></div>`;
+            html += `<div class="qa-submit-box" style="grid-template-columns:110px 1fr;"><div class="qa-labels"><label>Media Link</label>${qaLabelHtml}</div><div class="qa-fields">${mediaInputHtml}</div><div style="grid-column:1/-1;display:flex;gap:8px;"><button class="qa-submit-btn" style="flex:1;background:#7c3aed;" onclick="sendForSEO(${item.id})">Send for SEO</button>${qaRevisionButton(item.id)}</div></div>`;
         }
     }
     if(isQa && item.work_status === 'In QA'){
         if(isInfoOnly){
-            html += `<div class="qa-submit-box"><div class="qa-labels"><label>${mediaLabelText}</label>${qaLabelHtml}</div><div class="qa-fields">${mediaInputHtml}</div><button class="qa-submit-btn" style="align-self:start; padding:12px 18px; min-height:45px; background:#16a34a;" onclick="submitQA(${item.id})">✅ Info Done</button></div>`;
+            html += `<div class="qa-submit-box"><div class="qa-labels"><label>${mediaLabelText}</label>${qaLabelHtml}</div><div class="qa-fields">${mediaInputHtml}</div><button class="qa-submit-btn" style="align-self:start; padding:12px 18px; min-height:45px; background:#16a34a;" onclick="submitQA(${item.id})">✅ Info Done</button>${qaRevisionButton(item.id)}</div>`;
         } else {
-            html += `<div class="qa-submit-box"><div class="qa-labels"><label>Media Link</label>${qaLabelHtml}</div><div class="qa-fields">${mediaInputHtml}</div><button class="qa-submit-btn" style="align-self:start; padding:12px 0; min-height:45px; background:#7c3aed;" onclick="sendForSEO(${item.id})">Send for SEO</button></div>`;
+            html += `<div class="qa-submit-box"><div class="qa-labels"><label>Media Link</label>${qaLabelHtml}</div><div class="qa-fields">${mediaInputHtml}</div><button class="qa-submit-btn" style="align-self:start; padding:12px 0; min-height:45px; background:#7c3aed;" onclick="sendForSEO(${item.id})">Send for SEO</button>${qaRevisionButton(item.id)}</div>`;
         }
     }
     if(ROLE === 'seo_manager' && item.work_status === 'SEO Review'){
@@ -1941,8 +2020,19 @@ function buildActionButtons(item, isAdmin, isWorker, isQa, isListing, isUrgent, 
 
         var isDesignRev = item.active_revision_type === 'design';
         var isInfoStage = isInfoWorkflow(item);
-        if(item.status === 'A Plus'){
-            btns += `<div style="color:#c4b5fd;font-size:12px;padding:8px 0;font-style:italic;">⏳ A+ Content generate hone ka intezaar karein...</div>`;
+        var serviceCode = workflowServiceCode(item);
+        var servicePhase = item.active_service_phase_status || (serviceCode === 'aplus' ? item.aplus_phase_status : serviceCode === 'ai' ? item.ai_phase_status : item.info_phase_status) || item.work_status;
+        var serviceContent = item.active_service_content_status || (serviceCode === 'aplus' ? item.aplus_content_status : serviceCode === 'ai' ? item.ai_content_status : item.info_content_status) || item.status;
+        if(serviceCode === 'aplus'){
+            var aplusContentApproved = serviceContent === 'Approved' || serviceContent === 'Updated' || item.content_approved_at || item.content_updated_at;
+            if(!aplusContentApproved){
+                btns += `<div style="color:#c4b5fd;font-size:12px;padding:8px 0;font-style:italic;">⏳ A+ Content generate/approve hone ka intezaar karein...</div>`;
+            } else {
+                if(!['Working','Changing','Paused','Revision','In QA','SEO Review','Work Done'].includes(servicePhase)) btns += `<button class="btn1 actionbtn" onclick="updateWorkStatus(${item.id},'Working')">▶ A+ Working</button>`;
+                if(servicePhase === 'Working' || servicePhase === 'Changing') btns += `<button class="actionbtn" style="background:#b45309;color:#fff;" onclick="pauseWork(${item.id})">⏸ A+ Pause</button>`;
+                if(servicePhase === 'Paused') btns += `<button class="btn1 actionbtn" onclick="resumeWork(${item.id})">▶ A+ Resume</button>`;
+                if(['Working','Changing','Paused'].includes(servicePhase)) btns += `<button class="btn2 actionbtn" onclick="updateWorkStatus(${item.id},'In QA')">📤 A+ Send for QA</button>`;
+            }
         } else if(isInfoStage){
             var isContentApproved = item.status === 'Approved' || item.status === 'Updated' || item.content_approved_at || item.content_updated_at;
             if(!isContentApproved) {
@@ -1957,18 +2047,6 @@ function buildActionButtons(item, isAdmin, isWorker, isQa, isListing, isUrgent, 
                     btns += `<button class="btn2 actionbtn" onclick="updateWorkStatus(${item.id},'In QA')">📤 Ready for QA</button>`;
                 }
             }
-        } else if(isAplusWorkflow(item)){
-            if(item.work_status === 'Pending')         btns += `<button class="actionbtn" style="background:#c2410c;color:#fff;" onclick="updateWorkStatus(${item.id},'Info Work')">▶ Info Work</button>`;
-            if(item.work_status === 'Info Work')       btns += `<button class="btn2 actionbtn" onclick="updateWorkStatus(${item.id},'In QA')">📤 Send for QA</button>`;
-            if(item.work_status === 'Content Pending') btns += `<div style="color:#94a3b8;font-size:12px;padding:8px 0;font-style:italic;">⏳ Content generate hone ka intezaar karein...</div>`;
-            if(item.work_status !== 'Info Work' && item.work_status !== 'Content Pending' && item.work_status !== 'Pending'){
-                if(item.work_status !== 'Working' && item.work_status !== 'Changing' && item.work_status !== 'Paused' && item.work_status !== 'In QA' && item.work_status !== 'Work Done' && item.work_status !== 'Info Done'){
-                    btns += `<button class="btn1 actionbtn" onclick="updateWorkStatus(${item.id},'Working')">▶ Working</button>`;
-                }
-                if(item.work_status === 'Working')  btns += `<button class="actionbtn" style="background:#b45309;color:#fff;" onclick="pauseWork(${item.id})">⏸ Pause</button>`;
-                if(item.work_status === 'Paused')   btns += `<button class="btn1 actionbtn" onclick="resumeWork(${item.id})">▶ Resume</button>`;
-                if(item.work_status === 'Working' || item.work_status === 'Paused') btns += `<button class="btn2 actionbtn" onclick="updateWorkStatus(${item.id},'In QA')">📤 Ready for QA</button>`;
-            }
         } else {
             if(item.work_status !== 'Working' && item.work_status !== 'Changing' && item.work_status !== 'Paused' && item.work_status !== 'In QA' && item.work_status !== 'Work Done'){
                 if(isDesignRev){
@@ -1982,6 +2060,21 @@ function buildActionButtons(item, isAdmin, isWorker, isQa, isListing, isUrgent, 
             if(item.work_status === 'Working' || item.work_status === 'Changing' || item.work_status === 'Paused') {
                 btns += `<button class="btn2 actionbtn" onclick="updateWorkStatus(${item.id},'In QA')">📤 Ready for QA</button>`;
             }
+        }
+    }
+    if(ROLE === 'ai_work' && item.status === 'AI Work'){
+        var myAiId = typeof USER_ID !== 'undefined' ? parseInt(USER_ID) : 0;
+        var assignedAiId = parseInt(item.ai_worked_by || item.ai_service_worker_id || item.assigned_worker_id || 0);
+        if(!assignedAiId || assignedAiId !== myAiId) return btns;
+        var aiPhase = item.active_service_phase_status || item.ai_phase_status || item.work_status || 'Pending';
+        if(['Pending','Revision'].includes(aiPhase)) btns += `<button class="btn1 actionbtn" onclick="updateWorkStatus(${item.id},'Working')">▶ AI Working</button>`;
+        if(aiPhase === 'Working'){
+            btns += `<button class="actionbtn" style="background:#b45309;color:#fff;" onclick="pauseWork(${item.id})">⏸ AI Pause</button>`;
+            btns += `<button class="btn2 actionbtn" onclick="updateWorkStatus(${item.id},'AI In QA')">📤 AI Send for QA</button>`;
+        }
+        if(aiPhase === 'Paused'){
+            btns += `<button class="btn1 actionbtn" onclick="resumeWork(${item.id})">▶ AI Resume</button>`;
+            btns += `<button class="btn2 actionbtn" onclick="updateWorkStatus(${item.id},'AI In QA')">📤 AI Send for QA</button>`;
         }
     }
     var isClientAct = (ROLE === 'eco_client' || (typeof USERNAME !== 'undefined' && USERNAME === 'ilyaeco'));
@@ -2008,7 +2101,6 @@ function buildActionButtons(item, isAdmin, isWorker, isQa, isListing, isUrgent, 
         btns += `<button id="aplus-save-${item.id}" class="btn-writer-save actionbtn" style="background:#16a34a;color:#fff;display:none;" onclick="writerSave(${item.id})">💾 Save Draft</button>`;
     }
     if((ROLE === 'd4u_writer' || ROLE === 'seo_manager') && (item.status === 'Pending' || item.status === 'A Plus' || item.status === 'All Generated')) btns += `<button class="btn-writer-save actionbtn" onclick="writerSave(${item.id})">💾 Save Draft</button>`;
-    if(ROLE === 'ai_work' && item.status === 'AI Work') btns += `<button class="btn2 actionbtn" style="background:#16a34a;color:#fff;" onclick="updateWorkStatus(${item.id},'AI DONE')">🤖 AI Done</button>`;
     if(isListing && item.work_status === 'Work Done' && !item.published_at) {
         btns += `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;width:100%;margin-top:4px;"><input type="url" id="pub-link-${item.id}" placeholder="Amazon published link (optional)" style="flex:1;min-width:160px;padding:9px 12px;border:1px solid #334155;border-radius:5px;background:#0a1628;color:#e2e8f0;font-size:13px;outline:none;"><button class="btn2 actionbtn" style="flex-shrink:0;" onclick="publishProduct(${item.id})">📦 Publish</button></div>`;
         btns += `<div style="display:flex;gap:8px;margin-top:6px;width:100%;"><button class="actionbtn" style="background:#d97706;color:#fff;flex:1;" onclick="openRevisionBox(${item.id},'design')">🎨 Revise Design</button><button class="actionbtn" style="background:#db2777;color:#fff;flex:1;" onclick="openRevisionBox(${item.id},'content')">✍ Revise Content</button></div>`;
@@ -2024,8 +2116,18 @@ function buildAdminButtons(item, isUrgent, lock){
     var approvedDisabled = lock || (item.status !== 'Generated' && item.status !== 'All Generated');
     var isInfoStage = isInfoWorkflow(item);
     var btns = '';
+    var adminServiceCode = workflowServiceCode(item);
+    var adminPhase = item.active_service_phase_status || (adminServiceCode === 'ai' ? item.ai_phase_status : adminServiceCode === 'aplus' ? item.aplus_phase_status : item.info_phase_status) || item.work_status || 'Pending';
     if(item.status === 'AI Work'){
-        btns += `<button class="btn2 actionbtn" style="background:#16a34a;color:#fff;" onclick="updateWorkStatus(${item.id},'AI DONE')">🤖 AI Done</button>`;
+        if(['Pending','Revision'].includes(adminPhase)) btns += `<button class="btn1 actionbtn" onclick="updateWorkStatus(${item.id},'Working')">▶ AI Working</button>`;
+        if(adminPhase === 'Working'){
+            btns += `<button class="actionbtn" style="background:#2563eb;color:#fff;" onclick="pauseWork(${item.id})">⏸ AI Pause</button>`;
+            btns += `<button class="btn2 actionbtn" onclick="updateWorkStatus(${item.id},'AI In QA')">📤 AI Send for QA</button>`;
+        }
+        if(adminPhase === 'Paused'){
+            btns += `<button class="btn1 actionbtn" onclick="resumeWork(${item.id})">▶ AI Resume</button>`;
+            btns += `<button class="btn2 actionbtn" onclick="updateWorkStatus(${item.id},'AI In QA')">📤 AI Send for QA</button>`;
+        }
     }
 
     /* Admin must always be able to review generated content, including A+ content. */
@@ -2075,21 +2177,21 @@ function buildAdminButtons(item, isUrgent, lock){
     }
 
     /* Admin can perform the same worker controls when a worker is unavailable. */
-    var serviceWork = isAplusWorkflow(item) ? 'A+ ' : 'Info ';
-    var adminWorkStatus = item.work_status || 'Pending';
-    var normalizedContentStatus = String(item.status || '').toLowerCase();
-    var contentApproved = ['approved','updated'].includes(normalizedContentStatus) || item.content_approved_at || item.content_updated_at;
+    var serviceWork = adminServiceCode === 'ai' ? 'AI ' : adminServiceCode === 'aplus' ? 'A+ ' : 'Info ';
+    var adminWorkStatus = item.active_service_phase_status || (adminServiceCode === 'ai' ? item.ai_phase_status : adminServiceCode === 'aplus' ? item.aplus_phase_status : item.info_phase_status) || item.work_status || 'Pending';
+    var serviceContentStatus = item.active_service_content_status || (adminServiceCode === 'ai' ? item.ai_content_status : adminServiceCode === 'aplus' ? item.aplus_content_status : item.info_content_status) || item.status;
+    var contentApproved = ['approved','updated'].includes(String(serviceContentStatus || '').toLowerCase()) || item.content_approved_at || item.content_updated_at;
     if(contentApproved && !['In QA','SEO Review','Work Done','Info Done'].includes(adminWorkStatus)){
         if(adminWorkStatus === 'Pending' || adminWorkStatus === 'Content Pending'){
             btns += `<button class="btn1 actionbtn" onclick="updateWorkStatus(${item.id},'Working')">▶ ${serviceWork}Working</button>`;
         }
         if(adminWorkStatus === 'Working' || adminWorkStatus === 'Changing'){
             btns += `<button class="actionbtn" style="background:#2563eb;color:#fff;" onclick="pauseWork(${item.id})">⏸ ${serviceWork}Pause</button>`;
-            btns += `<button class="btn2 actionbtn" onclick="updateWorkStatus(${item.id},'In QA')">📤 Send for QA</button>`;
+            btns += `<button class="btn2 actionbtn" onclick="updateWorkStatus(${item.id},'In QA')">📤 ${serviceWork}Send for QA</button>`;
         }
         if(adminWorkStatus === 'Paused'){
             btns += `<button class="btn1 actionbtn" onclick="resumeWork(${item.id})">▶ ${serviceWork}Resume</button>`;
-            btns += `<button class="btn2 actionbtn" onclick="updateWorkStatus(${item.id},'In QA')">📤 Send for QA</button>`;
+            btns += `<button class="btn2 actionbtn" onclick="updateWorkStatus(${item.id},'In QA')">📤 ${serviceWork}Send for QA</button>`;
         }
     }
     if((typeof CAN_MODIFY_URGENT !== 'undefined' ? CAN_MODIFY_URGENT : true) && item.work_status !== 'Work Done' && !item.published_at){
@@ -2734,6 +2836,40 @@ function submitQA(id){
             if(r.success) loadTasks(); else alert(r.message || 'Submit failed'); 
         })
         .catch(e => { document.body.style.cursor = 'default'; alert('Upload Error'); });
+}
+
+function openQARevisionBox(taskId){
+    var boxId = 'qa-revision-box-' + taskId;
+    var existing = document.getElementById(boxId);
+    if(existing){ existing.remove(); return; }
+    var div = document.createElement('div');
+    div.id = boxId;
+    div.style.cssText = 'margin:10px 0;padding:12px;background:#1f0b0b;border:2px solid #dc2626;border-radius:7px;';
+    div.innerHTML = '<div style="color:#fca5a5;font-weight:bold;font-size:12px;margin-bottom:8px;">↩ QA Revision — worker ko correction comments bhejein</div>'
+      + '<textarea id="qa-revision-txt-'+taskId+'" style="width:100%;box-sizing:border-box;padding:8px;background:#0c0a0f;border:1px solid #b91c1c;border-radius:5px;color:#fff;font-size:13px;min-height:85px;resize:vertical;" placeholder="Mistake aur required correction detail mein likhein..."></textarea>'
+      + '<div style="display:flex;gap:8px;margin-top:8px;">'
+      + '<button onclick="submitQARevision('+taskId+')" style="flex:1;padding:9px;background:#dc2626;color:#fff;border:none;border-radius:5px;font-weight:bold;cursor:pointer;">Send Back to Same Worker</button>'
+      + '<button onclick="document.getElementById(\''+boxId+'\').remove()" style="padding:9px 14px;background:#374151;color:#d1d5db;border:none;border-radius:5px;cursor:pointer;">Cancel</button>'
+      + '</div>';
+    var body = document.getElementById('body-'+taskId);
+    if(body){
+        var qaBox = body.querySelector('.qa-submit-box');
+        if(qaBox) qaBox.before(div); else body.prepend(div);
+    }
+}
+
+function submitQARevision(taskId){
+    var txt = document.getElementById('qa-revision-txt-'+taskId);
+    if(!txt || !txt.value.trim()){ alert('QA revision comment likhna zaroori hai.'); return; }
+    var fd = new FormData();
+    fd.append('action','request_qa_revision');
+    fd.append('task_id',taskId);
+    fd.append('comment',txt.value.trim());
+    if(typeof CSRF_TOKEN !== 'undefined') fd.append('_csrf', CSRF_TOKEN);
+    fetch('index.php',{method:'POST',body:fd})
+      .then(function(r){ return r.json(); })
+      .then(function(r){ if(r.success) loadTasks(); else alert(r.message || 'QA revision failed'); })
+      .catch(function(err){ alert('Request failed: ' + err.message); });
 }
 
 

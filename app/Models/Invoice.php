@@ -53,9 +53,15 @@ class Invoice {
                     FROM eco_task_service_charges sc WHERE sc.task_id=t.id AND sc.service_type='info') AS info_invoice_numbers,
                    (SELECT GROUP_CONCAT(DISTINCT sc.invoice_no ORDER BY sc.id DESC SEPARATOR ', ')
                     FROM eco_task_service_charges sc WHERE sc.task_id=t.id AND sc.service_type='aplus') AS aplus_invoice_numbers,
+                   (SELECT ts.phase_status FROM eco_task_services ts WHERE ts.task_id=t.id AND ts.service_code='info' LIMIT 1) AS info_phase_status,
+                   (SELECT ts.phase_status FROM eco_task_services ts WHERE ts.task_id=t.id AND ts.service_code='aplus' LIMIT 1) AS aplus_phase_status,
+                   (SELECT ts.content_status FROM eco_task_services ts WHERE ts.task_id=t.id AND ts.service_code='info' LIMIT 1) AS info_content_status,
+                   (SELECT ts.content_status FROM eco_task_services ts WHERE ts.task_id=t.id AND ts.service_code='aplus' LIMIT 1) AS aplus_content_status,
+                   EXISTS(SELECT 1 FROM eco_task_services ts WHERE ts.task_id=t.id AND ts.service_code='info' AND ts.phase_status='Done') AS info_completed,
+                   EXISTS(SELECT 1 FROM eco_task_services ts WHERE ts.task_id=t.id AND ts.service_code='aplus' AND ts.phase_status='Done') AS aplus_completed,
                    t.published_at
             FROM wp_eco_aplus_tasks t
-            WHERE t.deleted_at IS NULL AND t.status <> 'No Charge'
+            WHERE t.deleted_at IS NULL AND t.status <> 'No Charge' AND t.work_status <> 'No Charge' AND t.no_charge_at IS NULL
             ORDER BY t.id DESC
         ")->fetchAll();
     }
@@ -85,7 +91,7 @@ class Invoice {
                 $taskStmt->execute([$tid]);
                 $task = $taskStmt->fetch(PDO::FETCH_ASSOC);
                 if(!$task) throw new RuntimeException('Product not found or deleted: #' . $tid);
-                if(($task['status'] ?? '') === 'No Charge') {
+                if(($task['status'] ?? '') === 'No Charge' || ($task['work_status'] ?? '') === 'No Charge' || !empty($task['no_charge_at'])) {
                     throw new RuntimeException('No Charge product invoice mein add nahi ho sakta: #' . $tid);
                 }
 
@@ -193,12 +199,24 @@ class Invoice {
 
     /* ── Private helper ──────────────────────────── */
     private static function canInvoiceInfo(array $task): bool {
+        if (!empty($task['id'])) {
+            try {
+                $service = TaskService::get((int)$task['id'], TaskService::INFO);
+                if ($service) return ($service['phase_status'] ?? '') === 'Done';
+            } catch (Throwable $e) {}
+        }
         $ptype = $task['product_type'] ?? '';
         return in_array($ptype, ['Infographics', 'Info + A Plus'], true)
             && in_array($task['work_status'] ?? '', ['Info Done', 'Work Done'], true);
     }
 
     private static function canInvoiceAplus(array $task): bool {
+        if (!empty($task['id'])) {
+            try {
+                $service = TaskService::get((int)$task['id'], TaskService::APLUS);
+                if ($service) return ($service['phase_status'] ?? '') === 'Done' && !empty(trim((string)($service['document_link'] ?? '')));
+            } catch (Throwable $e) {}
+        }
         $ptype = $task['product_type'] ?? '';
         return in_array($ptype, ['A+', 'A Plus', 'Info + A Plus'], true)
             && ($task['work_status'] ?? '') === 'Work Done'

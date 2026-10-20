@@ -65,11 +65,14 @@ class PayrollController {
         $advD4U           = floatval($_POST['adv_d4u']          ?? 0);
         $loanD4U          = floatval($_POST['loan_d4u']         ?? 0);
         $penaltyDeducted  = floatval($_POST['penalty_deducted'] ?? 0);
+        $rateAiWork       = isset($_POST['rate_ai_work']) ? floatval($_POST['rate_ai_work']) : null;
+        $rateInfo         = isset($_POST['rate_infographics']) ? floatval($_POST['rate_infographics']) : null;
+        $rateAplus        = isset($_POST['rate_aplus']) ? floatval($_POST['rate_aplus']) : null;
 
         if(!$workerId || !$taskIdsJ){ json_error('Invalid data'); }
 
         $taskIds = array_values(array_filter(array_map('intval', json_decode($taskIdsJ, true) ?: [])));
-        $result  = Payslip::generate($workerId, $taskIds, $label, $prevD4U, $advD4U, $loanD4U, $penaltyDeducted);
+        $result  = Payslip::generate($workerId, $taskIds, $label, $prevD4U, $advD4U, $loanD4U, $penaltyDeducted, $rateAiWork, $rateInfo, $rateAplus);
         if($result['ok']){
             json_success(['earned'=>$result['earned'],'total_paid'=>$result['total_paid'],'count'=>$result['count']]);
         } else {

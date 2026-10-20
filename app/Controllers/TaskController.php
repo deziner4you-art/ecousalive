@@ -158,7 +158,7 @@ class TaskController {
         verify_csrf();
         $user   = current_user();
         $taskId = intval($_POST['task_id'] ?? 0);
-        if($user['role'] !== 'worker' && !is_admin()) json_error('Unauthorized', 403);
+        if($user['role'] !== 'worker' && $user['role'] !== 'ai_work' && !is_admin()) json_error('Unauthorized', 403);
 
         $result = Task::pauseWork($taskId, $user);
         if($result['ok']){
@@ -173,7 +173,7 @@ class TaskController {
         verify_csrf();
         $user   = current_user();
         $taskId = intval($_POST['task_id'] ?? 0);
-        if($user['role'] !== 'worker' && !is_admin()) json_error('Unauthorized', 403);
+        if($user['role'] !== 'worker' && $user['role'] !== 'ai_work' && !is_admin()) json_error('Unauthorized', 403);
 
         $ok = Task::resumeWork($taskId, $user);
         if($ok) json_success(); else json_error('Unauthorized');
@@ -191,14 +191,15 @@ class TaskController {
 
         if(!$taskId) json_error('Task required');
 
-        $row = db()->prepare("SELECT product_type, status, work_status, content_approved_at, content_updated_at, info_subtasks, seo_doc_link, media_link FROM wp_eco_aplus_tasks WHERE id=?");
+        $row = db()->prepare("SELECT id, product_type, status, work_status, content_approved_at, content_updated_at, info_subtasks, seo_doc_link, media_link FROM wp_eco_aplus_tasks WHERE id=?");
         $row->execute([$taskId]); $row = $row->fetch();
         if(!$row) json_error('Task not found', 404);
         $isInfoStage = Task::isInfoService($row);
+        $isAIStage = Task::isAIService($row) || (($row['work_status'] ?? '') === 'AI In QA');
         $isAplusQA = !$isInfoStage && ($row['work_status'] ?? '') === 'In QA';
         $isSeoReview = ($row['work_status'] ?? '') === 'SEO Review';
 
-        if(($isInfoStage || $isAplusQA) && !$media) json_error('Media / Drive link required');
+        if(($isInfoStage || $isAplusQA) && !$isAIStage && !$media) json_error('Media / Drive link required');
         if($isSeoReview && !$seoDoc && !isset($_POST['has_seo_content'])) json_error('SEO Doc link required');
 
         $ok = Task::submitQA($taskId, $media, $seoDoc, $user);
@@ -213,7 +214,7 @@ class TaskController {
 
         $taskId = intval($_POST['task_id'] ?? 0);
         $media  = trim($_POST['media_link'] ?? '');
-        $row = db()->prepare("SELECT product_type, status, work_status, info_subtasks, content_approved_at, content_updated_at, seo_doc_link, media_link FROM wp_eco_aplus_tasks WHERE id=?");
+        $row = db()->prepare("SELECT id, product_type, status, work_status, info_subtasks, content_approved_at, content_updated_at, seo_doc_link, media_link FROM wp_eco_aplus_tasks WHERE id=?");
         $row->execute([$taskId]); $row = $row->fetch();
         if(!$row || !Task::isAplusService($row) || ($row['work_status'] ?? '') !== 'In QA') json_error('Sirf A+ QA stage product SEO ko bheja ja sakta hai');
         if(!$media && !$row['media_link']) json_error('A+ Media Link required');
@@ -694,6 +695,21 @@ class TaskController {
         } else {
             json_error($result['message'] ?? 'Error');
         }
+    }
+
+    public function requestQARevision(): void {
+        AuthMiddleware::requireAuth();
+        $u = current_user();
+        if(!in_array($u['role'], ['qa', 'administrator'], true)) json_error('Unauthorized', 403);
+        verify_csrf();
+
+        $taskId = intval($_POST['task_id'] ?? 0);
+        $comment = trim($_POST['comment'] ?? '');
+        if(!$taskId || $comment === '') json_error('QA revision comment required');
+
+        $result = Task::requestQARevision($taskId, $comment, $u);
+        if($result['ok']) json_success(['message'=>'Task original worker ko revision ke liye bhej diya gaya']);
+        else json_error($result['message'] ?? 'Revision request failed');
     }
 
     public function getWorkers(): void {

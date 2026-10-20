@@ -209,7 +209,7 @@ function getSortedFiltered(data){
         // 1. User specifically selects their filter ('No Charge' or 'Hold'), OR
         // 2. User searches in the search bar, OR
         // 3. User clicks on a Group button (handled above via ACTIVE_FAMILY_FILTER)
-        if (item.status === 'No Charge') {
+        if (item.status === 'No Charge' || item.work_status === 'No Charge' || !!item.no_charge_at) {
             if (filter !== 'No Charge' && !search) {
                 return false;
             }
@@ -220,8 +220,8 @@ function getSortedFiltered(data){
             }
         }
 
-        var currentStatus = (item.status === 'Hold' || item.status === 'No Charge')
-            ? item.status
+        var currentStatus = (item.status === 'Hold' || item.status === 'No Charge' || item.work_status === 'No Charge')
+            ? (item.status === 'No Charge' || item.work_status === 'No Charge' ? 'No Charge' : item.status)
             : (item.work_status && item.work_status !== 'Pending'
                 ? item.work_status
                 : item.status);

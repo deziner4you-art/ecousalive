@@ -306,12 +306,12 @@ function loadWorkerRates(filterMonth = null){
   <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;" onclick="event.stopPropagation()">
     ${(w.role === 'ai_work') ? `
     <span style="color:#a78bfa;font-size:10px;font-weight:700;white-space:nowrap;">AI Work:</span>
-    <input type="number" class="rate-input" id="rate-ai-${w.id}" value="${parseFloat(w.rate_ai_work || w.rate_per_product || w.rate_infographics || 0).toFixed(2)}" min="0" step="0.01" style="width:65px;padding:3px;background:#071428;border:1px solid #7c3aed66;color:#e2e8f0;border-radius:4px;outline:none;" title="AI Work rate">
+    <input type="number" class="rate-input" id="rate-ai-${w.id}" value="${parseFloat(w.rate_ai_work || w.rate_per_product || w.rate_infographics || 0).toFixed(2)}" min="0" step="0.01" style="width:65px;padding:3px;background:#071428;border:1px solid #7c3aed66;color:#e2e8f0;border-radius:4px;outline:none;" title="AI Work rate" oninput="calcPayslipTotalInline(${w.id});renderPayslipCartInline(${w.id});">
     ` : `
     <span style="color:#64748b;font-size:10px;white-space:nowrap;">Info:</span>
-    <input type="number" class="rate-input" id="rate-info-${w.id}" value="${parseFloat(w.rate_infographics||0).toFixed(2)}" min="0" step="0.01" style="width:60px;padding:3px;background:#071428;border:1px solid #1e3a5f;color:#e2e8f0;border-radius:4px;outline:none;" title="Infographics rate">
+    <input type="number" class="rate-input" id="rate-info-${w.id}" value="${parseFloat(w.rate_infographics||0).toFixed(2)}" min="0" step="0.01" style="width:60px;padding:3px;background:#071428;border:1px solid #1e3a5f;color:#e2e8f0;border-radius:4px;outline:none;" title="Infographics rate" oninput="calcPayslipTotalInline(${w.id});renderPayslipCartInline(${w.id});">
     <span style="color:#64748b;font-size:10px;white-space:nowrap;">A+:</span>
-    <input type="number" class="rate-input" id="rate-aplus-${w.id}" value="${parseFloat(w.rate_aplus||0).toFixed(2)}" min="0" step="0.01" style="width:60px;padding:3px;background:#071428;border:1px solid #1e3a5f;color:#e2e8f0;border-radius:4px;outline:none;" title="A+ Banners rate">
+    <input type="number" class="rate-input" id="rate-aplus-${w.id}" value="${parseFloat(w.rate_aplus||0).toFixed(2)}" min="0" step="0.01" style="width:60px;padding:3px;background:#071428;border:1px solid #1e3a5f;color:#e2e8f0;border-radius:4px;outline:none;" title="A+ Banners rate" oninput="calcPayslipTotalInline(${w.id});renderPayslipCartInline(${w.id});">
     `}
     <span style="color:#64748b;font-size:10px;white-space:nowrap;margin-left:4px;">Fine:</span>
     <input type="number" class="rate-input" id="fine-${w.id}" value="${parseFloat(w.fine_per_revision||0).toFixed(2)}" min="0" step="0.01" style="width:55px;padding:3px;background:#071428;border:1px solid #1e3a5f;color:#e2e8f0;border-radius:4px;outline:none;">
@@ -346,13 +346,16 @@ function loadWorkerRates(filterMonth = null){
     <button id="rate-toggle-${w.id}" style="background:none;border:1px solid #334155;border-radius:4px;color:#94a3b8;font-size:12px;cursor:pointer;padding:3px 8px;flex-shrink:0;" onclick="event.stopPropagation();toggleRateRow(${w.id})">▼</button>
   </div>
 </div>
-<div id="rate-acc-${w.id}" style="display:none;border-top:1px solid #1e3a5f;background:#071428;" data-worker-name="${wName}">
+<div id="rate-acc-${w.id}" style="display:none;border-top:1px solid #1e3a5f;background:#071428;" data-worker-name="${wName}" data-worker-role="${w.role}">
   <div style="padding:16px;color:#475569;font-size:13px;text-align:center;">⏳ Loading account history...</div>
 </div>
 </div>`;
         });
         html += '</div>';
         box.innerHTML = html;
+    }).catch(function(err){
+        console.error('Failed to load worker rates:', err);
+        box.innerHTML = '<div style="color:#f87171;font-size:13px;">Rates load karne mein error aaya: ' + (err.message || 'Server error') + '</div>';
     });
 }
 
@@ -569,6 +572,9 @@ ${total > 0 ? `<div style="background:#0a1628;border-radius:4px;height:5px;overf
 
         html += '</div>';
         acc.innerHTML = html;
+    }).catch(function(err){
+        console.error('Failed to load worker account:', err);
+        acc.innerHTML = '<div style="padding:16px;color:#f87171;">Account load karne mein error aaya: ' + (err.message || 'Server error') + '</div>';
     });
 }
 
@@ -723,7 +729,7 @@ function renderPayslipTableInline(wid){
     var all  = _psAllProducts[wid] || [];
 
     var filtered = all.filter(function(t){
-        if(t.status === 'No Charge') return false;
+        if(t.status === 'No Charge' || t.work_status === 'No Charge' || !!t.no_charge_at || !!t.no_charge_reason) return false;
         if(!fAll){
             var match = false;
             /* AI tasks keep work_status=Pending after AI Done. Treat the
@@ -785,7 +791,7 @@ function addSelectedToPayslipCartInline(wid){
     document.querySelectorAll('.ps-chk-' + wid + ':checked').forEach(function(chk){
         var id   = chk.getAttribute('data-id');
         var task = (_psAllProducts[wid] || []).find(function(t){ return String(t.id) === String(id); });
-        if(!task) return;
+        if(!task || task.status === 'No Charge' || task.work_status === 'No Charge' || task.no_charge_at) return;
         _psCart[wid][id] = {id: id, product_no: task.product_no, title: task.title, work_status: task.ai_payroll_eligible==1 ? 'AI DONE' : task.work_status, product_type: task.product_type};
         added++;
     });
@@ -808,21 +814,37 @@ function renderPayslipCartInline(wid){
     var cart = _psCart[wid] || {};
     var keys = Object.keys(cart);
     if(!keys.length){ cs.style.display='none'; cs.innerHTML=''; return; }
+
+    var acc       = document.getElementById('rate-acc-' + wid);
+    var inpAi     = document.getElementById('rate-ai-' + wid);
+    var isAi      = !!inpAi || ((acc && acc.dataset.workerRole === 'ai_work'));
+    var rateAi    = inpAi ? (parseFloat(inpAi.value) || 0) : 0;
     var rateInfo  = parseFloat((document.getElementById('rate-info-'+wid)||{}).value)||0;
     var rateAplus = parseFloat((document.getElementById('rate-aplus-'+wid)||{}).value)||0;
+
     var total=0, infoN=0, aplusN=0, bothN=0;
-    keys.forEach(function(id){
-        var it = cart[id];
-        var pt = it.product_type || '';
-        total += _getItemRate(pt, rateInfo, rateAplus);
-        if(pt==='Info + A Plus') bothN++;
-        else if(pt==='Infographics') infoN++;
-        else aplusN++;
-    });
+    if(isAi){
+        total = keys.length * rateAi;
+    } else {
+        keys.forEach(function(id){
+            var it = cart[id];
+            total += _getItemRate(it, rateInfo, rateAplus, wid);
+            var pt = (it && it.product_type) || '';
+            if(pt==='Info + A Plus') bothN++;
+            else if(pt==='Infographics') infoN++;
+            else aplusN++;
+        });
+    }
+
     var breakdown = '';
-    if(infoN  > 0) breakdown += infoN  + '×Info PKR '+(infoN*rateInfo).toFixed(0);
-    if(aplusN > 0) breakdown += (breakdown?'  |  ':'')+aplusN+'×A+ PKR '+(aplusN*rateAplus).toFixed(0);
-    if(bothN  > 0) breakdown += (breakdown?'  |  ':'')+bothN +'×Info+A+ PKR '+(bothN*(rateInfo+rateAplus)).toFixed(0);
+    if(isAi){
+        if(keys.length > 0) breakdown = keys.length + '×AI Work PKR ' + (keys.length * rateAi).toFixed(0);
+    } else {
+        if(infoN  > 0) breakdown += infoN  + '×Info PKR '+(infoN*rateInfo).toFixed(0);
+        if(aplusN > 0) breakdown += (breakdown?'  |  ':'')+aplusN+'×A+ PKR '+(aplusN*rateAplus).toFixed(0);
+        if(bothN  > 0) breakdown += (breakdown?'  |  ':'')+bothN +'×Info+A+ PKR '+(bothN*(rateInfo+rateAplus)).toFixed(0);
+    }
+
     var html = '<div style="background:#082f49;border:2px solid #38bdf8;border-radius:8px;padding:12px;">'
         + '<div style="font-size:13px;font-weight:700;color:#7dd3fc;margin-bottom:4px;">🛒 Payslip Cart (' + keys.length + ' product' + (keys.length > 1 ? 's' : '') + ') — PKR ' + total.toFixed(2) + '</div>'
         + (breakdown ? '<div style="font-size:11px;color:#94a3b8;margin-bottom:8px;">' + breakdown + '</div>' : '')
@@ -834,15 +856,24 @@ function renderPayslipCartInline(wid){
 }
 
 function _getItemRate(item, rInfo, rAplus, wid){
-    var pt = item.product_type || '';
+    if(wid){
+        var inpAi = document.getElementById('rate-ai-' + wid);
+        var acc   = document.getElementById('rate-acc-' + wid);
+        if(inpAi || (acc && acc.dataset.workerRole === 'ai_work')){
+            return inpAi ? (parseFloat(inpAi.value) || 0) : 0;
+        }
+    }
+    var pt = (typeof item === 'string' ? item : (item && item.product_type)) || '';
     if(pt === 'Info + A Plus'){
-        var isInfo = (item.info_worker_id && parseInt(item.info_worker_id) === parseInt(wid));
-        var isAplus = (item.aplus_worker_id && parseInt(item.aplus_worker_id) === parseInt(wid));
-        if(isInfo && isAplus) return rInfo + rAplus;
-        if(isInfo && !item.aplus_worker_id) return rInfo + rAplus;
-        if(isAplus && !item.info_worker_id) return rInfo + rAplus;
-        if(isInfo) return rInfo;
-        if(isAplus) return rAplus;
+        if(typeof item === 'object' && item !== null){
+            var isInfo = (item.info_worker_id && parseInt(item.info_worker_id) === parseInt(wid));
+            var isAplus = (item.aplus_worker_id && parseInt(item.aplus_worker_id) === parseInt(wid));
+            if(isInfo && isAplus) return rInfo + rAplus;
+            if(isInfo && !item.aplus_worker_id) return rInfo + rAplus;
+            if(isAplus && !item.info_worker_id) return rInfo + rAplus;
+            if(isInfo) return rInfo;
+            if(isAplus) return rAplus;
+        }
         return rInfo + rAplus;
     }
     if(pt === 'Infographics') return rInfo;
@@ -850,20 +881,36 @@ function _getItemRate(item, rInfo, rAplus, wid){
 }
 
 function calcPayslipTotalInline(wid){
+    var acc       = document.getElementById('rate-acc-' + wid);
+    var inpAi     = document.getElementById('rate-ai-' + wid);
+    var isAi      = !!inpAi || ((acc && acc.dataset.workerRole === 'ai_work'));
+    var rateAi    = inpAi ? (parseFloat(inpAi.value) || 0) : 0;
     var rateInfo  = parseFloat((document.getElementById('rate-info-'+wid)||{}).value)||0;
     var rateAplus = parseFloat((document.getElementById('rate-aplus-'+wid)||{}).value)||0;
     var cart      = _psCart[wid] || {};
     var total = 0, n = 0;
-    Object.values(cart).forEach(function(item){
-        total += _getItemRate(item, rateInfo, rateAplus, wid); n++;
-    });
-    document.querySelectorAll('.ps-chk-'+wid+':checked').forEach(function(chk){
-        var id = parseInt(chk.getAttribute('data-id'));
-        if(!(cart[id])){
-            var p = (_psAllProducts[wid]||[]).find(function(x){ return x.id==id; });
-            if(p){ total += _getItemRate(p, rateInfo, rateAplus, wid); n++; }
-        }
-    });
+
+    if(isAi){
+        var cartKeys = Object.keys(cart);
+        n += cartKeys.length;
+        document.querySelectorAll('.ps-chk-'+wid+':checked').forEach(function(chk){
+            var id = parseInt(chk.getAttribute('data-id'));
+            if(!cart[id]) n++;
+        });
+        total = n * rateAi;
+    } else {
+        Object.values(cart).forEach(function(item){
+            total += _getItemRate(item, rateInfo, rateAplus, wid); n++;
+        });
+        document.querySelectorAll('.ps-chk-'+wid+':checked').forEach(function(chk){
+            var id = parseInt(chk.getAttribute('data-id'));
+            if(!(cart[id])){
+                var p = (_psAllProducts[wid]||[]).find(function(x){ return x.id==id; });
+                if(p){ total += _getItemRate(p, rateInfo, rateAplus, wid); n++; }
+            }
+        });
+    }
+
     var el = document.getElementById('ps-total-preview-'+wid);
     if(el) el.textContent = n>0 ? n+' products — PKR '+total.toFixed(2) : '';
 }
@@ -877,48 +924,58 @@ function generatePayslipInline(wid){
     });
     if(!taskIds.length){ alert('Pehle products select karein ya cart mein add karein'); return; }
 
-    var labelEl  = document.getElementById('ps-label-'     + wid);
-    var dateFrom = (document.getElementById('ps-date-from-' + wid) || {}).value || '';
-    var dateTo   = (document.getElementById('ps-date-to-'   + wid) || {}).value || '';
-    var label    = (labelEl && labelEl.value.trim()) || (dateFrom && dateTo ? dateFrom + ' to ' + dateTo : new Date().toISOString().substring(0, 7));
+    var labelEl   = document.getElementById('ps-label-'     + wid);
+    var dateFrom  = (document.getElementById('ps-date-from-' + wid) || {}).value || '';
+    var dateTo    = (document.getElementById('ps-date-to-'   + wid) || {}).value || '';
+    var label     = (labelEl && labelEl.value.trim()) || (dateFrom && dateTo ? dateFrom + ' to ' + dateTo : new Date().toISOString().substring(0, 7));
+    var acc       = document.getElementById('rate-acc-' + wid);
+    var inpAi     = document.getElementById('rate-ai-' + wid);
+    var isAi      = !!inpAi || ((acc && acc.dataset.workerRole === 'ai_work'));
+    var rateAi    = inpAi ? (parseFloat(inpAi.value) || 0) : 0;
     var rateInfo  = parseFloat((document.getElementById('rate-info-'+wid)||{}).value)||0;
     var rateAplus = parseFloat((document.getElementById('rate-aplus-'+wid)||{}).value)||0;
 
     /* Read cycle data stored on accordion element */
-    var acc         = document.getElementById('rate-acc-' + wid);
     var prevD4u     = parseFloat((acc && acc.dataset.prevD4u)     || 0);
     var currentAdv  = parseFloat((acc && acc.dataset.currentAdv)  || 0);
     var currentLoan = parseFloat((acc && acc.dataset.currentLoan) || 0);
     var penalty     = parseFloat((acc && acc.dataset.penalty)     || 0);
 
-    /* Count per type from cart + checked items */
-    var infoCount=0, aplusCount=0, bothCount=0;
-    taskIds.forEach(function(id){
-        var item = cart[id] || ((_psAllProducts[wid]||[]).find(function(x){ return x.id==id; })||{});
-        var pt   = item.product_type || '';
-        if(pt==='Info + A Plus'){
-            var isInfo = (item.info_worker_id && parseInt(item.info_worker_id) === parseInt(wid));
-            var isAplus = (item.aplus_worker_id && parseInt(item.aplus_worker_id) === parseInt(wid));
-            if(isInfo && isAplus) bothCount++;
-            else if(isInfo && !item.aplus_worker_id) bothCount++;
-            else if(isAplus && !item.info_worker_id) bothCount++;
-            else if(isInfo) infoCount++;
-            else if(isAplus) aplusCount++;
-            else bothCount++;
-        }
-        else if(pt==='Infographics') infoCount++;
-        else aplusCount++;
-    });
-    var earned = infoCount*rateInfo + aplusCount*rateAplus + bothCount*(rateInfo+rateAplus);
+    var earned = 0;
+    var breakdownRows = '';
+
+    if(isAi){
+        earned = taskIds.length * rateAi;
+        breakdownRows = `<tr><td style="color:#a78bfa;padding:4px 0;">AI Work (${taskIds.length} × PKR ${rateAi.toFixed(0)})</td><td style="text-align:right;color:#a78bfa;">PKR ${earned.toFixed(2)}</td></tr>`;
+    } else {
+        /* Count per type from cart + checked items */
+        var infoCount=0, aplusCount=0, bothCount=0;
+        taskIds.forEach(function(id){
+            var item = cart[id] || ((_psAllProducts[wid]||[]).find(function(x){ return x.id==id; })||{});
+            var pt   = item.product_type || '';
+            if(pt==='Info + A Plus'){
+                var isInfo = (item.info_worker_id && parseInt(item.info_worker_id) === parseInt(wid));
+                var isAplus = (item.aplus_worker_id && parseInt(item.aplus_worker_id) === parseInt(wid));
+                if(isInfo && isAplus) bothCount++;
+                else if(isInfo && !item.aplus_worker_id) bothCount++;
+                else if(isAplus && !item.info_worker_id) bothCount++;
+                else if(isInfo) infoCount++;
+                else if(isAplus) aplusCount++;
+                else bothCount++;
+            }
+            else if(pt==='Infographics') infoCount++;
+            else aplusCount++;
+        });
+        earned = infoCount*rateInfo + aplusCount*rateAplus + bothCount*(rateInfo+rateAplus);
+
+        /* Build type breakdown rows (hide 0-count rows) */
+        if(infoCount  > 0) breakdownRows += `<tr><td style="color:#a78bfa;padding:4px 0;">Infographics (${infoCount} × PKR ${rateInfo.toFixed(0)})</td><td style="text-align:right;color:#a78bfa;">PKR ${(infoCount*rateInfo).toFixed(2)}</td></tr>`;
+        if(aplusCount > 0) breakdownRows += `<tr><td style="color:#60a5fa;padding:4px 0;">A+ Banners (${aplusCount} × PKR ${rateAplus.toFixed(0)})</td><td style="text-align:right;color:#60a5fa;">PKR ${(aplusCount*rateAplus).toFixed(2)}</td></tr>`;
+        if(bothCount  > 0) breakdownRows += `<tr><td style="color:#34d399;padding:4px 0;">Info+A+ (${bothCount} × PKR ${(rateInfo+rateAplus).toFixed(0)})</td><td style="text-align:right;color:#34d399;">PKR ${(bothCount*(rateInfo+rateAplus)).toFixed(2)}</td></tr>`;
+    }
 
     /* All pre-given amounts merge into totalPrevD4u → all DEDUCTED */
     var totalPrevD4u = prevD4u + currentAdv + currentLoan;
-
-    /* Build type breakdown rows (hide 0-count rows) */
-    var breakdownRows = '';
-    if(infoCount  > 0) breakdownRows += `<tr><td style="color:#a78bfa;padding:4px 0;">Infographics (${infoCount} × PKR ${rateInfo.toFixed(0)})</td><td style="text-align:right;color:#a78bfa;">PKR ${(infoCount*rateInfo).toFixed(2)}</td></tr>`;
-    if(aplusCount > 0) breakdownRows += `<tr><td style="color:#60a5fa;padding:4px 0;">A+ Banners (${aplusCount} × PKR ${rateAplus.toFixed(0)})</td><td style="text-align:right;color:#60a5fa;">PKR ${(aplusCount*rateAplus).toFixed(2)}</td></tr>`;
-    if(bothCount  > 0) breakdownRows += `<tr><td style="color:#34d399;padding:4px 0;">Info+A+ (${bothCount} × PKR ${(rateInfo+rateAplus).toFixed(0)})</td><td style="text-align:right;color:#34d399;">PKR ${(bothCount*(rateInfo+rateAplus)).toFixed(2)}</td></tr>`;
 
     /* Build confirm dialog with editable fresh ADV / LOAN fields */
     var modalDiv = document.createElement('div');
@@ -981,6 +1038,12 @@ function generatePayslipInline(wid){
         fd.append('adv_d4u',          freshAdv);
         fd.append('loan_d4u',         freshLoan);
         fd.append('penalty_deducted', penalty);
+        if(isAi){
+            fd.append('rate_ai_work', rateAi);
+        } else {
+            fd.append('rate_infographics', rateInfo);
+            fd.append('rate_aplus', rateAplus);
+        }
 
         fetch('index.php', {method: 'POST', body: fd})
             .then(function(r){ return r.json(); })
